@@ -1,66 +1,30 @@
 using System;
-using System.Drawing.Design;
 using System.Linq;
 using UnityEngine;
 using Warudo.Core.Attributes;
 using Warudo.Core.Scenes;
 using Warudo.Plugins.Core.Assets;
 using Warudo.Plugins.Core.Assets.Character;
-using Warudo.Plugins.Core.Assets.Prop;
 using Warudo.Plugins.Core.Assets.Utility;
 
-namespace FlameStream {
+namespace FlameStream
+{
     public partial class GamepadReceiverAsset : ReceiverAsset {
 
-        [Section("Basic Prop Setup")]
-
-        [Markdown]
-        [HiddenIf(nameof(IsSetupComplete))]
-        public String BasicPropSetupInstructions = @"### Instructions
-
-Make target controller hold controller in wanted neutral position, then set up anchors.";
-
         [DataInput]
-        [DisabledIf(nameof(IsSetupComplete))]
-        public CharacterAsset Character;
-
-        [DataInput]
-        [DisabledIf(nameof(IsSetupComplete))]
-        [Label("Game Controller")]
-        public PropAsset Gamepad;
-
+        [Hidden]
+        Guid RootAnchorAssetId;
         [DataInput]
         [Hidden]
         Guid GamepadAnchorAssetId;
         [DataInput]
         [Hidden]
-        Guid GamepadLeftHandAnchorAssetId;
+        Guid LeftHandAnchorAssetId;
         [DataInput]
         [Hidden]
-        Guid GamepadRightHandAnchorAssetId;
-
-        public AnchorAsset GamepadAnchor {
-            get {
-                if (GamepadAnchorAssetId == Guid.Empty) return null;
-                return Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == GamepadAnchorAssetId);
-            }
-        }
-
-        public AnchorAsset GamepadLeftHandAnchor {
-            get {
-                if (GamepadLeftHandAnchorAssetId == Guid.Empty) return null;
-                return Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == GamepadLeftHandAnchorAssetId);
-            }
-        }
-
-        public AnchorAsset GamepadRightHandAnchor {
-            get {
-                if (GamepadRightHandAnchorAssetId == Guid.Empty) return null;
-                return Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == GamepadRightHandAnchorAssetId);
-            }
-        }
-
+        Guid RightHandAnchorAssetId;
         [DataInput]
+
         [Hidden]
         public Vector3 GamepadPosition;
         [DataInput]
@@ -68,10 +32,10 @@ Make target controller hold controller in wanted neutral position, then set up a
         public Vector3 GamepadRotation;
         [DataInput]
         [Hidden]
-        public Vector3 GamepadAnchorPosition;
+        public Vector3 RootAnchorPosition;
         [DataInput]
         [Hidden]
-        public Vector3 GamepadAnchorRotation;
+        public Vector3 RootAnchorRotation;
         [DataInput]
         [Hidden]
         public Vector3 GamepadLeftHandPosition;
@@ -97,86 +61,161 @@ Make target controller hold controller in wanted neutral position, then set up a
         [Hidden]
         public Vector3 RightHandAnchorRotation;
 
+        public enum GamepadHandSide {
+            LeftHand,
+            RightHand
+        }
 
-        bool IsSetupIncomplete() {
+        public AnchorAsset RootAnchor {
+            get {
+                if (RootAnchorAssetId == Guid.Empty) return null;
+                return Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == RootAnchorAssetId);
+            }
+        }
+
+        public AnchorAsset GamepadAnchor {
+            get {
+                if (GamepadAnchorAssetId == Guid.Empty) return null;
+                return Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == GamepadAnchorAssetId);
+            }
+        }
+
+        public AnchorAsset LeftHandAnchor {
+            get {
+                if (LeftHandAnchorAssetId == Guid.Empty) return null;
+                return Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == LeftHandAnchorAssetId);
+            }
+        }
+
+        public AnchorAsset RightHandAnchor {
+            get {
+                if (RightHandAnchorAssetId == Guid.Empty) return null;
+                return Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == RightHandAnchorAssetId);
+            }
+        }
+
+        bool IsBasicSetupNotDone() {
             return GamepadAnchor == null;
         }
-        bool IsSetupComplete() {
-            return !IsSetupIncomplete();
+        bool IsBasicSetupDone() {
+            return !IsBasicSetupNotDone();
         }
-
-        bool IsMissingInput() {
+        bool IsBasicSetupInputMissing() {
             return Gamepad == null || Character == null;
         }
 
-        [Trigger]
-        [DisabledIf(nameof(IsMissingInput))]
-        [HiddenIf(nameof(IsSetupComplete))]
-        public void SetupGamepadAnchors() {
+        void SetupGamepadAnchors() {
+
+            AnchorAsset rootAnchor = Scene.AddAsset<AnchorAsset>();
+            rootAnchor.Name = "⚓-🔥🎮 Mover";
+            Scene.UpdateNewAssetName(rootAnchor);
+            RootAnchorAssetId = rootAnchor.Id;
 
             AnchorAsset gamepadAnchor = Scene.AddAsset<AnchorAsset>();
-            gamepadAnchor.Name = "⚓-🔥🎮";
+            gamepadAnchor.Name = "⚓-🔥🎮🎯";
             Scene.UpdateNewAssetName(gamepadAnchor);
             GamepadAnchorAssetId = gamepadAnchor.Id;
 
-            var anchorTransform = gamepadAnchor.Transform;
+            var rootAnchorTransform = rootAnchor.Transform;
+            var gamepadAnchorTransform = gamepadAnchor.Transform;
             var gamepadTransform = Gamepad.Transform;
-            anchorTransform.Position = gamepadTransform.Position;
 
-            SetParent(Gamepad, gamepadAnchor);
-            SetParent(gamepadAnchor, Character);
+            // Set anchor position to where the controller is
+            rootAnchorTransform.Position = gamepadTransform.Position;
+            rootAnchor.GameObject.transform.position = Gamepad.GameObject.transform.position;
+            gamepadAnchorTransform.Position = gamepadTransform.Position;
+            gamepadAnchor.GameObject.transform.position = Gamepad.GameObject.transform.position;
 
+            Helper.SetParent(Gamepad, gamepadAnchor);
+            Helper.SetParent(gamepadAnchor, rootAnchor);
+            Helper.SetParent(rootAnchor, Character);
+
+            // Record coordinates to reset later
             GamepadPosition = Gamepad.Transform.Position;
             GamepadRotation = Gamepad.Transform.Rotation;
-
-            GamepadAnchorPosition = gamepadAnchor.Transform.Position;
-            GamepadAnchorRotation = gamepadAnchor.Transform.Rotation;
+            RootAnchorPosition = rootAnchor.Transform.Position;
+            RootAnchorRotation = rootAnchor.Transform.Rotation;
 
             var leftAnchor = SetupIKTargetHandAnchor(
                 "⚓-🔥🎮🫲",
                 HumanBodyBones.LeftHand,
                 Character.LeftHandIK,
                 gamepadAnchor,
-                ref GamepadLeftHandAnchorAssetId,
+                ref LeftHandAnchorAssetId,
                 ref LeftHandAnchorPosition,
                 ref LeftHandAnchorRotation
             );
+
             var rightAnchor = SetupIKTargetHandAnchor(
                 "⚓-🔥🎮🫱",
                 HumanBodyBones.RightHand,
                 Character.RightHandIK,
                 gamepadAnchor,
-                ref GamepadRightHandAnchorAssetId,
+                ref RightHandAnchorAssetId,
                 ref RightHandAnchorPosition,
                 ref RightHandAnchorRotation
             );
 
             Gamepad.Transform.Position = GamepadPosition;
             Gamepad.Transform.Rotation = GamepadRotation;
-            SetParent(Gamepad, leftAnchor);
+            Helper.SetParent(Gamepad, leftAnchor);
             GamepadLeftHandPosition = Gamepad.Transform.Position;
             GamepadLeftHandRotation = Gamepad.Transform.Rotation;
 
             Gamepad.Transform.Position = GamepadPosition;
             Gamepad.Transform.Rotation = GamepadRotation;
-            SetParent(Gamepad, rightAnchor);
+            Helper.SetParent(Gamepad, rightAnchor);
             GamepadRightHandPosition = Gamepad.Transform.Position;
             GamepadRightHandRotation = Gamepad.Transform.Rotation;
 
             AttachGamepad(DefaultControllerAnchorSide);
 
+            rootAnchor.Broadcast();
             gamepadAnchor.Broadcast();
             leftAnchor.Broadcast();
             rightAnchor.Broadcast();
             Gamepad.Broadcast();
         }
 
-        public void AttachGamepad(GamepadAnchorSide side = GamepadAnchorSide.LeftHand) {
+        AnchorAsset SetupIKTargetHandAnchor(
+            string name,
+            HumanBodyBones targetBone,
+            CharacterAsset.LimbIKData limb,
+            AnchorAsset parent,
+            ref Guid anchorAssetId,
+            ref Vector3 handPosition,
+            ref Vector3 handRotation
+        ) {
+            AnchorAsset anchor = Scene.AddAsset<AnchorAsset>();
+            anchor.Name = name;
+            Scene.UpdateNewAssetName(anchor);
+            anchor.Transform.CopyFromWorldTransform(Character.Animator.GetBoneTransform(targetBone));
+            anchor.Transform.ApplyAsWorldTransform(anchor.GameObject.transform);
+
+            anchorAssetId = anchor.Id;
+
+            limb.Enabled = true;
+            limb.IkTarget = anchor;
+            limb.PositionWeight = 1.0f;
+            limb.RotationWeight = 1.0f;
+
+            Helper.SetParent(anchor, parent);
+
+            handPosition = anchor.Transform.Position;
+            handRotation = anchor.Transform.Rotation;
+
+            anchor.Broadcast();
+            limb.Broadcast();
+
+            return anchor;
+        }
+
+        void AttachGamepad(GamepadHandSide side = GamepadHandSide.LeftHand) {
 
             var position = GamepadLeftHandPosition;
             var rotation = GamepadLeftHandRotation;
             HumanBodyBones bone = HumanBodyBones.LeftHand;
-            if (side == GamepadAnchorSide.RightHand) {
+            if (side == GamepadHandSide.RightHand) {
                 position = GamepadRightHandPosition;
                 rotation = GamepadRightHandRotation;
                 bone = HumanBodyBones.RightHand;
@@ -191,130 +230,33 @@ Make target controller hold controller in wanted neutral position, then set up a
             Gamepad.Attachable.AttachToBone = bone;
         }
 
-        [Trigger]
-        [Label("🔁 Reset All Anchors")]
-        [HiddenIf(nameof(IsSetupIncomplete))]
-        public void ResetAllAnchors() {
+        void ResetAllAnchors() {
             Gamepad.Transform.Position = GamepadRightHandPosition;
             Gamepad.Transform.Rotation = GamepadRightHandRotation;
             AttachGamepad(DefaultControllerAnchorSide);
 
-            GamepadAnchor.Transform.Position = GamepadAnchorPosition;
-            GamepadAnchor.Transform.Rotation = GamepadAnchorRotation;
-            GamepadLeftHandAnchor.Transform.Position = LeftHandAnchorPosition;
-            GamepadLeftHandAnchor.Transform.Rotation = LeftHandAnchorRotation;
-            GamepadRightHandAnchor.Transform.Position = RightHandAnchorPosition;
-            GamepadRightHandAnchor.Transform.Rotation = RightHandAnchorRotation;
+            RootAnchor.Transform.Position = RootAnchorPosition;
+            RootAnchor.Transform.Rotation = RootAnchorRotation;
+            GamepadAnchor.Transform.Position = Vector3.zero;
+            GamepadAnchor.Transform.Rotation = Vector3.zero;
+            LeftHandAnchor.Transform.Position = LeftHandAnchorPosition;
+            LeftHandAnchor.Transform.Rotation = LeftHandAnchorRotation;
+            RightHandAnchor.Transform.Position = RightHandAnchorPosition;
+            RightHandAnchor.Transform.Rotation = RightHandAnchorRotation;
 
             Gamepad.Broadcast();
+            RootAnchor.Broadcast();
             GamepadAnchor.Broadcast();
-            GamepadLeftHandAnchor.Broadcast();
-            GamepadRightHandAnchor.Broadcast();
+            LeftHandAnchor.Broadcast();
+            RightHandAnchor.Broadcast();
         }
 
-        [Trigger]
-        [HiddenIf(nameof(IsSetupIncomplete))]
-        [Label("💣 Clear All Anchors")]
-        public void ClearAllAnchors() {
-            UnsetParent(Gamepad);
+        void ClearAllAnchors() {
+            Helper.UnsetParent(Gamepad);
+            CleanDestroy(RootAnchor);
             CleanDestroy(GamepadAnchor);
-            CleanDestroy(GamepadLeftHandAnchor);
-            CleanDestroy(GamepadRightHandAnchor);
-        }
-
-        AnchorAsset SetupIKTargetHandAnchor(
-            string name,
-            HumanBodyBones targetBone,
-            CharacterAsset.LimbIKData limb,
-            AnchorAsset parent,
-            ref Guid anchorAssetId,
-            ref Vector3 handPosition,
-            ref Vector3 handRotation
-        ) {
-			AnchorAsset anchor = Scene.AddAsset<AnchorAsset>();
-			anchor.Name = name;
-			Scene.UpdateNewAssetName(anchor);
-			anchor.Transform.CopyFromWorldTransform(Character.Animator.GetBoneTransform(targetBone));
-			anchor.Transform.ApplyAsWorldTransform(anchor.GameObject.transform);
-
-            anchorAssetId = anchor.Id;
-
-            limb.Enabled = true;
-            limb.IkTarget = anchor;
-            limb.PositionWeight = 1.0f;
-            limb.RotationWeight = 1.0f;
-
-            SetParent(anchor, parent);
-
-            handPosition = anchor.Transform.Position;
-            handRotation = anchor.Transform.Rotation;
-
-			anchor.Broadcast();
-            limb.Broadcast();
-
-            return anchor;
-		}
-
-        void SetParent(AnchorAsset child, AnchorAsset parent) {
-            _SetParent(child, parent);
-            child.Attachable.Parent = parent;
-        }
-
-        void SetParent(PropAsset child, AnchorAsset parent) {
-            _SetParent(child, parent);
-            child.Attachable.Parent = parent;
-        }
-
-        void SetParent(AnchorAsset child, CharacterAsset parent) {
-            _SetParent(child, parent);
-            child.Attachable.Parent = parent;
-            child.Attachable.AttachType = Warudo.Plugins.Core.Assets.Mixins.AttachType.TransformPath;
-            child.Attachable.AttachToTransform = null;
-        }
-
-        /// <summary>
-        /// Parent assets and preserve world transforms.
-        /// Kinda hack-ish, since modifying GOA transforms directly seems to be undone immediately
-        /// NOTE: This doesn't create the parent on GOA. Use #SetParent instead when possible.
-        /// </summary>
-        /// <param name="child">Child GOA</param>
-        /// <param name="parent">Parent GOA</param>
-        void _SetParent(GameObjectAsset child, GameObjectAsset parent) {
-            var ch = new GameObject();
-            ch.transform.SetParent(child.GameObject.transform.parent);
-            ch.transform.localPosition = child.Transform.Position;
-            ch.transform.localRotation = Quaternion.Euler(child.Transform.Rotation);
-            ch.transform.localScale = child.Transform.Scale;
-
-            var pa = new GameObject();
-            pa.transform.SetParent(parent.GameObject.transform.parent);
-            pa.transform.localPosition = parent.Transform.Position;
-            pa.transform.localRotation = Quaternion.Euler(parent.Transform.Rotation);
-            pa.transform.localScale = parent.Transform.Scale;
-
-            // Take advantage of unity recursion multiplication
-            ch.transform.SetParent(pa.transform, true);
-
-            child.Transform.Position = ch.transform.localPosition;
-            child.Transform.Rotation = ch.transform.localRotation.eulerAngles;
-            child.Transform.Scale = ch.transform.localScale;
-
-            UnityEngine.Object.Destroy(ch);
-            UnityEngine.Object.Destroy(pa);
-        }
-
-        void UnsetParent(PropAsset child) {
-            _UnsetParent(child);
-            child.Attachable.Parent = null;
-        }
-
-        void _UnsetParent(GameObjectAsset child) {
-
-            var transform = child.Transform;
-            var unityTransform = child.GameObject.transform;
-            transform.Position = unityTransform.position;
-            transform.Rotation = unityTransform.rotation.eulerAngles;
-            transform.Scale = unityTransform.lossyScale;
+            CleanDestroy(LeftHandAnchor);
+            CleanDestroy(RightHandAnchor);
         }
 
         void CleanDestroy(GameObjectAsset g) {

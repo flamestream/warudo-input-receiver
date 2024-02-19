@@ -165,27 +165,27 @@ namespace FlameStream {
 
             if (Receiver == null) return;
 
-            // Left Face
-            if (LeftStickActive()) {
-                _LeftFaceHoverInputId = "LeftStick";
-            } else if (ControlPad() != 5) {
-                _LeftFaceHoverInputId = $"D{ControlPad()}";
-            } else {
-                var buttonId = Array.Find(LEFT_BUTTON_IDS, b => Receiver.JustDownButtonFlag((int)b - 1));
-                if (buttonId != BUTTON_ID.None) {
-                    _LeftFaceHoverInputId = buttonId.ToString();
-                }
-            }
+            // // Left Face
+            // if (LeftStickActive()) {
+            //     _LeftFaceHoverInputId = "LeftStick";
+            // } else if (ControlPad() != 5) {
+            //     _LeftFaceHoverInputId = $"D{ControlPad()}";
+            // } else {
+            //     var buttonId = Array.Find(LEFT_BUTTON_IDS, b => Receiver.JustDownButtonFlag((int)b - 1));
+            //     if (buttonId != BUTTON_ID.None) {
+            //         _LeftFaceHoverInputId = buttonId.ToString();
+            //     }
+            // }
 
-            // Right Face
-            if (RightStickActive()) {
-                _RightFaceHoverInputId = "RightStick";
-            } else {
-                var buttonId = Array.Find(RIGHT_BUTTON_IDS, b => Receiver.JustDownButtonFlag((int)b - 1));
-                if (buttonId != BUTTON_ID.None) {
-                    _RightFaceHoverInputId = buttonId.ToString();
-                }
-            }
+            // // Right Face
+            // if (RightStickActive()) {
+            //     _RightFaceHoverInputId = "RightStick";
+            // } else {
+            //     var buttonId = Array.Find(RIGHT_BUTTON_IDS, b => Receiver.JustDownButtonFlag((int)b - 1));
+            //     if (buttonId != BUTTON_ID.None) {
+            //         _RightFaceHoverInputId = buttonId.ToString();
+            //     }
+            // }
         }
     }
 }

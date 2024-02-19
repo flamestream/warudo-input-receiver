@@ -6,6 +6,7 @@ using Warudo.Plugins.Core.Assets.Utility;
 
 namespace FlameStream {
     public class Helper {
+
         public static void SetParent(AnchorAsset child, AnchorAsset parent) {
             _SetParent(child, parent);
             child.Attachable.Parent = parent;
@@ -23,11 +24,6 @@ namespace FlameStream {
             child.Attachable.AttachToTransform = null;
         }
 
-        public static void SetParent(AnchorAsset child, Transform parent) {
-            _SetParent(child, parent);
-        }
-
-
         /// <summary>
         /// Parent assets and preserve world transforms.
         /// Kinda hack-ish, since modifying GOA transforms directly seems to be undone immediately
@@ -36,56 +32,41 @@ namespace FlameStream {
         /// <param name="child">Child GOA</param>
         /// <param name="parent">Parent GOA</param>
         public static void _SetParent(GameObjectAsset child, GameObjectAsset parent) {
+
+            var childUnityTransform = child.GameObject.transform;
+            var parentUnityTransform = parent.GameObject.transform;
+            var childWorldPosition = childUnityTransform.position;
+            var childWorldRotation = childUnityTransform.rotation;
+            var parentWorldPosition = parentUnityTransform.position;
+            var parentWorldRotation = parentUnityTransform.rotation;
+
             var ch = new GameObject();
-            ch.transform.SetParent(child.GameObject.transform.parent);
-            ch.transform.localPosition = child.Transform.Position;
-            ch.transform.localRotation = Quaternion.Euler(child.Transform.Rotation);
+            ch.transform.SetPositionAndRotation(childWorldPosition, childWorldRotation);
             ch.transform.localScale = child.Transform.Scale;
 
             var pa = new GameObject();
-            pa.transform.SetParent(parent.GameObject.transform.parent);
-            pa.transform.localPosition = parent.Transform.Position;
-            pa.transform.localRotation = Quaternion.Euler(parent.Transform.Rotation);
+            pa.transform.SetPositionAndRotation(parentWorldPosition, parentWorldRotation);
             pa.transform.localScale = parent.Transform.Scale;
 
             // Take advantage of unity recursion multiplication
+            // FIXME: Apparently unity transforms have no parent, but is controlled by Attachable post calculation
+            // So this is just a single inverse matrix calculation
             ch.transform.SetParent(pa.transform, true);
 
-            child.Transform.Position = ch.transform.localPosition;
-            child.Transform.Rotation = ch.transform.localRotation.eulerAngles;
+            var finalLocalPosition = ch.transform.localPosition;
+            var finalLocalRotation = ch.transform.localRotation;
+            var finalWorldPosition = ch.transform.position;
+            var finalWorldRotation = ch.transform.rotation;
+            child.Transform.Position = finalLocalPosition;
+            child.Transform.Rotation = finalLocalRotation.eulerAngles;
             child.Transform.Scale = ch.transform.localScale;
+            child.GameObject.transform.SetPositionAndRotation(finalWorldPosition, finalWorldRotation);
+            child.GameObject.transform.localScale = ch.transform.localScale;
 
             Object.Destroy(ch);
             Object.Destroy(pa);
         }
 
-        public static void _SetParent(GameObjectAsset child, Transform parent) {
-            var ch = new GameObject();
-            ch.transform.SetParent(child.GameObject.transform.parent);
-            ch.transform.localPosition = child.Transform.Position;
-            ch.transform.localRotation = Quaternion.Euler(child.Transform.Rotation);
-            ch.transform.localScale = child.Transform.Scale;
-
-            var pa = new GameObject();
-            pa.transform.SetParent(parent.parent);
-            ch.transform.localPosition = parent.localPosition;
-            ch.transform.localRotation = parent.localRotation;
-            ch.transform.localScale = parent.localScale;
-
-            // Take advantage of unity recursion multiplication
-            ch.transform.SetParent(pa.transform, true);
-            child.Transform.Position = ch.transform.localPosition;
-            child.Transform.Rotation = ch.transform.localRotation.eulerAngles;
-            child.Transform.Scale = ch.transform.localScale;
-
-            Object.Destroy(ch);
-            Object.Destroy(pa);
-        }
-
-        public static void UnsetParent(AnchorAsset child) {
-            _UnsetParent(child);
-            child.Attachable.Parent = null;
-        }
         public static void UnsetParent(PropAsset child) {
             _UnsetParent(child);
             child.Attachable.Parent = null;

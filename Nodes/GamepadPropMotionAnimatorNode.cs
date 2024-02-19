@@ -62,7 +62,7 @@ namespace FlameStream {
             rotationTween = DOTween.To(
                 () => anchor.Transform.Rotation,
                 delegate(Vector3 it) { anchor.Transform.Rotation = (it); },
-                Receiver.GamepadAnchorRotation + tilt,
+                Receiver.RootAnchorRotation + tilt,
                 0.1f
             ).SetEase(Ease.Linear);
 
@@ -74,7 +74,7 @@ namespace FlameStream {
             rotationTween = DOTween.To(
                 () => anchor.Transform.Rotation,
                 delegate(Vector3 it) { anchor.Transform.Rotation = (it); },
-                Receiver.GamepadAnchorRotation + tilt,
+                Receiver.RootAnchorRotation + tilt,
                 0.1f
             ).SetEase(Ease.Linear);
 

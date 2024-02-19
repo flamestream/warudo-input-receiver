@@ -1,51 +1,14 @@
 using System;
-using System.Linq;
 using DG.Tweening;
 using UnityEngine;
-using Warudo.Core.Attributes;
 
 namespace FlameStream {
     public partial class GamepadReceiverAsset : ReceiverAsset {
 
-        [Section("Shaking Motion")]
+        Tween gamepadRotationTween;
+        Tween gamepadPositionTween;
 
-        [Markdown]
-        [HiddenIf(nameof(CanConfigureShaking))]
-        public string ShakingMotionInstructions = "Allows game controller to shake in response to input.";
-
-        [DataInput]
-        [Label("Enable")]
-        [DisabledIf(nameof(IsSetupIncomplete))]
-        public bool IsShakingEnabled;
-
-        public bool CanConfigureShaking() {
-            return IsShakingEnabled;
-        }
-
-        public bool CannotConfigureShaking() {
-            return !IsShakingEnabled;
-        }
-
-        public enum ControllerType {
-            SwitchProController,
-            PS5Controller,
-        }
-
-        [DataInput]
-        [HiddenIf(nameof(CannotConfigureShaking))]
-        [FloatSlider(0.1f, 10f, 0.01f)]
-        float TiltInfluenceFactor = 1.0f;
-        [DataInput]
-        [HiddenIf(nameof(CannotConfigureShaking))]
-        [FloatSlider(0.1f, 10f, 0.01f)]
-        float DisplacementInfluenceFactor = 1.0f;
-
-        Tween rotationTween;
-        Tween positionTween;
-
-        bool LastAnyFaceButton;
-
-        void PerformPropMovement() {
+        void PerformShakingMotionLoop() {
             if (!IsShakingEnabled) {
                 return;
             }
@@ -106,19 +69,19 @@ namespace FlameStream {
             var tilt = new Vector3(-influenceY, 0, -influenceX);
 
 
-            positionTween?.Kill();
-            positionTween = DOTween.To(
+            gamepadPositionTween?.Kill();
+            gamepadPositionTween = DOTween.To(
                 () => anchor.Transform.Position,
                 delegate(Vector3 it) { anchor.Transform.Position = it; },
-                GamepadAnchorPosition + displacement * 0.001f * DisplacementInfluenceFactor,
+                RootAnchorPosition + displacement * 0.001f * DisplacementInfluenceFactor,
                 0.1f
             ).SetEase(Ease.OutBack);
 
-            rotationTween?.Kill();
-            rotationTween = DOTween.To(
+            gamepadRotationTween?.Kill();
+            gamepadRotationTween = DOTween.To(
                 () => anchor.Transform.Rotation,
                 delegate(Vector3 it) { anchor.Transform.Rotation = it; },
-                GamepadAnchorRotation + tilt * TiltInfluenceFactor,
+                RootAnchorRotation + tilt * TiltInfluenceFactor,
                 0.1f
             ).SetEase(Ease.Linear);
         }
@@ -202,55 +165,5 @@ namespace FlameStream {
                 return false;
             }
         }
-
-        // NOTE: Buttons indices are offset by one to allow dummy default at 0./
-        public enum SwitchProButton: int
-        {
-            None = 0,
-            B = 1,
-            A = 2,
-            Y = 3,
-            X = 4,
-            L = 5,
-            R = 6,
-            ZL = 7,
-            ZR = 8,
-            Plus = 9,
-            Minus = 10,
-            LeftStick = 11,
-            RightStick = 12,
-            Home = 13,
-            Capture = 14,
-        };
-
-        public static readonly SwitchProButton[] LeftFaceButtonIdsSwitch = {
-            SwitchProButton.LeftStick,
-            SwitchProButton.Plus,
-            SwitchProButton.Capture,
-        };
-
-        public static readonly SwitchProButton[] RightFaceButtonIdsSwitch = {
-            SwitchProButton.A,
-            SwitchProButton.B,
-            SwitchProButton.X,
-            SwitchProButton.Y,
-            SwitchProButton.RightStick,
-            SwitchProButton.Minus,
-            SwitchProButton.Home,
-        };
-
-        public static readonly SwitchProButton[] FaceButtonIdsSwitch = LeftFaceButtonIdsSwitch.Union(RightFaceButtonIdsSwitch).ToArray();
-
-        public static readonly SwitchProButton[] LeftShoulderButtonIdsSwitch = {
-            SwitchProButton.L,
-            SwitchProButton.ZL,
-        };
-
-        public static readonly SwitchProButton[] RightShoulderButtonIdsSwitch = {
-            SwitchProButton.R,
-            SwitchProButton.ZR,
-        };
-
-        public static readonly SwitchProButton[] ShoulderButtonIdsSwitch = LeftShoulderButtonIdsSwitch.Union(RightShoulderButtonIdsSwitch).ToArray();
     }
 }
