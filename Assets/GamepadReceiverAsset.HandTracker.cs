@@ -1,5 +1,10 @@
 using DG.Tweening;
 using UnityEngine;
+using Warudo.Core;
+using Warudo.Core.Attributes;
+using Warudo.Core.Graphs;
+using Warudo.Plugins.Core.Nodes;
+using Warudo.Plugins.Core.Nodes.Event;
 
 namespace FlameStream
 {
@@ -19,6 +24,36 @@ namespace FlameStream
         bool LastIsLeftHandTracked;
         bool LastIsRightHandTracked;
 
+//         void DoGenerateBlueprint() {
+
+//             Graph graph = new Graph
+//             {
+//                 Name = "🔥🎮 Hand Tracker",
+//                 Enabled = true
+//             };
+
+//             CommentNode commentNode = graph.AddNode<CommentNode>();
+//             commentNode.SetDataInput("Text", $@"### Instructions
+
+// 1. Place node corresponding to your hand tracker and feed it with the hand tracking flags.
+// 2. Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** node before the **Override Character Bone Rotations** node's **Bone Rotation Weights** input. Feed it the hand tracking flags.
+// ");
+
+//             OnUpdateNode onUpdateNode = graph.AddNode<OnUpdateNode>();
+
+//             GamepadHandSwitcherNode gamepadHandTrackerNode = graph.AddNode<GamepadHandSwitcherNode>();
+//             gamepadHandTrackerNode.Receiver = this;
+
+//             graph.AddFlowConnection(onUpdateNode, "Exit", gamepadHandTrackerNode, "Enter");
+
+//             base.Scene.AddGraph(graph);
+//             HandTrackingGraphId = graph.Id.ToString();
+//             Context.Service.PromptMessage("SUCCESS", $"Blueprint {graph.Name} has been succesfully generated.");
+//             Context.Service.BroadcastOpenedScene();
+//             Context.Service.NavigateToGraph(graph.Id, commentNode.Id);
+//         }
+
+        // Called by node, since I don't really know how to associate tracker asset (like LeapMotion)
         public short ProcessHandTracking(bool IsLeftHandTracked, bool IsRightHandTracked) {
 
             if (priorityTrackedHand == 0) {

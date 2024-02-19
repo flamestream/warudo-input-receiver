@@ -94,7 +94,7 @@ Make target controller hold controller in wanted neutral position, then set up a
         public string ShakingMotionInstructions = "Allows game controller to shake in response to input.";
 
         [DataInput]
-        [Label("Enable")]
+        [Label("ENABLE")]
         [DisabledIf(nameof(IsBasicSetupNotDone))]
         public bool IsShakingEnabled;
 
@@ -123,96 +123,122 @@ Make target controller hold controller in wanted neutral position, then set up a
         /// <summary>
         /// HAND TRACKING
         /// </summary>
-        [Section("Hand Tracking")]
+        [Section("Hand Tracker")]
 
         [Markdown]
-        [HiddenIf(nameof(IsHandTrackingGraphPresent))]
-        public string HandTrackingInstructions = @"### Information
-Allows temporarily holding the game controller with the untracked hand while the other hand is being tracked.
-### Instructions
+        [HiddenIf(nameof(CanConfigureHandTracker))]
+        public string HandTrackerInfo = @"Allows temporarily holding the game controller with the untracked hand while the other hand is being tracked.";
+
+        [DataInput]
+        [Label("ENABLE")]
+        [DisabledIf(nameof(IsBasicSetupNotDone))]
+        public bool IsHandTrackerEnabled;
+
+        public bool CanConfigureHandTracker() {
+            return IsHandTrackerEnabled;
+        }
+
+        public bool CannotConfigureHandTracker() {
+            return !IsHandTrackerEnabled;
+        }
+
+        [Markdown]
+        [HiddenIf(nameof(CannotConfigureHandTracker))]
+        public string HandTrackerInstructions = @"### Setup Instructions
 Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** node before the **Override Character Bone Rotations** node's **Bone Rotation Weights** input.";
 
-        string HandTrackingGraphId;
 
-        bool IsHandTrackingGraphPresent() {
-            return HandTrackingGraphId != null;
-        }
-        bool IsHandTrackingGraphBlank() {
-            return !IsHandTrackingGraphPresent();
-        }
+//         string HandTrackingGraphId;
 
-        [Trigger]
-        [HiddenIf(nameof(IsHandTrackingGraphPresent))]
-        void GenerateBlueprint() {
+        // bool IsHandTrackingGraphPresent() {
+        //     return HandTrackingGraphId != null;
+        // }
+        // bool IsHandTrackingGraphBlank() {
+        //     return !IsHandTrackingGraphPresent();
+        // }
 
-            Graph graph = new Graph
-            {
-                Name = "🔥🎮 Hand Tracker",
-                Enabled = true
-            };
+//         [Trigger]
+//         [HiddenIf(nameof(IsHandTrackingGraphPresent))]
+//         void GenerateBlueprint() {
 
-            CommentNode commentNode = graph.AddNode<CommentNode>();
-            commentNode.SetDataInput("Text", $@"### Instructions
+//             Graph graph = new Graph
+//             {
+//                 Name = "🔥🎮 Hand Tracker",
+//                 Enabled = true
+//             };
 
-1. Place node corresponding to your hand tracker and feed it with the hand tracking flags.
-2. Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** node before the **Override Character Bone Rotations** node's **Bone Rotation Weights** input. Feed it the hand tracking flags.
-");
+//             CommentNode commentNode = graph.AddNode<CommentNode>();
+//             commentNode.SetDataInput("Text", $@"### Instructions
 
-            OnUpdateNode onUpdateNode = graph.AddNode<OnUpdateNode>();
+// 1. Place node corresponding to your hand tracker and feed it with the hand tracking flags.
+// 2. Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** node before the **Override Character Bone Rotations** node's **Bone Rotation Weights** input. Feed it the hand tracking flags.
+// ");
 
-            GamepadHandSwitcherNode gamepadHandTrackerNode = graph.AddNode<GamepadHandSwitcherNode>();
-            gamepadHandTrackerNode.Receiver = this;
+//             OnUpdateNode onUpdateNode = graph.AddNode<OnUpdateNode>();
 
-            graph.AddFlowConnection(onUpdateNode, "Exit", gamepadHandTrackerNode, "Enter");
+//             GamepadHandSwitcherNode gamepadHandTrackerNode = graph.AddNode<GamepadHandSwitcherNode>();
+//             gamepadHandTrackerNode.Receiver = this;
 
-            base.Scene.AddGraph(graph);
-            HandTrackingGraphId = graph.Id.ToString();
-            Context.Service.PromptMessage("SUCCESS", $"Blueprint {graph.Name} has been succesfully generated.");
-            Context.Service.BroadcastOpenedScene();
-            Context.Service.NavigateToGraph(graph.Id, commentNode.Id);
-        }
+//             graph.AddFlowConnection(onUpdateNode, "Exit", gamepadHandTrackerNode, "Enter");
 
-        [Trigger]
-        [HiddenIf(nameof(IsHandTrackingGraphBlank))]
-        async void DeleteGeneratedBlueprint() {
+//             base.Scene.AddGraph(graph);
+//             HandTrackingGraphId = graph.Id.ToString();
+//             Context.Service.PromptMessage("SUCCESS", $"Blueprint {graph.Name} has been succesfully generated.");
+//             Context.Service.BroadcastOpenedScene();
+//             Context.Service.NavigateToGraph(graph.Id, commentNode.Id);
+//         }
 
-            Graph graph = Context.OpenedScene.GetGraph(Guid.Parse(HandTrackingGraphId));
-            if (graph == null)
-            {
-                HandTrackingGraphId = null;
-            }
-            else if (await Context.Service.PromptConfirmation("WARNING", "BLUEPRINT_WILL_BE_REMOVED".Localized(graph.Name)))
-            {
-                Context.OpenedScene.RemoveGraph(graph.Id);
-                Context.Service.BroadcastOpenedScene();
-                HandTrackingGraphId = null;
-            }
-        }
+//         [Trigger]
+//         [HiddenIf(nameof(IsHandTrackingGraphBlank))]
+//         async void DeleteGeneratedBlueprint() {
+
+//             Graph graph = Context.OpenedScene.GetGraph(Guid.Parse(HandTrackingGraphId));
+//             if (graph == null)
+//             {
+//                 HandTrackingGraphId = null;
+//             }
+//             else if (await Context.Service.PromptConfirmation("WARNING", "BLUEPRINT_WILL_BE_REMOVED".Localized(graph.Name)))
+//             {
+//                 Context.OpenedScene.RemoveGraph(graph.Id);
+//                 Context.Service.BroadcastOpenedScene();
+//                 HandTrackingGraphId = null;
+//             }
+//         }
 
         [DataInput]
+        [HiddenIf(nameof(CannotConfigureHandTracker))]
         public Vector3 HoldLeftHandTilt = new Vector3(30f, 10f, 0f);
         [DataInput]
+        [HiddenIf(nameof(CannotConfigureHandTracker))]
         public Vector3 HoldLeftHandDisplacement = new Vector3(0f, -0.05f, -0.02f);
 
         [DataInput]
+        [HiddenIf(nameof(CannotConfigureHandTracker))]
         public Vector3 HoldRightHandTilt = new Vector3(30f, 10f, 0f);
         [DataInput]
+        [HiddenIf(nameof(CannotConfigureHandTracker))]
         public Vector3 HoldRightHandDisplacement = new Vector3(0f, -0.05f, -0.02f);
 
         [DataInput]
+        [HiddenIf(nameof(CannotConfigureHandTracker))]
         [FloatSlider(0f, 2f, 0.01f)]
         public float TiltTransitionTime = 1.0f;
         [DataInput]
+        [HiddenIf(nameof(CannotConfigureHandTracker))]
         public Ease TiltEasing = Ease.OutCubic;
         [DataInput]
+        [HiddenIf(nameof(CannotConfigureHandTracker))]
         [FloatSlider(0f, 2f, 0.01f)]
         public float DisplacementTransitionTime = 1.5f;
         [DataInput]
+        [HiddenIf(nameof(CannotConfigureHandTracker))]
         public Ease DisplacementEasing = Ease.OutBack;
         [DataInput]
+        [HiddenIf(nameof(CannotConfigureHandTracker))]
         [FloatSlider(0f, 2f, 0.01f)]
         public float ReturnTime = 0.2f;
         [DataInput]
+        [HiddenIf(nameof(CannotConfigureHandTracker))]
         public Ease ReturnEasing = Ease.OutBack;
 
         /// <summary>

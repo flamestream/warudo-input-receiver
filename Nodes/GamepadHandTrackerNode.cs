@@ -30,7 +30,7 @@ namespace FlameStream {
             for (var i = 0; i < 55; ++i) {
                 if (i >= BoneRotationWeights.Length) break;
                 boneWeights[i] = BoneRotationWeights[i];
-                if (Receiver == null || !Receiver.Active) {
+                if (Receiver == null || !Receiver.Active || !Receiver.IsHandTrackerEnabled) {
                     continue;
                 }
                 var min = (int)HumanBodyBones.LeftThumbProximal;
@@ -57,7 +57,13 @@ namespace FlameStream {
 
         void MainLoop() {
             if (Receiver == null) return;
-            firstTracked = Receiver.ProcessHandTracking(IsLeftHandTracked, IsRightHandTracked);
+            bool isLeftHandTracked = IsLeftHandTracked;
+            bool isRightHandTracked = IsRightHandTracked;
+            if (!Receiver.IsHandTrackerEnabled) {
+                isLeftHandTracked = false;
+                isRightHandTracked = false;
+            };
+            firstTracked = Receiver.ProcessHandTracking(isLeftHandTracked, isRightHandTracked);
         }
 
         // -1: Left
