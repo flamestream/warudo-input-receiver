@@ -253,5 +253,21 @@ Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** 
 * Finger animations files must be provided
 * Two animations per button: hover and press
 * Animations must have an additive reference pose";
+
+        [Trigger]
+        public void TriggerGenerateButtonAnimationTemplate() {
+            GenerateButtonAnimationTemplate();
+        }
+
+        [DataInput]
+        public GamepadButtonAnimationData[] ButtonAnimationData;
+
+        [Trigger]
+        public void TriggerGenerateButtonAnimationBlueprint() {
+            GenerateButtonAnimationTemplate();
+        }
+        public void TriggerGenerateCharacterOverlayingAnimations() {
+            GenerateButtonAnimationTemplate();
+        }
     }
 }

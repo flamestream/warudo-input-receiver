@@ -12,7 +12,7 @@ namespace FlameStream
 
 
         // NOTE: Buttons indices are offset by one to allow dummy default at 0./
-        public enum SwitchProButton: int {
+        public enum SwitchProButton : int {
             None = 0,
             B = 1,
             A = 2,
