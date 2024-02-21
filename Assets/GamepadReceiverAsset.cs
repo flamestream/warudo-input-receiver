@@ -1,15 +1,9 @@
-using System;
 using DG.Tweening;
 using UnityEngine;
-using Warudo.Core;
 using Warudo.Core.Attributes;
-using Warudo.Core.Graphs;
-using Warudo.Core.Localization;
 using Warudo.Core.Scenes;
 using Warudo.Plugins.Core.Assets.Character;
 using Warudo.Plugins.Core.Assets.Prop;
-using Warudo.Plugins.Core.Nodes;
-using Warudo.Plugins.Core.Nodes.Event;
 
 namespace FlameStream
 {
@@ -148,63 +142,6 @@ Make target controller hold controller in wanted neutral position, then set up a
 Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** node before the **Override Character Bone Rotations** node's **Bone Rotation Weights** input.";
 
 
-//         string HandTrackingGraphId;
-
-        // bool IsHandTrackingGraphPresent() {
-        //     return HandTrackingGraphId != null;
-        // }
-        // bool IsHandTrackingGraphBlank() {
-        //     return !IsHandTrackingGraphPresent();
-        // }
-
-//         [Trigger]
-//         [HiddenIf(nameof(IsHandTrackingGraphPresent))]
-//         void GenerateBlueprint() {
-
-//             Graph graph = new Graph
-//             {
-//                 Name = "🔥🎮 Hand Tracker",
-//                 Enabled = true
-//             };
-
-//             CommentNode commentNode = graph.AddNode<CommentNode>();
-//             commentNode.SetDataInput("Text", $@"### Instructions
-
-// 1. Place node corresponding to your hand tracker and feed it with the hand tracking flags.
-// 2. Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** node before the **Override Character Bone Rotations** node's **Bone Rotation Weights** input. Feed it the hand tracking flags.
-// ");
-
-//             OnUpdateNode onUpdateNode = graph.AddNode<OnUpdateNode>();
-
-//             GamepadHandSwitcherNode gamepadHandTrackerNode = graph.AddNode<GamepadHandSwitcherNode>();
-//             gamepadHandTrackerNode.Receiver = this;
-
-//             graph.AddFlowConnection(onUpdateNode, "Exit", gamepadHandTrackerNode, "Enter");
-
-//             base.Scene.AddGraph(graph);
-//             HandTrackingGraphId = graph.Id.ToString();
-//             Context.Service.PromptMessage("SUCCESS", $"Blueprint {graph.Name} has been succesfully generated.");
-//             Context.Service.BroadcastOpenedScene();
-//             Context.Service.NavigateToGraph(graph.Id, commentNode.Id);
-//         }
-
-//         [Trigger]
-//         [HiddenIf(nameof(IsHandTrackingGraphBlank))]
-//         async void DeleteGeneratedBlueprint() {
-
-//             Graph graph = Context.OpenedScene.GetGraph(Guid.Parse(HandTrackingGraphId));
-//             if (graph == null)
-//             {
-//                 HandTrackingGraphId = null;
-//             }
-//             else if (await Context.Service.PromptConfirmation("WARNING", "BLUEPRINT_WILL_BE_REMOVED".Localized(graph.Name)))
-//             {
-//                 Context.OpenedScene.RemoveGraph(graph.Id);
-//                 Context.Service.BroadcastOpenedScene();
-//                 HandTrackingGraphId = null;
-//             }
-//         }
-
         [DataInput]
         [HiddenIf(nameof(CannotConfigureHandTracker))]
         public Vector3 HoldLeftHandTilt = new Vector3(30f, 10f, 0f);
@@ -247,7 +184,7 @@ Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** 
         [Section("Finger and Prop Animation")]
         [Markdown]
         public string AnimationInstructions = @"### Game Controller Prop Setup
-* The prop must have an Animator component with multiple named Additive blending layers for each wanted buttons
+* The prop must have an Animator component with multiple named **Additive blending** layers for each wanted buttons
 * Map each button to the correct layer
 ### Finger Animation
 * Finger animations files must be provided
@@ -263,11 +200,13 @@ Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** 
         public GamepadButtonAnimationData[] ButtonAnimationData;
 
         [Trigger]
-        public void TriggerGenerateButtonAnimationBlueprint() {
-            GenerateButtonAnimationTemplate();
+        public void TriggerGenerateAnimationBlueprint() {
+            GenerateAnimationBlueprint();
         }
-        public void TriggerGenerateCharacterOverlayingAnimations() {
-            GenerateButtonAnimationTemplate();
+        [Trigger]
+        [Description("Modifies your character to support finger animation.")]
+        public void TriggerSyncCharacterOverlayingAnimations() {
+            SyncCharacterOverlayingAnimations();
         }
     }
 }

@@ -12,12 +12,12 @@ namespace FlameStream {
     Category = "NODE_CATEGORY")]
     public class GamepadFingerButtonAnimatorNode : GamepadFingerAnimatorNode {
 
-        [DataInput]
+        [DataInput(99)]
         public string HoverLayerId;
-        [DataInput]
+        [DataInput(199)]
         public string PressLayerId;
 
-        [DataInput(100)]
+        [DataInput(500)]
         [Description("From receiver Button Press State")]
         public bool IsPressed;
 

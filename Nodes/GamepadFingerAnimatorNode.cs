@@ -12,10 +12,10 @@ namespace FlameStream {
         [DataOutput]
         public string _HoverInputId() => HoverInputId;
 
-        [DataInput]
+        [DataInput(0)]
         public CharacterAsset Character;
 
-        [DataInput]
+        [DataInput(0)]
         public string InputId;
 
         [DataInput(100)]
@@ -24,18 +24,18 @@ namespace FlameStream {
         public Ease HoverTransitionEasing = Ease.OutCubic;
         [DataInput(100)]
         public float PressInTransitionTime = 0.5f;
-        [DataInput(100)]
+        [DataInput(200)]
         public Ease PressInTransitionEasing = Ease.OutCubic;
-        [DataInput(100)]
+        [DataInput(200)]
         public float PressOutTransitionTime = 0.5f;
-        [DataInput(100)]
+        [DataInput(200)]
         public Ease PressOutTransitionEasing = Ease.OutCubic;
 
-        [DataInput(200)]
+        [DataInput(500)]
         [Description("From receiver Hover Input ID")]
         public string HoverInputId;
 
-        [Markdown(300)]
+        [Markdown(1000)]
         public string Message;
 
         [FlowInput]
