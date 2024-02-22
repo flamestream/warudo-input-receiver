@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Warudo.Core.Attributes;
 using Warudo.Core.Graphs;
+using static FlameStream.GamepadReceiverAsset;
 
 namespace FlameStream {
 [NodeType(
@@ -10,41 +11,6 @@ namespace FlameStream {
     Category = "NODE_CATEGORY"
 )]
     public class GetGamepadReceiverDataNode : Node {
-
-        public enum BUTTON_ID: int
-        {
-            None = 0,
-            B = 1,
-            A = 2,
-            Y = 3,
-            X = 4,
-            L = 5,
-            R = 6,
-            ZL = 7,
-            ZR = 8,
-            Plus = 9,
-            Minus = 10,
-            LeftStick = 11,
-            RightStick = 12,
-            Home = 13,
-            Capture = 14,
-        };
-
-        public static readonly BUTTON_ID[] LEFT_BUTTON_IDS = {
-            BUTTON_ID.LeftStick,
-            BUTTON_ID.Plus,
-            BUTTON_ID.Capture,
-        };
-
-        public static readonly BUTTON_ID[] RIGHT_BUTTON_IDS = {
-            BUTTON_ID.A,
-            BUTTON_ID.B,
-            BUTTON_ID.X,
-            BUTTON_ID.Y,
-            BUTTON_ID.RightStick,
-            BUTTON_ID.Minus,
-            BUTTON_ID.Home,
-        };
 
         [DataInput]
         public GamepadReceiverAsset Receiver;
@@ -59,59 +25,59 @@ namespace FlameStream {
 
         [DataOutput]
         [Label("NODE_A_BUTTON")]
-        public bool A() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.A - 1);
+        public bool A() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.A);
 
         [DataOutput]
         [Label("NODE_B_BUTTON")]
-        public bool B() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.B - 1);
+        public bool B() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.B);
 
         [DataOutput]
         [Label("NODE_X_BUTTON")]
-        public bool X() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.X - 1);
+        public bool X() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.X);
 
         [DataOutput]
         [Label("NODE_Y_BUTTON")]
-        public bool Y() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.Y - 1);
+        public bool Y() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.Y);
 
         [DataOutput]
         [Label("NODE_L_BUTTON")]
-        public bool L() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.L - 1);
+        public bool L() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.L);
 
         [DataOutput]
         [Label("NODE_R_BUTTON")]
-        public bool R() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.R - 1);
+        public bool R() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.R);
 
         [DataOutput]
         [Label("NODE_ZL_BUTTON")]
-        public bool ZL() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.ZL - 1);
+        public bool ZL() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.ZL);
 
         [DataOutput]
         [Label("NODE_ZR_BUTTON")]
-        public bool ZR() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.ZR - 1);
+        public bool ZR() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.ZR);
 
         [DataOutput]
         [Label("NODE_LEFT_STICK")]
-        public bool LeftStick() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.LeftStick - 1);
+        public bool LeftStick() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.LeftStick);
 
         [DataOutput]
         [Label("NODE_RIGHT_STICK")]
-        public bool RightStick() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.RightStick - 1);
+        public bool RightStick() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.RightStick);
 
         [DataOutput]
         [Label("NODE_PLUS_BUTTON")]
-        public bool Plus() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.Plus - 1);
+        public bool Plus() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.Plus);
 
         [DataOutput]
         [Label("NODE_MINUS_BUTTON")]
-        public bool Minus() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.Minus - 1);
+        public bool Minus() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.Minus);
 
         [DataOutput]
         [Label("NODE_HOME_BUTTON")]
-        public bool Home() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.Home - 1);
+        public bool Home() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.Home);
 
         [DataOutput]
         [Label("NODE_CAPTURE_BUTTON")]
-        public bool Capture() => Receiver != null && Receiver.ButtonFlag((int)BUTTON_ID.Capture - 1);
+        public bool Capture() => Receiver != null && Receiver.ButtonFlag(SwitchProButton.Capture);
 
         [DataOutput]
         [Label("NODE_LEFT_STICK_X")]
@@ -132,14 +98,6 @@ namespace FlameStream {
         [DataOutput]
         [Label("NODE_CONTROL_PAD")]
         public int ControlPad() => Receiver == null ? 5 : Receiver.Pad;
-
-        [DataOutput]
-        [Label("NODE_ANY_FACE_BUTTON")]
-        public bool AnyFaceButton() =>  A() || B() || X() || Y() || Plus() || Minus() || LeftStick() || RightStick() || Home() || Capture() || ControlPad() != 5;
-
-        [DataOutput]
-        [Label("NODE_ANY_SHOULDER_BUTTON")]
-        public bool AnyShoulderButton() => L() || R() || ZL() || ZR();
 
         [DataOutput]
         [Label("NODE_HOVER_LEFT_FACE")]
@@ -165,27 +123,27 @@ namespace FlameStream {
 
             if (Receiver == null) return;
 
-            // // Left Face
-            // if (LeftStickActive()) {
-            //     _LeftFaceHoverInputId = "LeftStick";
-            // } else if (ControlPad() != 5) {
-            //     _LeftFaceHoverInputId = $"D{ControlPad()}";
-            // } else {
-            //     var buttonId = Array.Find(LEFT_BUTTON_IDS, b => Receiver.JustDownButtonFlag((int)b - 1));
-            //     if (buttonId != BUTTON_ID.None) {
-            //         _LeftFaceHoverInputId = buttonId.ToString();
-            //     }
-            // }
+            // Left Face
+            if (LeftStickActive()) {
+                _LeftFaceHoverInputId = "LeftStick";
+            } else if (ControlPad() != 5) {
+                _LeftFaceHoverInputId = $"D{ControlPad()}";
+            } else {
+                var buttonId = Array.Find(LeftFaceButtonIdsSwitch, b => Receiver.ActivatedButtonFlag(b));
+                if (buttonId != SwitchProButton.None) {
+                    _LeftFaceHoverInputId = buttonId.ToString();
+                }
+            }
 
-            // // Right Face
-            // if (RightStickActive()) {
-            //     _RightFaceHoverInputId = "RightStick";
-            // } else {
-            //     var buttonId = Array.Find(RIGHT_BUTTON_IDS, b => Receiver.JustDownButtonFlag((int)b - 1));
-            //     if (buttonId != BUTTON_ID.None) {
-            //         _RightFaceHoverInputId = buttonId.ToString();
-            //     }
-            // }
+            // Right Face
+            if (RightStickActive()) {
+                _RightFaceHoverInputId = "RightStick";
+            } else {
+                var buttonId = Array.Find(RightFaceButtonIdsSwitch, b => Receiver.ActivatedButtonFlag(b));
+                if (buttonId != SwitchProButton.None) {
+                    _RightFaceHoverInputId = buttonId.ToString();
+                }
+            }
         }
     }
 }

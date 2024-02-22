@@ -55,8 +55,36 @@ namespace FlameStream {
                 })
                 .ToArray();
 
+            var oldLeftStickAnimationData = LeftStickAnimationData;
+            LeftStickAnimationData = StructuredData.Create<GamepadStickAnimationData>((d) => {
+                d.Number = 1;
+                d.PositiveXAnimation = oldLeftStickAnimationData?.PositiveXAnimation;
+                d.NegativeXAnimation = oldLeftStickAnimationData?.NegativeXAnimation;
+                d.PositiveYAnimation = oldLeftStickAnimationData?.PositiveYAnimation;
+                d.NegativeYAnimation = oldLeftStickAnimationData?.NegativeYAnimation;
+                d.PropPositiveXLayerName = oldLeftStickAnimationData?.PropPositiveXLayerName ?? "Stick1 +X";
+                d.PropPositiveYLayerName = oldLeftStickAnimationData?.PropPositiveYLayerName ?? "Stick1 +Y";
+                d.PropNegativeXLayerName = oldLeftStickAnimationData?.PropNegativeXLayerName ?? "Stick1 -X";
+                d.PropNegativeYLayerName = oldLeftStickAnimationData?.PropNegativeYLayerName ?? "Stick1 -Y";
+            });
+
+            var oldRightStickAnimationData = RightStickAnimationData;
+            RightStickAnimationData = StructuredData.Create<GamepadStickAnimationData>((d) => {
+                d.Number = 2;
+                d.PositiveXAnimation = oldRightStickAnimationData?.PositiveXAnimation;
+                d.PositiveYAnimation = oldRightStickAnimationData?.PositiveYAnimation;
+                d.NegativeXAnimation = oldRightStickAnimationData?.NegativeXAnimation;
+                d.NegativeYAnimation = oldRightStickAnimationData?.NegativeYAnimation;
+                d.PropPositiveXLayerName = oldRightStickAnimationData?.PropPositiveXLayerName ?? "Stick2 +X";
+                d.PropPositiveYLayerName = oldRightStickAnimationData?.PropPositiveYLayerName ?? "Stick2 +Y";
+                d.PropNegativeXLayerName = oldRightStickAnimationData?.PropNegativeXLayerName ?? "Stick2 -X";
+                d.PropNegativeYLayerName = oldRightStickAnimationData?.PropNegativeYLayerName ?? "Stick2 -Y";
+            });
+
             BroadcastDataInput(nameof(ButtonAnimationData));
             BroadcastDataInput(nameof(ControlPadAnimationData));
+            BroadcastDataInput(nameof(LeftStickAnimationData));
+            BroadcastDataInput(nameof(RightStickAnimationData));
             Context.Service.PromptMessage("SUCCESS", $@"Button animation definition for [{TargetControllerType}] has been succesfully generated.
 
 Please note that they do not have to be all filled. You may remove unused fields to optimize your setup.
@@ -187,6 +215,65 @@ Please note that they do not have to be all filled. You may remove unused fields
             AddDataConnection(graph, receiverNode, "ControlPad", fingerControlPadAnimatorNode, "ControlPadState");
             AddFlowConnection(graph, fingerControlPadAnimatorNode, "Exit", propControlPadAnimatorNode, "Enter");
 
+            OnUpdateNode onUpdateStickNode = graph.AddNode<OnUpdateNode>();
+
+            var fingerStick1AxisXAnimatorNode = graph.AddNode<GamepadFingerAxisAnimatorNode>();
+            fingerStick1AxisXAnimatorNode.Character = Character;
+            fingerStick1AxisXAnimatorNode.NegativeLayerId = LeftStickAnimationData.NegativeXLayerId;
+            fingerStick1AxisXAnimatorNode.PositiveLayerId = LeftStickAnimationData.PositiveXLayerId;
+            AddDataConnection(graph, receiverNode, "LeftStickX", fingerStick1AxisXAnimatorNode, "AxisValue");
+            AddFlowConnection(graph, onUpdateControlPadNode, "Exit", fingerStick1AxisXAnimatorNode, "Enter");
+
+            var fingerStick1AxisYAnimatorNode = graph.AddNode<GamepadFingerAxisAnimatorNode>();
+            fingerStick1AxisYAnimatorNode.Character = Character;
+            fingerStick1AxisYAnimatorNode.NegativeLayerId = LeftStickAnimationData.NegativeYLayerId;
+            fingerStick1AxisYAnimatorNode.PositiveLayerId = LeftStickAnimationData.PositiveYLayerId;
+            AddDataConnection(graph, receiverNode, "LeftStickY", fingerStick1AxisYAnimatorNode, "AxisValue");
+            AddFlowConnection(graph, fingerStick1AxisXAnimatorNode, "Exit", fingerStick1AxisYAnimatorNode, "Enter");
+
+            var fingerStick2AxisXAnimatorNode = graph.AddNode<GamepadFingerAxisAnimatorNode>();
+            fingerStick2AxisXAnimatorNode.Character = Character;
+            fingerStick2AxisXAnimatorNode.NegativeLayerId = RightStickAnimationData.NegativeXLayerId;
+            fingerStick2AxisXAnimatorNode.PositiveLayerId = RightStickAnimationData.PositiveXLayerId;
+            AddDataConnection(graph, receiverNode, "RightStickX", fingerStick2AxisXAnimatorNode, "AxisValue");
+            AddFlowConnection(graph, fingerStick1AxisYAnimatorNode, "Exit", fingerStick2AxisXAnimatorNode, "Enter");
+
+            var fingerStick2AxisYAnimatorNode = graph.AddNode<GamepadFingerAxisAnimatorNode>();
+            fingerStick2AxisYAnimatorNode.Character = Character;
+            fingerStick2AxisYAnimatorNode.NegativeLayerId = RightStickAnimationData.NegativeYLayerId;
+            fingerStick2AxisYAnimatorNode.PositiveLayerId = RightStickAnimationData.PositiveYLayerId;
+            AddDataConnection(graph, receiverNode, "RightStickY", fingerStick2AxisYAnimatorNode, "AxisValue");
+            AddFlowConnection(graph, fingerStick2AxisXAnimatorNode, "Exit", fingerStick2AxisYAnimatorNode, "Enter");
+
+            var propStick1AxisXAnimatorNode = graph.AddNode<GamepadPropAxisAnimatorNode>();
+            propStick1AxisXAnimatorNode.Gamepad = Gamepad;
+            propStick1AxisXAnimatorNode.NegativeLayerId = LeftStickAnimationData.PropNegativeXLayerName;
+            propStick1AxisXAnimatorNode.PositiveLayerId = LeftStickAnimationData.PropPositiveXLayerName;
+            AddDataConnection(graph, receiverNode, "LeftStickX", propStick1AxisXAnimatorNode, "AxisValue");
+            AddFlowConnection(graph, fingerStick2AxisYAnimatorNode, "Exit", propStick1AxisXAnimatorNode, "Enter");
+
+            var propStick1AxisYAnimatorNode = graph.AddNode<GamepadPropAxisAnimatorNode>();
+            propStick1AxisYAnimatorNode.Gamepad = Gamepad;
+            propStick1AxisYAnimatorNode.NegativeLayerId = LeftStickAnimationData.PropNegativeYLayerName;
+            propStick1AxisYAnimatorNode.PositiveLayerId = LeftStickAnimationData.PropPositiveYLayerName;
+            AddDataConnection(graph, receiverNode, "LeftStickY", propStick1AxisYAnimatorNode, "AxisValue");
+            AddFlowConnection(graph, propStick1AxisXAnimatorNode, "Exit", propStick1AxisYAnimatorNode, "Enter");
+
+            var propStick2AxisXAnimatorNode = graph.AddNode<GamepadPropAxisAnimatorNode>();
+            propStick2AxisXAnimatorNode.Gamepad = Gamepad;
+            propStick2AxisXAnimatorNode.NegativeLayerId = RightStickAnimationData.PropNegativeXLayerName;
+            propStick2AxisXAnimatorNode.PositiveLayerId = RightStickAnimationData.PropPositiveXLayerName;
+            AddDataConnection(graph, receiverNode, "RightStickX", propStick2AxisXAnimatorNode, "AxisValue");
+            AddFlowConnection(graph, propStick1AxisYAnimatorNode, "Exit", propStick2AxisXAnimatorNode, "Enter");
+
+            var propStick2AxisYAnimatorNode = graph.AddNode<GamepadPropAxisAnimatorNode>();
+            propStick2AxisYAnimatorNode.Gamepad = Gamepad;
+            propStick2AxisYAnimatorNode.NegativeLayerId = RightStickAnimationData.PropNegativeYLayerName;
+            propStick2AxisYAnimatorNode.PositiveLayerId = RightStickAnimationData.PropPositiveYLayerName;
+            AddDataConnection(graph, receiverNode, "RightStickY", propStick2AxisYAnimatorNode, "AxisValue");
+            AddFlowConnection(graph, propStick2AxisXAnimatorNode, "Exit", propStick2AxisYAnimatorNode, "Enter");
+
+
             base.Scene.AddGraph(graph);
             Context.Service.PromptMessage("SUCCESS", $"Blueprint {graph.Name} has been succesfully generated.");
             Context.Service.BroadcastOpenedScene();
@@ -276,6 +363,114 @@ Please note that they do not have to be all filled. You may remove unused fields
                 }
             }
 
+            if (LeftStickAnimationData?.Number != 0) {
+                var layerPosX = StructuredData.Create<OverlappingAnimationData>();
+                layerPosX.Animation = LeftStickAnimationData.PositiveXAnimation;
+                layerPosX.Weight = 1f;
+                layerPosX.Speed = 1f;
+                layerPosX.Masked = true;
+                layerPosX.MaskedBodyParts = new AnimationMaskedBodyPart[] {
+                    AnimationMaskedBodyPart.LeftFingers
+                };
+                layerPosX.Additive = true;
+                layerPosX.Looping = false;
+                layerPosX.CustomLayerID = LeftStickAnimationData.PositiveXLayerId;
+                userLayers.Add(layerPosX);
+
+                var layerNegX = StructuredData.Create<OverlappingAnimationData>();
+                layerNegX.Animation = LeftStickAnimationData.NegativeXAnimation;
+                layerNegX.Weight = 1f;
+                layerNegX.Speed = 1f;
+                layerNegX.Masked = true;
+                layerNegX.MaskedBodyParts = new AnimationMaskedBodyPart[] {
+                    AnimationMaskedBodyPart.LeftFingers
+                };
+                layerNegX.Additive = true;
+                layerNegX.Looping = false;
+                layerNegX.CustomLayerID = LeftStickAnimationData.NegativeXLayerId;
+                userLayers.Add(layerNegX);
+
+                var layerPosY = StructuredData.Create<OverlappingAnimationData>();
+                layerPosY.Animation = LeftStickAnimationData.PositiveYAnimation;
+                layerPosY.Weight = 1f;
+                layerPosY.Speed = 1f;
+                layerPosY.Masked = true;
+                layerPosY.MaskedBodyParts = new AnimationMaskedBodyPart[] {
+                    AnimationMaskedBodyPart.LeftFingers
+                };
+                layerPosY.Additive = true;
+                layerPosY.Looping = false;
+                layerPosY.CustomLayerID = LeftStickAnimationData.PositiveYLayerId;
+                userLayers.Add(layerPosY);
+
+                var layerNegY = StructuredData.Create<OverlappingAnimationData>();
+                layerNegY.Animation = LeftStickAnimationData.NegativeYAnimation;
+                layerNegY.Weight = 1f;
+                layerNegY.Speed = 1f;
+                layerNegY.Masked = true;
+                layerNegY.MaskedBodyParts = new AnimationMaskedBodyPart[] {
+                    AnimationMaskedBodyPart.LeftFingers
+                };
+                layerNegY.Additive = true;
+                layerNegY.Looping = false;
+                layerNegY.CustomLayerID = LeftStickAnimationData.NegativeYLayerId;
+                userLayers.Add(layerNegY);
+            }
+
+            if (RightStickAnimationData?.Number != 0) {
+                var layerPosX = StructuredData.Create<OverlappingAnimationData>();
+                layerPosX.Animation = RightStickAnimationData.PositiveXAnimation;
+                layerPosX.Weight = 1f;
+                layerPosX.Speed = 1f;
+                layerPosX.Masked = true;
+                layerPosX.MaskedBodyParts = new AnimationMaskedBodyPart[] {
+                    AnimationMaskedBodyPart.RightFingers
+                };
+                layerPosX.Additive = true;
+                layerPosX.Looping = false;
+                layerPosX.CustomLayerID = RightStickAnimationData.PositiveXLayerId;
+                userLayers.Add(layerPosX);
+
+                var layerNegX = StructuredData.Create<OverlappingAnimationData>();
+                layerNegX.Animation = RightStickAnimationData.NegativeXAnimation;
+                layerNegX.Weight = 1f;
+                layerNegX.Speed = 1f;
+                layerNegX.Masked = true;
+                layerNegX.MaskedBodyParts = new AnimationMaskedBodyPart[] {
+                    AnimationMaskedBodyPart.RightFingers
+                };
+                layerNegX.Additive = true;
+                layerNegX.Looping = false;
+                layerNegX.CustomLayerID = RightStickAnimationData.NegativeXLayerId;
+                userLayers.Add(layerNegX);
+
+                var layerPosY = StructuredData.Create<OverlappingAnimationData>();
+                layerPosY.Animation = RightStickAnimationData.PositiveYAnimation;
+                layerPosY.Weight = 1f;
+                layerPosY.Speed = 1f;
+                layerPosY.Masked = true;
+                layerPosY.MaskedBodyParts = new AnimationMaskedBodyPart[] {
+                    AnimationMaskedBodyPart.RightFingers
+                };
+                layerPosY.Additive = true;
+                layerPosY.Looping = false;
+                layerPosY.CustomLayerID = RightStickAnimationData.PositiveYLayerId;
+                userLayers.Add(layerPosY);
+
+                var layerNegY = StructuredData.Create<OverlappingAnimationData>();
+                layerNegY.Animation = RightStickAnimationData.NegativeYAnimation;
+                layerNegY.Weight = 1f;
+                layerNegY.Speed = 1f;
+                layerNegY.Masked = true;
+                layerNegY.MaskedBodyParts = new AnimationMaskedBodyPart[] {
+                    AnimationMaskedBodyPart.RightFingers
+                };
+                layerNegY.Additive = true;
+                layerNegY.Looping = false;
+                layerNegY.CustomLayerID = RightStickAnimationData.NegativeYLayerId;
+                userLayers.Add(layerNegY);
+            }
+
             UnityEngine.Debug.Log("[GamepadReceiverAsset.Animation] Final layers");
             foreach (var l in userLayers) {
                 UnityEngine.Debug.Log($"{l.Id} {l.CustomLayerID}");
@@ -283,6 +478,7 @@ Please note that they do not have to be all filled. You may remove unused fields
 
             Character.OverlappingAnimations = userLayers.ToArray();
             Character.BroadcastDataInput(nameof(Character.OverlappingAnimations));
+            Character.SetupOverlappingAnimations();
 
             Context.Service.PromptMessage("SUCCESS", "Character Overlaying Animations has been synced.");
         }
@@ -399,6 +595,72 @@ Please note that they do not have to be all filled. You may remove unused fields
             public string PressLayerId {
                 get {
                     return $"🔥🎮 {ButtonName} Press";
+                }
+            }
+        }
+
+        public class GamepadStickAnimationData : StructuredData, ICollapsibleStructuredData {
+
+            [DataInput]
+            [PreviewGallery]
+            [AutoCompleteResource("CharacterAnimation", null)]
+            public string PositiveXAnimation;
+            [DataInput]
+            [PreviewGallery]
+            [AutoCompleteResource("CharacterAnimation", null)]
+            public string PositiveYAnimation;
+
+            [DataInput]
+            [PreviewGallery]
+            [AutoCompleteResource("CharacterAnimation", null)]
+            public string NegativeXAnimation;
+            [DataInput]
+            [PreviewGallery]
+            [AutoCompleteResource("CharacterAnimation", null)]
+            public string NegativeYAnimation;
+
+            [DataInput]
+            public string PropPositiveXLayerName;
+            [DataInput]
+            public string PropPositiveYLayerName;
+            [DataInput]
+            public string PropNegativeXLayerName;
+            [DataInput]
+            public string PropNegativeYLayerName;
+
+            [Hidden]
+            [DataInput]
+            public int Number;
+
+            public string ButtonName {
+                get {
+                    return $"Stick{Number}";
+                }
+            }
+
+            public string GetHeader() {
+                if (Number == 0) return "Invalid. Regenerate button to fix.";
+                return $"{ButtonName}";
+            }
+
+            public string NegativeXLayerId {
+                get {
+                    return $"🔥🎮 {ButtonName} -X";
+                }
+            }
+            public string PositiveXLayerId {
+                get {
+                    return $"🔥🎮 {ButtonName} +X";
+                }
+            }
+            public string NegativeYLayerId {
+                get {
+                    return $"🔥🎮 {ButtonName} -Y";
+                }
+            }
+            public string PositiveYLayerId {
+                get {
+                    return $"🔥🎮 {ButtonName} +Y";
                 }
             }
         }

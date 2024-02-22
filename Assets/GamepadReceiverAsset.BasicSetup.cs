@@ -62,8 +62,10 @@ namespace FlameStream
         public Vector3 RightHandAnchorRotation;
 
         public enum GamepadHandSide {
+            [Label("LEFT_HAND")]
             LeftHand,
-            RightHand
+            [Label("RIGHT_HAND")]
+            RightHand,
         }
 
         public AnchorAsset RootAnchor {

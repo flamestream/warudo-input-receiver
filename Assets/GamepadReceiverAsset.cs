@@ -1,6 +1,7 @@
 using DG.Tweening;
 using UnityEngine;
 using Warudo.Core.Attributes;
+using Warudo.Core.Data;
 using Warudo.Core.Scenes;
 using Warudo.Plugins.Core.Assets.Character;
 using Warudo.Plugins.Core.Assets.Prop;
@@ -101,9 +102,9 @@ Make target controller hold controller in wanted neutral position, then set up a
         }
 
         public enum ControllerType {
-            [Label("Switch Pro Controller")]
+            [Label("Nintendo Switch Pro Controller")]
             SwitchProController,
-            [Label("PS5 Controller")]
+            [Label("PlayStation 5 Controller")]
             PS5Controller,
         }
 
@@ -203,6 +204,12 @@ Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** 
 
         [DataInput]
         public GamepadControlPadAnimationData[] ControlPadAnimationData;
+
+        [DataInput]
+        public GamepadStickAnimationData LeftStickAnimationData;
+
+        [DataInput]
+        public GamepadStickAnimationData RightStickAnimationData;
 
         [Trigger]
         [Description("Modifies your character to support finger animation.")]
