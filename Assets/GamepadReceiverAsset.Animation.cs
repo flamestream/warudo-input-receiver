@@ -39,7 +39,24 @@ namespace FlameStream {
                         .ToArray();
                     break;
             }
+
+            ControlPadAnimationData = Enum.GetValues(typeof(ControlPadDirection))
+                .Cast<ControlPadDirection>()
+                .Where(e => e != ControlPadDirection.None && e != ControlPadDirection.Neutral)
+                .Select(e => {
+                    var old = Array.Find(ControlPadAnimationData, d => (ControlPadDirection)d.ButtonId == e);
+
+                    var o = StructuredData.Create<GamepadControlPadAnimationData>();
+                    o.ButtonId = (int)e;
+                    o.PropLayerName = old?.PropLayerName ?? $"D{(int)e}";
+                    o.FingerHoverAnimation = old?.FingerHoverAnimation ?? null;
+                    o.FingerPressAnimation = old?.FingerPressAnimation ?? null;
+                    return o;
+                })
+                .ToArray();
+
             BroadcastDataInput(nameof(ButtonAnimationData));
+            BroadcastDataInput(nameof(ControlPadAnimationData));
             Context.Service.PromptMessage("SUCCESS", $@"Button animation definition for [{TargetControllerType}] has been succesfully generated.
 
 Please note that they do not have to be all filled. You may remove unused fields to optimize your setup.
@@ -133,6 +150,43 @@ Please note that they do not have to be all filled. You may remove unused fields
                 }
             }
 
+            OnUpdateNode onUpdateControlPadNode = graph.AddNode<OnUpdateNode>();
+
+            var fingerControlPadAnimatorNode = graph.AddNode<GamepadFingerControlPadAnimatorNode>();
+            fingerControlPadAnimatorNode.Character = Character;
+            fingerControlPadAnimatorNode.D1HoverLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 1)?.HoverLayerId;
+            fingerControlPadAnimatorNode.D1PressLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 1)?.PressLayerId;
+            fingerControlPadAnimatorNode.D2HoverLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 2)?.HoverLayerId;
+            fingerControlPadAnimatorNode.D2PressLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 2)?.PressLayerId;
+            fingerControlPadAnimatorNode.D3HoverLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 3)?.HoverLayerId;
+            fingerControlPadAnimatorNode.D3PressLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 3)?.PressLayerId;
+            fingerControlPadAnimatorNode.D4HoverLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 4)?.HoverLayerId;
+            fingerControlPadAnimatorNode.D4PressLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 4)?.PressLayerId;
+            fingerControlPadAnimatorNode.D6HoverLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 6)?.HoverLayerId;
+            fingerControlPadAnimatorNode.D6PressLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 6)?.PressLayerId;
+            fingerControlPadAnimatorNode.D7HoverLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 7)?.HoverLayerId;
+            fingerControlPadAnimatorNode.D7PressLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 7)?.PressLayerId;
+            fingerControlPadAnimatorNode.D8HoverLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 8)?.HoverLayerId;
+            fingerControlPadAnimatorNode.D8PressLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 8)?.PressLayerId;
+            fingerControlPadAnimatorNode.D9HoverLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 9)?.HoverLayerId;
+            fingerControlPadAnimatorNode.D9PressLayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 9)?.PressLayerId;
+            AddDataConnection(graph, receiverNode, "LeftFaceHoverInputId", fingerControlPadAnimatorNode, "HoverInputId");
+            AddDataConnection(graph, receiverNode, "ControlPad", fingerControlPadAnimatorNode, "ControlPadState");
+            AddFlowConnection(graph, onUpdateControlPadNode, "Exit", fingerControlPadAnimatorNode, "Enter");
+
+            var propControlPadAnimatorNode = graph.AddNode<GamepadControlPadAnimatorNode>();
+            propControlPadAnimatorNode.Controller = Gamepad;
+            propControlPadAnimatorNode.D1LayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 1)?.PropLayerName;
+            propControlPadAnimatorNode.D2LayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 2)?.PropLayerName;
+            propControlPadAnimatorNode.D3LayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 3)?.PropLayerName;
+            propControlPadAnimatorNode.D4LayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 4)?.PropLayerName;
+            propControlPadAnimatorNode.D6LayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 6)?.PropLayerName;
+            propControlPadAnimatorNode.D7LayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 7)?.PropLayerName;
+            propControlPadAnimatorNode.D8LayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 8)?.PropLayerName;
+            propControlPadAnimatorNode.D9LayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 9)?.PropLayerName;
+            AddDataConnection(graph, receiverNode, "ControlPad", fingerControlPadAnimatorNode, "ControlPadState");
+            AddFlowConnection(graph, fingerControlPadAnimatorNode, "Exit", propControlPadAnimatorNode, "Enter");
+
             base.Scene.AddGraph(graph);
             Context.Service.PromptMessage("SUCCESS", $"Blueprint {graph.Name} has been succesfully generated.");
             Context.Service.BroadcastOpenedScene();
@@ -186,6 +240,42 @@ Please note that they do not have to be all filled. You may remove unused fields
                 }
             }
 
+            foreach (var d in ControlPadAnimationData) {
+                if (d.FingerHoverAnimation != null) {
+                    var hoverLayer = StructuredData.Create<OverlappingAnimationData>();
+                    hoverLayer.Animation = d.FingerHoverAnimation;
+                    hoverLayer.Weight = 1f;
+                    hoverLayer.Speed = 1f;
+                    hoverLayer.Masked = true;
+                    hoverLayer.MaskedBodyParts = new AnimationMaskedBodyPart[] {
+                        AnimationMaskedBodyPart.RightFingers,
+                        AnimationMaskedBodyPart.LeftFingers
+                    };
+                    hoverLayer.Additive = true;
+                    hoverLayer.Looping = false;
+                    hoverLayer.CustomLayerID = d.HoverLayerId;
+
+                    userLayers.Add(hoverLayer);
+                }
+
+                if (d.FingerPressAnimation != null) {
+                    var pressLayer = StructuredData.Create<OverlappingAnimationData>();
+                    pressLayer.Animation = d.FingerPressAnimation;
+                    pressLayer.Weight = 1f;
+                    pressLayer.Speed = 1f;
+                    pressLayer.Masked = true;
+                    pressLayer.MaskedBodyParts = new AnimationMaskedBodyPart[] {
+                        AnimationMaskedBodyPart.RightFingers,
+                        AnimationMaskedBodyPart.LeftFingers
+                    };
+                    pressLayer.Additive = true;
+                    pressLayer.Looping = false;
+                    pressLayer.CustomLayerID = d.PressLayerId;
+
+                    userLayers.Add(pressLayer);
+                }
+            }
+
             UnityEngine.Debug.Log("[GamepadReceiverAsset.Animation] Final layers");
             foreach (var l in userLayers) {
                 UnityEngine.Debug.Log($"{l.Id} {l.CustomLayerID}");
@@ -224,8 +314,6 @@ Please note that they do not have to be all filled. You may remove unused fields
             [DataInput]
             public int ButtonId;
 
-            public bool IsLooping() { return false; }
-
             public string GetHeader() {
                 string name;
                 switch(TargetControllerType) {
@@ -245,6 +333,60 @@ Please note that they do not have to be all filled. You may remove unused fields
                         default:
                             return Enum.GetName(typeof(SwitchProButton), ButtonId);
                     }
+                }
+            }
+
+            public string HoverLayerId {
+                get {
+                    return $"🔥🎮 {ButtonName} Hover";
+                }
+            }
+
+            public string PressLayerId {
+                get {
+                    return $"🔥🎮 {ButtonName} Press";
+                }
+            }
+        }
+
+        public class GamepadControlPadAnimationData : StructuredData, ICollapsibleStructuredData {
+
+            [DataInput]
+            [PreviewGallery]
+            [AutoCompleteResource("CharacterAnimation", null)]
+            public string FingerHoverAnimation;
+
+            [DataInput]
+            [PreviewGallery]
+            [AutoCompleteResource("CharacterAnimation", null)]
+            public string FingerPressAnimation;
+
+            [DataInput]
+            public string PropLayerName;
+
+            [Hidden]
+            [DataInput]
+            public int ButtonId;
+
+            public string GetHeader() {
+                if (ButtonId == 0) return "Invalid. Please Generate this list instead.";
+                return $"{ButtonName}";
+            }
+
+            public string ButtonName {
+                get {
+                    switch(ButtonId) {
+                        case 1: return "↙️";
+                        case 2: return "⬇️";
+                        case 3: return "↘️";
+                        case 4: return "⬅️";
+                        case 6: return "➡️";
+                        case 7: return "↖️";
+                        case 8: return "⬆️";
+                        case 9: return "↗️";
+                    }
+
+                    return Enum.GetName(typeof(ControlPadDirection), ButtonId);
                 }
             }
 

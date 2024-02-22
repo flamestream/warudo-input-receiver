@@ -32,5 +32,8 @@
     <Reference Include="DOTween">
       <HintPath>../../../Managed/DOTween.dll</HintPath>
     </Reference>
+    <Reference Include="Animancer">
+      <HintPath>../../../Managed/Animancer.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>

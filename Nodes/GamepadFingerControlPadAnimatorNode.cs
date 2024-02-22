@@ -44,8 +44,12 @@ namespace FlameStream {
         [DataInput]
         public string D9PressLayerId = "d9p";
 
-        [DataInput(200)]
+        [DataInput(500)]
         public int ControlPadState;
+
+        public GamepadFingerControlPadAnimatorNode() {
+            _HideInputId = true;
+        }
 
         bool lastIsPressed;
 

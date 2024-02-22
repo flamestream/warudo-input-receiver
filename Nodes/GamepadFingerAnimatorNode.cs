@@ -16,6 +16,7 @@ namespace FlameStream {
         public CharacterAsset Character;
 
         [DataInput(0)]
+        [HiddenIf(nameof(HideInputId))]
         public string InputId;
 
         [DataInput(100)]
@@ -57,6 +58,11 @@ namespace FlameStream {
 
         [FlowOutput]
         public Continuation Exit;
+
+        public bool _HideInputId = false;
+        public bool HideInputId() {
+            return _HideInputId;
+        }
 
         protected Tween pressTween;
         protected Tween pressTweenClone;

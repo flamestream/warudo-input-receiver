@@ -10,6 +10,18 @@ namespace FlameStream
         const ushort PROTOCOL_VERSION = 2;
         const int DEFAULT_PORT = 40611;
 
+        public enum ControlPadDirection : int {
+            None = 0,
+            DownLeft = 1,
+            Down = 2,
+            DownRight = 3,
+            Left = 4,
+            Neutral = 5,
+            Right = 6,
+            UpLeft = 7,
+            Up = 8,
+            UpRight = 9,
+        };
 
         // NOTE: Buttons indices are offset by one to allow dummy default at 0./
         public enum SwitchProButton : int {

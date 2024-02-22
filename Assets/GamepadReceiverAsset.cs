@@ -101,7 +101,9 @@ Make target controller hold controller in wanted neutral position, then set up a
         }
 
         public enum ControllerType {
+            [Label("Switch Pro Controller")]
             SwitchProController,
+            [Label("PS5 Controller")]
             PS5Controller,
         }
 
@@ -199,14 +201,18 @@ Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** 
         [DataInput]
         public GamepadButtonAnimationData[] ButtonAnimationData;
 
-        [Trigger]
-        public void TriggerGenerateAnimationBlueprint() {
-            GenerateAnimationBlueprint();
-        }
+        [DataInput]
+        public GamepadControlPadAnimationData[] ControlPadAnimationData;
+
         [Trigger]
         [Description("Modifies your character to support finger animation.")]
         public void TriggerSyncCharacterOverlayingAnimations() {
             SyncCharacterOverlayingAnimations();
+        }
+
+        [Trigger]
+        public void TriggerGenerateAnimationBlueprint() {
+            GenerateAnimationBlueprint();
         }
     }
 }
