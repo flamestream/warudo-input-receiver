@@ -17,6 +17,19 @@ using static Warudo.Plugins.Core.Assets.Character.CharacterAsset;
 namespace FlameStream {
     public partial class GamepadReceiverAsset : ReceiverAsset {
 
+        const string LAYER_NAME_PREFIX = "🔥🎮";
+        const string LAYER_NAME_IDLE = "🔥🎮 Idle";
+
+        [DataInput]
+        [Hidden]
+        Guid AnimationGraphId;
+
+        Graph AnimationGraph {
+            get {
+                return Context.OpenedScene.GetGraph(AnimationGraphId);
+            }
+        }
+
         void GenerateButtonAnimationTemplate() {
             switch (TargetControllerType) {
                 case ControllerType.SwitchProController:
@@ -96,7 +109,7 @@ Please note that they do not have to be all filled. You may remove unused fields
         /// But we don't have control over it; it may be cleared by somethign else.
         /// So until we have a reserved stack that can be self-managed, this will have to do.
         /// </summary>
-        void GenerateAnimationBlueprint() {
+        async void GenerateAnimationBlueprint() {
 
             Graph graph = new Graph
             {
@@ -212,7 +225,7 @@ Please note that they do not have to be all filled. You may remove unused fields
             propControlPadAnimatorNode.D7LayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 7)?.PropLayerName;
             propControlPadAnimatorNode.D8LayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 8)?.PropLayerName;
             propControlPadAnimatorNode.D9LayerId = ControlPadAnimationData.FirstOrDefault(d => d.ButtonId == 9)?.PropLayerName;
-            AddDataConnection(graph, receiverNode, "ControlPad", fingerControlPadAnimatorNode, "ControlPadState");
+            AddDataConnection(graph, receiverNode, "ControlPad", propControlPadAnimatorNode, "ControlPadState");
             AddFlowConnection(graph, fingerControlPadAnimatorNode, "Exit", propControlPadAnimatorNode, "Enter");
 
             OnUpdateNode onUpdateStickNode = graph.AddNode<OnUpdateNode>();
@@ -222,7 +235,7 @@ Please note that they do not have to be all filled. You may remove unused fields
             fingerStick1AxisXAnimatorNode.NegativeLayerId = LeftStickAnimationData.NegativeXLayerId;
             fingerStick1AxisXAnimatorNode.PositiveLayerId = LeftStickAnimationData.PositiveXLayerId;
             AddDataConnection(graph, receiverNode, "LeftStickX", fingerStick1AxisXAnimatorNode, "AxisValue");
-            AddFlowConnection(graph, onUpdateControlPadNode, "Exit", fingerStick1AxisXAnimatorNode, "Enter");
+            AddFlowConnection(graph, onUpdateStickNode, "Exit", fingerStick1AxisXAnimatorNode, "Enter");
 
             var fingerStick1AxisYAnimatorNode = graph.AddNode<GamepadFingerAxisAnimatorNode>();
             fingerStick1AxisYAnimatorNode.Character = Character;
@@ -273,11 +286,19 @@ Please note that they do not have to be all filled. You may remove unused fields
             AddDataConnection(graph, receiverNode, "RightStickY", propStick2AxisYAnimatorNode, "AxisValue");
             AddFlowConnection(graph, propStick2AxisXAnimatorNode, "Exit", propStick2AxisYAnimatorNode, "Enter");
 
+            Graph oldgraph = AnimationGraph;
+            if (oldgraph != null) {
+                bool isDeleteWanted = await Context.Service.PromptConfirmation("WARNING", "DETECTED_ASSETS_AND_BLUEPRINT_CREATED_AUTOMATICALLY_DURING_A_PREVIOUS_SETUP");
+                if (isDeleteWanted) {
+                    Context.OpenedScene.RemoveGraph(oldgraph.Id);
+                }
+            }
 
+            AnimationGraphId = graph.Id;
             base.Scene.AddGraph(graph);
             Context.Service.PromptMessage("SUCCESS", $"Blueprint {graph.Name} has been succesfully generated.");
             Context.Service.BroadcastOpenedScene();
-            Context.Service.NavigateToGraph(graph.Id, receiverNode.Id);
+            Context.Service.NavigateToGraph(AnimationGraphId, receiverNode.Id);
         }
 
         void AddFlowConnection(Graph graph, Node n1, string s1, Node n2, string s2) {
@@ -292,7 +313,32 @@ Please note that they do not have to be all filled. You may remove unused fields
 
         void SyncCharacterOverlayingAnimations() {
 
-            var userLayers = Character.OverlappingAnimations.Where(d => !d.CustomLayerID.StartsWith("🔥🎮")).ToList();
+            var userLayers = Character.OverlappingAnimations.Where(d => !d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)).ToList();
+
+            // This one must be before all additive animations
+            if (IdleFingerAnimation != null) {
+                var oldLayer = Character.OverlappingAnimations.FirstOrDefault(d => d.CustomLayerID == LAYER_NAME_IDLE);
+                OverlappingAnimationData layer;
+                if (oldLayer != null) {
+                    layer = oldLayer;
+                } else {
+                    layer = StructuredData.Create<OverlappingAnimationData>();
+                    layer.Animation = IdleFingerAnimation;
+                    layer.Weight = 1f;
+                    layer.Speed = 1f;
+                    layer.Masked = true;
+                    layer.MaskedBodyParts = new AnimationMaskedBodyPart[] {
+                        AnimationMaskedBodyPart.RightFingers,
+                        AnimationMaskedBodyPart.LeftFingers,
+                    };
+                    layer.Additive = false;
+                    layer.Looping = false;
+                    layer.CustomLayerID = LAYER_NAME_IDLE;
+                }
+
+                userLayers.Add(layer);
+            }
+
             foreach (var d in ButtonAnimationData) {
                 if (d.FingerHoverAnimation != null) {
                     var hoverLayer = StructuredData.Create<OverlappingAnimationData>();
@@ -476,10 +522,9 @@ Please note that they do not have to be all filled. You may remove unused fields
                 UnityEngine.Debug.Log($"{l.Id} {l.CustomLayerID}");
             }
 
-            Character.OverlappingAnimations = userLayers.ToArray();
-            Character.BroadcastDataInput(nameof(Character.OverlappingAnimations));
-            Character.SetupOverlappingAnimations();
-
+            // NOTE: Doing it this way rather than setting value directly and involking broadcast/call SetupOverlappingAnimations()
+            // Because it crashes that way if the mod is not previously loaded
+            Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}", userLayers.ToArray(), true);
             Context.Service.PromptMessage("SUCCESS", "Character Overlaying Animations has been synced.");
         }
 
@@ -534,13 +579,13 @@ Please note that they do not have to be all filled. You may remove unused fields
 
             public string HoverLayerId {
                 get {
-                    return $"🔥🎮 {ButtonName} Hover";
+                    return $"{LAYER_NAME_PREFIX} {ButtonName} Hover";
                 }
             }
 
             public string PressLayerId {
                 get {
-                    return $"🔥🎮 {ButtonName} Press";
+                    return $"{LAYER_NAME_PREFIX} {ButtonName} Press";
                 }
             }
         }
@@ -588,13 +633,13 @@ Please note that they do not have to be all filled. You may remove unused fields
 
             public string HoverLayerId {
                 get {
-                    return $"🔥🎮 {ButtonName} Hover";
+                    return $"{LAYER_NAME_PREFIX} {ButtonName} Hover";
                 }
             }
 
             public string PressLayerId {
                 get {
-                    return $"🔥🎮 {ButtonName} Press";
+                    return $"{LAYER_NAME_PREFIX} {ButtonName} Press";
                 }
             }
         }
@@ -645,22 +690,22 @@ Please note that they do not have to be all filled. You may remove unused fields
 
             public string NegativeXLayerId {
                 get {
-                    return $"🔥🎮 {ButtonName} -X";
+                    return $"{LAYER_NAME_PREFIX} {ButtonName} -X";
                 }
             }
             public string PositiveXLayerId {
                 get {
-                    return $"🔥🎮 {ButtonName} +X";
+                    return $"{LAYER_NAME_PREFIX} {ButtonName} +X";
                 }
             }
             public string NegativeYLayerId {
                 get {
-                    return $"🔥🎮 {ButtonName} -Y";
+                    return $"{LAYER_NAME_PREFIX} {ButtonName} -Y";
                 }
             }
             public string PositiveYLayerId {
                 get {
-                    return $"🔥🎮 {ButtonName} +Y";
+                    return $"{LAYER_NAME_PREFIX} {ButtonName} +Y";
                 }
             }
         }

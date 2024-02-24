@@ -5,6 +5,7 @@ using Warudo.Core.Data;
 using Warudo.Core.Scenes;
 using Warudo.Plugins.Core.Assets.Character;
 using Warudo.Plugins.Core.Assets.Prop;
+using UMod;
 
 namespace FlameStream
 {
@@ -17,6 +18,8 @@ namespace FlameStream
         protected override void OnCreate() {
             if (Port == 0) Port = DEFAULT_PORT;
             base.OnCreate();
+            Watch(nameof(IsHandEnabled), delegate { OnIsHandEnabledChange(); });
+            Watch(nameof(IdleFingerAnimation), delegate { OnIdleFingerAnimationChange(); });
         }
 
         public override void OnUpdate() {
@@ -41,7 +44,12 @@ namespace FlameStream
         /// <summary>
         /// BASIC SETUP
         /// </summary>
-        [Section("Basic Prop Setup")]
+        [Section("Basic Hand and Prop Setup")]
+
+        [DataInput]
+        [Label("ENABLE")]
+        [DisabledIf(nameof(IsBasicSetupNotDone))]
+        public bool IsHandEnabled;
 
         [Markdown]
         [HiddenIf(nameof(IsBasicSetupDone))]
@@ -52,6 +60,11 @@ Make target controller hold controller in wanted neutral position, then set up a
         [DataInput]
         [DisabledIf(nameof(IsBasicSetupDone))]
         public CharacterAsset Character;
+
+        [DataInput]
+        [PreviewGallery]
+        [AutoCompleteResource("CharacterAnimation", null)]
+        public string IdleFingerAnimation;
 
         [DataInput]
         [DisabledIf(nameof(IsBasicSetupDone))]

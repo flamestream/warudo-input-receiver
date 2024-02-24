@@ -1,11 +1,16 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using UnityEngine;
+using Warudo.Core;
 using Warudo.Core.Attributes;
+using Warudo.Core.Data;
 using Warudo.Core.Scenes;
 using Warudo.Plugins.Core.Assets;
 using Warudo.Plugins.Core.Assets.Character;
 using Warudo.Plugins.Core.Assets.Utility;
+using static Warudo.Plugins.Core.Assets.Character.CharacterAsset;
 
 namespace FlameStream
 {
@@ -106,6 +111,78 @@ namespace FlameStream
             return Gamepad == null || Character == null;
         }
 
+        void OnIsHandEnabledChange() {
+            var idleLayer = Character.OverlappingAnimations.FirstOrDefault(d => d.CustomLayerID == LAYER_NAME_IDLE);
+            if (idleLayer != null) {
+                var idx = Array.IndexOf(Character.OverlappingAnimations, idleLayer);
+                Character.DataInputPortCollection.SetValueAtPath(
+                    $"{nameof(Character.OverlappingAnimations)}.{idx}.Weight",
+                    IsHandEnabled ? 1f : 0f,
+                    true
+                );
+            }
+            EnableLimb(IsHandEnabled, Character.LeftHandIK, LeftHandAnchor);
+            EnableLimb(IsHandEnabled, Character.RightHandIK, RightHandAnchor);
+
+            var animationGraph = AnimationGraph;
+            if (animationGraph != null) {
+                animationGraph.Enabled = IsHandEnabled;
+                Context.Service?.BroadcastGraphEnabled(animationGraph.Id, IsHandEnabled);
+            }
+
+            Gamepad.SetDataInput(nameof(Gamepad.Enabled), IsHandEnabled);
+            Gamepad.BroadcastDataInput(nameof(Gamepad.Enabled));
+        }
+
+        void EnableLimb(bool isEnabled, LimbIKData limb, AnchorAsset anchor) {
+            if (isEnabled) {
+                limb.Enabled = true;
+                limb.IkTarget = anchor;
+                limb.PositionWeight = 1.0f;
+                limb.RotationWeight = 1.0f;
+            } else {
+                limb.Enabled = false;
+            }
+            limb.Broadcast();
+        }
+
+        public void OnIdleFingerAnimationChange() {
+            if (Character == null) return;
+
+            var idleLayer = Character.OverlappingAnimations?.FirstOrDefault(d => d.CustomLayerID == LAYER_NAME_IDLE);
+            if (idleLayer == null) {
+                idleLayer = StructuredData.Create<OverlappingAnimationData>();
+                idleLayer.Animation = IdleFingerAnimation;
+                idleLayer.Weight = 1f;
+                idleLayer.Speed = 1f;
+                idleLayer.Masked = true;
+                idleLayer.MaskedBodyParts = new AnimationMaskedBodyPart[] {
+                    AnimationMaskedBodyPart.LeftArm,
+                    AnimationMaskedBodyPart.RightArm,
+                    AnimationMaskedBodyPart.LeftFingers,
+                    AnimationMaskedBodyPart.RightFingers,
+                };
+                idleLayer.Additive = false;
+                idleLayer.Looping = false;
+                idleLayer.CustomLayerID = LAYER_NAME_IDLE;
+
+                var list = Character.OverlappingAnimations?.ToList() ?? new List<OverlappingAnimationData>();
+                var firstLayerElement = list.Find(d => d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX));
+                var idx = list.IndexOf(firstLayerElement);
+                if (idx >= 0) {
+                    list.Insert(idx, idleLayer);
+                } else {
+                    list.Add(idleLayer);
+                }
+                Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}", list.ToArray(), true);
+
+            } else {
+
+                var idx = Array.IndexOf(Character.OverlappingAnimations, idleLayer);
+                Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}.{idx}.Animation", IdleFingerAnimation, true);
+            }
+        }
+
         void SetupGamepadAnchors() {
 
             AnchorAsset rootAnchor = Scene.AddAsset<AnchorAsset>();
@@ -196,10 +273,7 @@ namespace FlameStream
 
             anchorAssetId = anchor.Id;
 
-            limb.Enabled = true;
-            limb.IkTarget = anchor;
-            limb.PositionWeight = 1.0f;
-            limb.RotationWeight = 1.0f;
+            EnableLimb(true, limb, anchor);
 
             Helper.SetParent(anchor, parent);
 

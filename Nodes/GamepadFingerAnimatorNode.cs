@@ -20,15 +20,15 @@ namespace FlameStream {
         public string InputId;
 
         [DataInput(100)]
-        public float HoverTransitionTime = 0f;
+        public float HoverTransitionTime = 0.1f;
         [DataInput(100)]
         public Ease HoverTransitionEasing = Ease.OutCubic;
         [DataInput(100)]
-        public float PressInTransitionTime = 0.5f;
+        public float PressInTransitionTime = 0f;
         [DataInput(200)]
         public Ease PressInTransitionEasing = Ease.OutCubic;
         [DataInput(200)]
-        public float PressOutTransitionTime = 0.5f;
+        public float PressOutTransitionTime = 0.1f;
         [DataInput(200)]
         public Ease PressOutTransitionEasing = Ease.OutCubic;
 

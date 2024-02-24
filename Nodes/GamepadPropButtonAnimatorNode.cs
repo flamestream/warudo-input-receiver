@@ -76,7 +76,7 @@ namespace FlameStream {
         [DataInput]
         public float OnDampingTime = 0.05f;
         [DataInput]
-        public float OnDelay = 0f;
+        public float OnDelay = 0.2f;
         [DataInput]
         public float OffDampingTime = 0.05f;
         [DataInput]

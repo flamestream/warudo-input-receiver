@@ -35,5 +35,11 @@
     <Reference Include="Animancer">
       <HintPath>../../../Managed/Animancer.dll</HintPath>
     </Reference>
+    <Reference Include="UMod">
+      <HintPath>../../../Managed/UMod.dll</HintPath>
+    </Reference>
+    <Reference Include="UMod-Interface">
+      <HintPath>../../../Managed/UMod-Interface.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>

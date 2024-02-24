@@ -36,8 +36,8 @@ namespace FlameStream {
         protected override void OnCreate() {
             base.OnCreate();
 
-            Watch(nameof(IsEnabled), OnIsEnabledChange);
-            Watch(nameof(Port), OnPortChange);
+            Watch(nameof(IsEnabled), delegate { OnIsEnabledChange(); });
+            Watch(nameof(Port), delegate { OnPortChange(); });
 
             if (Active) StartReceiver();
         }
