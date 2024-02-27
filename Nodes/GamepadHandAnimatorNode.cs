@@ -7,39 +7,50 @@ using Warudo.Plugins.Core.Assets.Character;
 
 namespace FlameStream {
 
-    public abstract class GamepadFingerAnimatorNode : Node {
+    public abstract class GamepadHandAnimatorNode : Node {
 
         [DataOutput]
+        [Label("HOVER_INPUT_ID")]
         public string _HoverInputId() => HoverInputId;
 
         [DataInput(0)]
+        [Label("CHARACTER")]
         public CharacterAsset Character;
 
         [DataInput(0)]
         [HiddenIf(nameof(HideInputId))]
+        [Label("INPUT_ID")]
         public string InputId;
 
         [DataInput(100)]
+        [Label("HOVER_TRANSITION_TIME")]
         public float HoverTransitionTime = 0.1f;
         [DataInput(100)]
+        [Label("HOVER_TRANSITION_EASING")]
         public Ease HoverTransitionEasing = Ease.OutCubic;
         [DataInput(100)]
+        [Label("PRESS_IN_TRANSITION_TIME")]
         public float PressInTransitionTime = 0f;
         [DataInput(200)]
+        [Label("PRESS_IN_TRANSITION_EASING")]
         public Ease PressInTransitionEasing = Ease.OutCubic;
         [DataInput(200)]
+        [Label("PRESS_OUT_TRANSITION_TIME")]
         public float PressOutTransitionTime = 0.1f;
         [DataInput(200)]
+        [Label("PRESS_OUT_TRANSITION_EASING")]
         public Ease PressOutTransitionEasing = Ease.OutCubic;
 
         [DataInput(500)]
-        [Description("From receiver Hover Input ID")]
+        [Label("HOVER_INPUT_ID")]
         public string HoverInputId;
 
         [Markdown(1000)]
+        [Label("MESSAGE")]
         public string Message;
 
         [FlowInput]
+        [Label("ENTER")]
         public Continuation Enter() {
 
             Message = "";
@@ -57,6 +68,7 @@ namespace FlameStream {
         }
 
         [FlowOutput]
+        [Label("EXIT")]
         public Continuation Exit;
 
         public bool _HideInputId = false;

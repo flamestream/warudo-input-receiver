@@ -1,24 +1,24 @@
-using System;
-using DG.Tweening;
 using Warudo.Core.Attributes;
 using Warudo.Core.Graphs;
-using Warudo.Core.Utils;
-using Warudo.Plugins.Core.Assets.Character;
 
-namespace FlameStream {
-[NodeType(
-    Id = "FlameStream.Node.GamepadFingerButtonAnimator",
-    Title = "Gamepad Finger Button Animator",
+namespace FlameStream
+{
+    [NodeType(
+    Id = "FlameStream.Node.GamepadButtonHandAnimator",
+    Title = "NODE_TITLE_GAMEPAD_BUTTON_HAND_ANIMATOR",
     Category = "NODE_CATEGORY")]
-    public class GamepadFingerButtonAnimatorNode : GamepadFingerAnimatorNode {
+    public class GamepadButtonHandAnimatorNode : GamepadHandAnimatorNode {
 
         [DataInput(99)]
+        [Label("HOVER_LAYER_ID")]
         public string HoverLayerId;
         [DataInput(199)]
+        [Label("PRESS_LAYER_ID")]
         public string PressLayerId;
 
         [DataInput(500)]
         [Description("From receiver Button Press State")]
+        [Label("IS_PRESSED")]
         public bool IsPressed;
 
         protected bool lastIsPressed;

@@ -13,11 +13,11 @@ namespace FlameStream {
         public PointerReceiverAsset Receiver;
 
         [DataOutput]
-        [Label("NODE_IS_ACTIVE")]
+        [Label("IS_ACTIVE")]
         public bool IsActive() => Receiver != null && Receiver.Active;
 
         [DataOutput]
-        [Label("NODE_IS_RECEIVING")]
+        [Label("IS_RECEIVING")]
         public bool IsReceiving() => Receiver != null && Receiver.IsReceiving;
 
         [DataOutput]
@@ -27,15 +27,15 @@ namespace FlameStream {
         public int Y() => Receiver == null ? 0 : Receiver.Y;
 
         [DataOutput]
-        [Label("NODE_POINTER_SOURCE")]
+        [Label("POINTER_SOURCE")]
         public int Source() => Receiver == null ? 0 : Receiver.Source;
 
         [DataOutput]
-        [Label("NODE_POINTER_BUTTON_1")]
+        [Label("POINTER_BUTTON_1")]
         public bool Button1() => Receiver != null && Receiver.Button1;
 
         [DataOutput]
-        [Label("NODE_POINTER_BUTTON_2")]
+        [Label("POINTER_BUTTON_2")]
         public bool Button2() => Receiver != null && Receiver.Button2;
     }
 }

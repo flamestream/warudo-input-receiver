@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using UnityEngine;
 using Warudo.Core;
 using Warudo.Core.Attributes;
@@ -73,6 +72,13 @@ namespace FlameStream
             RightHand,
         }
 
+        public enum GamepadType {
+            [Label("Nintendo Switch Pro Controller")]
+            SwitchProController,
+            [Label("PlayStation 5 Controller")]
+            PS5Controller,
+        }
+
         public AnchorAsset RootAnchor {
             get {
                 if (RootAnchorAssetId == Guid.Empty) return null;
@@ -108,7 +114,7 @@ namespace FlameStream
             return !IsBasicSetupNotDone();
         }
         bool IsBasicSetupInputMissing() {
-            return Gamepad == null || Character == null;
+            return Gamepad == null || Character == null || IdleFingerAnimation == null;
         }
 
         void OnIsHandEnabledChange() {
@@ -151,20 +157,8 @@ namespace FlameStream
 
             var idleLayer = Character.OverlappingAnimations?.FirstOrDefault(d => d.CustomLayerID == LAYER_NAME_IDLE);
             if (idleLayer == null) {
-                idleLayer = StructuredData.Create<OverlappingAnimationData>();
-                idleLayer.Animation = IdleFingerAnimation;
-                idleLayer.Weight = 1f;
-                idleLayer.Speed = 1f;
-                idleLayer.Masked = true;
-                idleLayer.MaskedBodyParts = new AnimationMaskedBodyPart[] {
-                    AnimationMaskedBodyPart.LeftArm,
-                    AnimationMaskedBodyPart.RightArm,
-                    AnimationMaskedBodyPart.LeftFingers,
-                    AnimationMaskedBodyPart.RightFingers,
-                };
-                idleLayer.Additive = false;
-                idleLayer.Looping = false;
-                idleLayer.CustomLayerID = LAYER_NAME_IDLE;
+
+                idleLayer = CreateIdleFingerAnimationData();
 
                 var list = Character.OverlappingAnimations?.ToList() ?? new List<OverlappingAnimationData>();
                 var firstLayerElement = list.Find(d => d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX));
@@ -174,16 +168,16 @@ namespace FlameStream
                 } else {
                     list.Add(idleLayer);
                 }
-                Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}", list.ToArray(), true);
+                // Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}", list.ToArray(), true);
 
             } else {
 
                 var idx = Array.IndexOf(Character.OverlappingAnimations, idleLayer);
-                Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}.{idx}.Animation", IdleFingerAnimation, true);
+                // Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}.{idx}.Animation", IdleFingerAnimation, true);
             }
         }
 
-        void SetupGamepadAnchors() {
+        void ApplyBasicSetup() {
 
             AnchorAsset rootAnchor = Scene.AddAsset<AnchorAsset>();
             rootAnchor.Name = "⚓-🔥🎮 Mover";
@@ -247,13 +241,24 @@ namespace FlameStream
             GamepadRightHandPosition = Gamepad.Transform.Position;
             GamepadRightHandRotation = Gamepad.Transform.Rotation;
 
-            AttachGamepad(DefaultControllerAnchorSide);
+            AttachGamepad(DefaultAnchorSide);
 
             rootAnchor.Broadcast();
             gamepadAnchor.Broadcast();
             leftAnchor.Broadcast();
             rightAnchor.Broadcast();
             Gamepad.Broadcast();
+
+            var idleLayer = Character.OverlappingAnimations?.FirstOrDefault(d => d.CustomLayerID == LAYER_NAME_IDLE);
+            var idx = Array.IndexOf(Character.OverlappingAnimations, idleLayer);
+            Character.DataInputPortCollection.SetValueAtPath(
+                $"{nameof(Character.OverlappingAnimations)}.{idx}.MaskedBodyParts",
+                new AnimationMaskedBodyPart[] {
+                    AnimationMaskedBodyPart.LeftFingers,
+                    AnimationMaskedBodyPart.RightFingers,
+                },
+                true
+            );
         }
 
         AnchorAsset SetupIKTargetHandAnchor(
@@ -309,7 +314,7 @@ namespace FlameStream
         void ResetAllAnchors() {
             Gamepad.Transform.Position = GamepadRightHandPosition;
             Gamepad.Transform.Rotation = GamepadRightHandRotation;
-            AttachGamepad(DefaultControllerAnchorSide);
+            AttachGamepad(DefaultAnchorSide);
 
             RootAnchor.Transform.Position = RootAnchorPosition;
             RootAnchor.Transform.Rotation = RootAnchorRotation;

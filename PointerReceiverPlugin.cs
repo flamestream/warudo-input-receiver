@@ -16,8 +16,8 @@ namespace FlameStream {
             typeof(CharacterAssetReferenceNode),
             typeof(GameObjectAssetReferenceNode),
             typeof(GetPointerReceiverDataNode),
-            typeof(GetGamepadReceiverDataNode),
-            typeof(GetPs5GamepadReceiverDataNode),
+            typeof(GetGamepadReceiverDataPs5Node),
+            typeof(GetGamepadReceiverDataSwitchNode),
         })]
     public class PointerReceiverPlugin : Plugin {}
 }

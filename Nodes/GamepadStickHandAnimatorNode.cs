@@ -6,42 +6,21 @@ using Warudo.Plugins.Core.Assets.Character;
 
 namespace FlameStream {
 [NodeType(
-    Id = "FlameStream.Node.GamepadFingerAxisAnimator",
-    Title = "Gamepad Finger Axis Animator",
+    Id = "FlameStream.Node.GamepadStickHandAnimator",
+    Title = "NODE_TITLE_GAMEPAD_STICK_HAND_ANIMATOR",
     Category ="NODE_CATEGORY")]
-    public class GamepadFingerAxisAnimatorNode : Node {
+    public class GamepadStickHandAnimatorNode : GamepadStickAnimatorNode {
 
-        [FlowInput]
-        public Continuation Enter() {
-            BroadcastDataInput(nameof(Message));
-
-            Message = null;
-            if (Character == null) return Exit;
-
-            ProcessAnimation();
-
-            return Exit;
-        }
-
-        [FlowOutput]
-        public Continuation Exit;
         [DataInput]
         public CharacterAsset Character;
-        [DataInput]
-        public string NegativeLayerId;
-        [DataInput]
-        public string PositiveLayerId;
-        [DataInput]
-        public float AxisValue;
-        [Markdown]
-        public string Message;
 
         CharacterAsset.OverlappingAnimationData GetOverlappingAnimationData(string layerId) {
             if (layerId.IsNullOrWhiteSpace()) return null;
             return Array.Find(Character.OverlappingAnimations, (a) => a.CustomLayerID == layerId);
         }
 
-        void ProcessAnimation() {
+        override protected void ProcessAnimation() {
+            if (Character == null) return;
 
             var negativeOverlappingAnimationData = GetOverlappingAnimationData(NegativeLayerId);
             if (negativeOverlappingAnimationData == null) {
@@ -55,8 +34,8 @@ namespace FlameStream {
                 return;
             }
 
-            int negativeIdx = Array.IndexOf<CharacterAsset.OverlappingAnimationData>(Character.OverlappingAnimations, negativeOverlappingAnimationData) + 1;
-            int positiveIdx = Array.IndexOf<CharacterAsset.OverlappingAnimationData>(Character.OverlappingAnimations, positiveOverlappingAnimationData) + 1;
+            int negativeIdx = Array.IndexOf(Character.OverlappingAnimations, negativeOverlappingAnimationData) + 1;
+            int positiveIdx = Array.IndexOf(Character.OverlappingAnimations, positiveOverlappingAnimationData) + 1;
 
             var animancer = Character.Animancer;
             var animancer2 = Character.CloneAnimancer;

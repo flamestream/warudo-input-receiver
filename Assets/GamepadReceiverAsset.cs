@@ -1,11 +1,9 @@
 using DG.Tweening;
 using UnityEngine;
 using Warudo.Core.Attributes;
-using Warudo.Core.Data;
 using Warudo.Core.Scenes;
 using Warudo.Plugins.Core.Assets.Character;
 using Warudo.Plugins.Core.Assets.Prop;
-using UMod;
 
 namespace FlameStream
 {
@@ -19,6 +17,7 @@ namespace FlameStream
             if (Port == 0) Port = DEFAULT_PORT;
             base.OnCreate();
             Watch(nameof(IsHandEnabled), delegate { OnIsHandEnabledChange(); });
+            Watch(nameof(Character), delegate { OnIdleFingerAnimationChange(); });
             Watch(nameof(IdleFingerAnimation), delegate { OnIdleFingerAnimationChange(); });
         }
 
@@ -35,21 +34,16 @@ namespace FlameStream
 
         [DataInput]
         [Label("Game Controller Type")]
-        public ControllerType TargetControllerType;
+        public GamepadType TargetGamepadType;
 
         [DataInput]
         [Label("Default Controller Hand")]
-        public GamepadHandSide DefaultControllerAnchorSide;
+        public GamepadHandSide DefaultAnchorSide;
 
         /// <summary>
         /// BASIC SETUP
         /// </summary>
         [Section("Basic Hand and Prop Setup")]
-
-        [DataInput]
-        [Label("ENABLE")]
-        [DisabledIf(nameof(IsBasicSetupNotDone))]
-        public bool IsHandEnabled;
 
         [Markdown]
         [HiddenIf(nameof(IsBasicSetupDone))]
@@ -64,6 +58,7 @@ Make target controller hold controller in wanted neutral position, then set up a
         [DataInput]
         [PreviewGallery]
         [AutoCompleteResource("CharacterAnimation", null)]
+        [DisabledIf(nameof(IsBasicSetupDone))]
         public string IdleFingerAnimation;
 
         [DataInput]
@@ -74,9 +69,14 @@ Make target controller hold controller in wanted neutral position, then set up a
         [Trigger]
         [DisabledIf(nameof(IsBasicSetupInputMissing))]
         [HiddenIf(nameof(IsBasicSetupDone))]
-        public void TriggerSetupGamepadAnchors() {
-            SetupGamepadAnchors();
+        public void TriggerApplyBasicSetup() {
+            ApplyBasicSetup();
         }
+
+        [DataInput]
+        [Label("ENABLE")]
+        [HiddenIf(nameof(IsBasicSetupNotDone))]
+        public bool IsHandEnabled;
 
         [Trigger]
         [Label("🔁 Reset All Anchors")]
@@ -93,13 +93,13 @@ Make target controller hold controller in wanted neutral position, then set up a
         }
 
         /// <summary>
-        /// SHAKING MOTION
+        /// SHAKING AND TILTING MOTION
         /// </summary>
-        [Section("Shaking Motion")]
+        [Section("Shaking and Tilting Motion")]
 
         [Markdown]
         [HiddenIf(nameof(CanConfigureShaking))]
-        public string ShakingMotionInstructions = "Allows game controller to shake in response to input.";
+        public string ShakingMotionInstructions = "Allows game controller to shake and tilt in response to input.";
 
         [DataInput]
         [Label("ENABLE")]
@@ -114,24 +114,18 @@ Make target controller hold controller in wanted neutral position, then set up a
             return !IsShakingEnabled;
         }
 
-        public enum ControllerType {
-            [Label("Nintendo Switch Pro Controller")]
-            SwitchProController,
-            [Label("PlayStation 5 Controller")]
-            PS5Controller,
-        }
-
         [DataInput]
         [HiddenIf(nameof(CannotConfigureShaking))]
         [FloatSlider(0.1f, 10f, 0.01f)]
         float TiltInfluenceFactor = 1.0f;
+
         [DataInput]
         [HiddenIf(nameof(CannotConfigureShaking))]
         [FloatSlider(0.1f, 10f, 0.01f)]
         float DisplacementInfluenceFactor = 1.0f;
 
         /// <summary>
-        /// HAND TRACKING
+        /// HAND TRACKER
         /// </summary>
         [Section("Hand Tracker")]
 
@@ -156,7 +150,6 @@ Make target controller hold controller in wanted neutral position, then set up a
         [HiddenIf(nameof(CannotConfigureHandTracker))]
         public string HandTrackerInstructions = @"### Setup Instructions
 Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** node before the **Override Character Bone Rotations** node's **Bone Rotation Weights** input.";
-
 
         [DataInput]
         [HiddenIf(nameof(CannotConfigureHandTracker))]
@@ -201,11 +194,10 @@ Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** 
         [Markdown]
         public string AnimationInstructions = @"### Game Controller Prop Setup
 * The prop must have an Animator component with multiple named **Additive blending** layers for each wanted buttons
-* Map each button to the correct layer
 ### Finger Animation
-* Finger animations files must be provided
-* Two animations per button: hover and press
-* Animations must have an additive reference pose";
+* Animations should have **Additive Reference Pose**
+* Additive reference pose should be equivalent to the idle finger pose defined in the **General Configuration** section
+* Idle finger pose must be resting thumbs on the two sticks";
 
         [Trigger]
         public void TriggerGenerateButtonAnimationTemplate() {
@@ -216,7 +208,7 @@ Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** 
         public GamepadButtonAnimationData[] ButtonAnimationData;
 
         [DataInput]
-        public GamepadControlPadAnimationData[] ControlPadAnimationData;
+        public GamepadDPadAnimationData[] DPadAnimationData;
 
         [DataInput]
         public GamepadStickAnimationData LeftStickAnimationData;

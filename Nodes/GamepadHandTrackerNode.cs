@@ -5,24 +5,29 @@ using Warudo.Core.Graphs;
 namespace FlameStream {
 [NodeType(
     Id = "FlameStream.Node.GamepadHandTrackerNode",
-    Title = "🔥🎮 Hand Tracker",
+    Title = "NODE_TITLE_GAMEPAD_HAND_TRACKER",
     Category = "NODE_CATEGORY")
 ]
     public class GamepadHandTrackerModderNode : Node {
 
         [DataInput]
+        [Label("RECEIVER")]
         public GamepadReceiverAsset Receiver;
 
         [DataInput]
+        [Label("IS_LEFT_HAND_TRACKED")]
         public bool IsLeftHandTracked;
 
         [DataInput]
+        [Label("IS_RIGHT_HAND_TRACKED")]
         public bool IsRightHandTracked;
 
         [DataInput]
+        [Label("BONE_ROTATION_WEIGHTS")]
         public float[] BoneRotationWeights;
 
         [DataOutput]
+        [Label("OUTPUT_BONE_WEIGHTS")]
         public float[] OutputBoneRotationWeights() {
 
             var boneWeights = new float[55];
@@ -48,11 +53,13 @@ namespace FlameStream {
         }
 
         [FlowInput]
+        [Label("ENTER")]
         public Continuation Enter() {
             MainLoop();
             return Exit;
         }
         [FlowOutput]
+        [Label("EXIT")]
         public Continuation Exit;
 
         void MainLoop() {

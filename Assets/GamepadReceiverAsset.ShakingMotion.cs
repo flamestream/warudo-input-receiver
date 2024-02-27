@@ -35,7 +35,7 @@ namespace FlameStream {
             var influenceX = LeftStickX + RightStickX;
             var influenceY = LeftStickY + RightStickY;
 
-            switch(Pad) {
+            switch(DPad) {
                 case 1:
                     influenceX += -1f;
                     influenceY += 1f;
@@ -84,86 +84,6 @@ namespace FlameStream {
                 RootAnchorRotation + tilt * TiltInfluenceFactor,
                 0.1f
             ).SetEase(Ease.Linear);
-        }
-
-        float LeftStickX {
-            get {
-                switch(TargetControllerType) {
-                    case ControllerType.SwitchProController:
-                        return (LX / (float)ushort.MaxValue - 0.5f) * 2f;
-                }
-                return 0.5f;
-            }
-        }
-
-        float LeftStickY {
-            get {
-                switch(TargetControllerType) {
-                    case ControllerType.SwitchProController:
-                        return (LY / (float)ushort.MaxValue - 0.5f) * 2f;
-                }
-                return 0.5f;
-            }
-        }
-
-        float RightStickX {
-            get {
-                switch(TargetControllerType) {
-                    case ControllerType.SwitchProController:
-                        return (LrX / (float)ushort.MaxValue - 0.5f) * 2f;
-                }
-                return 0.5f;
-            }
-        }
-
-        float RightStickY {
-            get {
-                switch(TargetControllerType) {
-                    case ControllerType.SwitchProController:
-                        return (LrY / (float)ushort.MaxValue - 0.5f) * 2f;
-                }
-                return 0.5f;
-            }
-        }
-
-        bool IsAnyFaceButtonActivated {
-            get {
-                switch(TargetControllerType) {
-                    case ControllerType.SwitchProController:
-                        return Array.Find(FaceButtonIdsSwitch, v => ActivatedButtonFlag(v)) != 0;
-                }
-                return false;
-            }
-        }
-
-        bool IsAnyFaceButtonDown {
-            get {
-                switch(TargetControllerType) {
-                    case ControllerType.SwitchProController:
-                        return Array.Find(FaceButtonIdsSwitch, v => ButtonFlag(v)) != 0;
-                }
-                return false;
-            }
-        }
-
-        bool IsAnyShoulderButtonActivated {
-            get {
-                switch(TargetControllerType) {
-                    case ControllerType.SwitchProController:
-                        return Array.Find(ShoulderButtonIdsSwitch, v => ActivatedButtonFlag(v)) != 0;
-                }
-                return false;
-            }
-        }
-
-        bool IsAnyShoulderButtonDown {
-            get {
-                switch(TargetControllerType) {
-                    case ControllerType.SwitchProController:
-                        return Array.Find(ShoulderButtonIdsSwitch, v => ButtonFlag(v)) != 0;
-                }
-                return false;
-            }
         }
     }
 }

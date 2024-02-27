@@ -1,19 +1,19 @@
 using System;
-using System.Data;
 using UnityEngine;
 using Warudo.Core.Attributes;
 using Warudo.Core.Graphs;
-using Warudo.Core.Scenes;
 using Warudo.Plugins.Core.Assets;
 
-namespace FlameStream {
-[NodeType(
-    Id = "FlameStream.Node.GamepadPropButtonAnimator",
-    Title = "Gamepad Prop Button Animator",
+namespace FlameStream
+{
+    [NodeType(
+    Id = "FlameStream.Node.GamepadButtonPropAnimatorNode",
+    Title = "NODE_TITLE_GAMEPAD_BUTTON_PROP_ANIMATOR",
     Category ="NODE_CATEGORY")]
-    public class GamepadPropButtonAnimatorNode : Node {
+    public class GamepadButtonPropAnimatorNode : Node {
 
         [FlowInput]
+        [Label("ENTER")]
         public Continuation Enter() {
             BroadcastDataInput(nameof(Message));
 
@@ -34,14 +34,14 @@ namespace FlameStream {
 
             if (IsPressed && !previousIsActive) {
 
-                timeToAnimationPlay = OnDelay;
-                targetDampingTime = OnDampingTime;
+                timeToAnimationPlay = PressInDelayTime;
+                targetDampingTime = PressInTransitionTime;
                 targetWeight = 1;
 
             } else if (!IsPressed && previousIsActive) {
 
-                timeToAnimationPlay = OffDelay;
-                targetDampingTime = OffDampingTime;
+                timeToAnimationPlay = PressOutDelayTime;
+                targetDampingTime = PressOutTransitionTime;
                 targetWeight = 0;
 
             } else if (timeToAnimationPlay > 0) {
@@ -61,29 +61,39 @@ namespace FlameStream {
             return Exit;
         }
 
+        [FlowOutput]
+        [Label("EXIT")]
+        public Continuation Exit;
+
+        [DataInput]
+        [Label("CONTROLLER")]
+        public GameObjectAsset Controller;
+        [DataInput]
+        [Label("PRESS_LAYER_ID")]
+        public string PressLayerId;
+        [DataInput]
+        [Label("PRESS_IN_TRANSITION_TIME")]
+        public float PressInTransitionTime = 0.05f;
+        [DataInput]
+        [Label("PRESS_IN_DELAY_TIME")]
+        public float PressInDelayTime = 0.2f;
+        [DataInput]
+        [Label("PRESS_OUT_TRANSITION_TIME")]
+        public float PressOutTransitionTime = 0.05f;
+        [DataInput]
+        [Label("PRESS_OUT_DELAY_TIME")]
+        public float PressOutDelayTime = 0f;
+        [DataInput]
+        [Label("IS_PRESSED")]
+        public bool IsPressed;
+        [Markdown]
+        [Label("MESSAGE")]
+        public string Message;
+
         bool previousIsActive;
         float targetWeight;
         float timeToAnimationPlay;
         float currentDampingVelocity;
         float targetDampingTime;
-
-        [FlowOutput]
-        public Continuation Exit;
-        [DataInput]
-        public GameObjectAsset Controller;
-        [DataInput]
-        public string PressLayerId;
-        [DataInput]
-        public float OnDampingTime = 0.05f;
-        [DataInput]
-        public float OnDelay = 0.2f;
-        [DataInput]
-        public float OffDampingTime = 0.05f;
-        [DataInput]
-        public float OffDelay = 0f;
-        [DataInput]
-        public bool IsPressed;
-        [Markdown]
-        public string Message;
     }
 }
