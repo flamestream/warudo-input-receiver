@@ -5,9 +5,11 @@ using UnityEngine;
 using Warudo.Core;
 using Warudo.Core.Attributes;
 using Warudo.Core.Scenes;
+using Warudo.Core.Utils;
 using Warudo.Plugins.Core.Assets;
 using Warudo.Plugins.Core.Assets.Character;
 using Warudo.Plugins.Core.Assets.Utility;
+using Warudo.Plugins.Core.Nodes;
 using static Warudo.Plugins.Core.Assets.Character.CharacterAsset;
 
 namespace FlameStream
@@ -126,6 +128,21 @@ namespace FlameStream
                     true
                 );
             }
+
+            for (var idx = 0; idx < Character.OverlappingAnimations.Length; ++idx) {
+                var d = Character.OverlappingAnimations[idx];
+                if (!d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)) {
+                    continue;
+                }
+
+                if (d.CustomLayerID == LAYER_NAME_IDLE) {
+                    d.Weight = IsHandEnabled ? 1f : 0f;
+                } else if (!IsHandEnabled) {
+                    d.Weight = 0f;
+                }
+                ApplyAnimancerPropertyWeight(idx, d.Weight);
+                d.BroadcastDataInput("Weight");
+            };
             EnableLimb(IsHandEnabled, Character.LeftHandIK, LeftHandAnchor);
             EnableLimb(IsHandEnabled, Character.RightHandIK, RightHandAnchor);
 

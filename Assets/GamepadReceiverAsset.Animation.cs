@@ -524,6 +524,34 @@ Please note that they do not have to be all filled. You may remove unused fields
             Context.Service.PromptMessage("SUCCESS", "Character Overlaying Animations has been synced.");
         }
 
+        public Animancer.AnimancerComponent CharacterAnimancer {
+            get {
+                return Character?.Animancer;
+            }
+        }
+
+        public Animancer.AnimancerComponent CharacterAnimancerClone {
+            get {
+                return Character?.CloneAnimancer;
+            }
+        }
+
+        public void ApplyAnimancerPropertyWeight(
+            int idx,
+            float weight
+        ) {
+            ApplyAnimancerPropertyWeightLow(CharacterAnimancer, idx, weight);
+            ApplyAnimancerPropertyWeightLow(CharacterAnimancerClone, idx, weight);
+        }
+
+        void ApplyAnimancerPropertyWeightLow(
+            Animancer.AnimancerComponent animancer,
+            int idx,
+            float weight
+        ) {
+            animancer.Layers[idx].SetWeight(weight);
+        }
+
         OverlappingAnimationData CreateIdleFingerAnimationData() {
             var layer = StructuredData.Create<OverlappingAnimationData>();
             layer.Animation = IdleFingerAnimation;
