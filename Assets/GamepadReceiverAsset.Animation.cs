@@ -206,7 +206,7 @@ Please note that they do not have to be all filled. You may remove unused fields
             fingerControlPadAnimatorNode.D9HoverLayerId = DPadAnimationData.FirstOrDefault(d => d.ButtonId == 9)?.HoverLayerId;
             fingerControlPadAnimatorNode.D9PressLayerId = DPadAnimationData.FirstOrDefault(d => d.ButtonId == 9)?.PressLayerId;
             AddDataConnection(graph, receiverNode, "LeftFaceHoverInputId", fingerControlPadAnimatorNode, "HoverInputId");
-            AddDataConnection(graph, receiverNode, "DPad", fingerControlPadAnimatorNode, "DPadState");
+            AddDataConnection(graph, receiverNode, "DPad", fingerControlPadAnimatorNode, "DPad");
             AddFlowConnection(graph, onUpdateControlPadNode, "Exit", fingerControlPadAnimatorNode, "Enter");
 
             var propControlPadAnimatorNode = graph.AddNode<GamepadDPadPropAnimatorNode>();
@@ -219,7 +219,7 @@ Please note that they do not have to be all filled. You may remove unused fields
             propControlPadAnimatorNode.D7LayerId = DPadAnimationData.FirstOrDefault(d => d.ButtonId == 7)?.PropLayerName;
             propControlPadAnimatorNode.D8LayerId = DPadAnimationData.FirstOrDefault(d => d.ButtonId == 8)?.PropLayerName;
             propControlPadAnimatorNode.D9LayerId = DPadAnimationData.FirstOrDefault(d => d.ButtonId == 9)?.PropLayerName;
-            AddDataConnection(graph, receiverNode, "DPad", propControlPadAnimatorNode, "DPadState");
+            AddDataConnection(graph, receiverNode, "DPad", propControlPadAnimatorNode, "DPad");
             AddFlowConnection(graph, fingerControlPadAnimatorNode, "Exit", propControlPadAnimatorNode, "Enter");
 
             OnUpdateNode onUpdateStickNode = graph.AddNode<OnUpdateNode>();
@@ -282,7 +282,7 @@ Please note that they do not have to be all filled. You may remove unused fields
 
             Graph oldgraph = AnimationGraph;
             if (oldgraph != null) {
-                bool isDeleteWanted = await Context.Service.PromptConfirmation("WARNING", "DETECTED_ASSETS_AND_BLUEPRINT_CREATED_AUTOMATICALLY_DURING_A_PREVIOUS_SETUP");
+                bool isDeleteWanted = await Context.Service.PromptConfirmation("WARNING", "Previously generated blueprint has been detected. Would you like to replace it?");
                 if (isDeleteWanted) {
                     Context.OpenedScene.RemoveGraph(oldgraph.Id);
                 }
@@ -515,12 +515,11 @@ Please note that they do not have to be all filled. You may remove unused fields
                 UnityEngine.Debug.Log($"{l.Id} {l.CustomLayerID}");
             }
 
-            // NOTE: Doing it this way rather than setting value directly and involking broadcast/call SetupOverlappingAnimations()
-            // Because it crashes that way if the mod is not previously loaded
-            // Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}", userLayers.ToArray(), true);
-
-            Character.OverlappingAnimations = userLayers.ToArray();
-            Character.BroadcastDataInput(nameof(Character.OverlappingAnimations));
+            // Plug-in Mode
+            Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}", userLayers.ToArray(), true);
+            // Playground Mode
+            // Character.OverlappingAnimations = userLayers.ToArray();
+            // Character.BroadcastDataInput(nameof(Character.OverlappingAnimations));
 
             Context.Service.PromptMessage("SUCCESS", "Character Overlaying Animations has been synced.");
         }

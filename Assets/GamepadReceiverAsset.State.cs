@@ -206,7 +206,7 @@ namespace FlameStream
                         return (LX / (float)ushort.MaxValue - 0.5f) * 2f;
 
                 }
-                return 0.5f;
+                return 0;
             }
         }
 
@@ -215,9 +215,9 @@ namespace FlameStream
                 switch(TargetGamepadType) {
                     case GamepadType.SwitchProController:
                     case GamepadType.PS5Controller:
-                        return (LY / (float)ushort.MaxValue - 0.5f) * 2f;
+                        return (LY / (float)ushort.MaxValue - 0.5f) * -2f;
                 }
-                return 0.5f;
+                return 0;
             }
         }
 
@@ -229,7 +229,7 @@ namespace FlameStream
                     case GamepadType.PS5Controller:
                         return (LZ / (float)ushort.MaxValue - 0.5f) * 2f;
                 }
-                return 0.5f;
+                return 0;
             }
         }
 
@@ -237,11 +237,11 @@ namespace FlameStream
             get {
                 switch(TargetGamepadType) {
                     case GamepadType.SwitchProController:
-                        return (LrY / (float)ushort.MaxValue - 0.5f) * 2f;
+                        return (LrY / (float)ushort.MaxValue - 0.5f) * -2f;
                     case GamepadType.PS5Controller:
-                        return (LrZ / (float)ushort.MaxValue - 0.5f) * 2f;
+                        return (LrZ / (float)ushort.MaxValue - 0.5f) * -2f;
                 }
-                return 0.5f;
+                return 0;
             }
         }
 

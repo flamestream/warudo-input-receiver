@@ -1,8 +1,8 @@
-using System;
 using DG.Tweening;
 using UnityEngine;
 
-namespace FlameStream {
+namespace FlameStream
+{
     public partial class GamepadReceiverAsset : ReceiverAsset {
 
         Tween gamepadRotationTween;
@@ -38,42 +38,44 @@ namespace FlameStream {
             switch(DPad) {
                 case 1:
                     influenceX += -1f;
-                    influenceY += 1f;
+                    influenceY += -1f;
                     break;
                 case 2:
-                    influenceY += -2f;
+                    influenceY += -1.5f;
                     break;
                 case 3:
                     influenceX += 1f;
-                    influenceY += 1f;
+                    influenceY += -1f;
                     break;
                 case 4:
-                    influenceX += -2f;
+                    influenceX += -1.5f;
                     break;
                 case 6:
-                    influenceX += 2f;
+                    influenceX += 1.5f;
                     break;
                 case 7:
                     influenceX += -1f;
-                    influenceY += -1f;
+                    influenceY += 1f;
                     break;
                 case 8:
-                    influenceY += -2f;
+                    influenceY += 1.5f;
                     break;
                 case 9:
                     influenceX += 1f;
-                    influenceY += -1f;
+                    influenceY += 1f;
                     break;
             }
 
-            var tilt = new Vector3(-influenceY, 0, -influenceX);
-
+            var tilt = new Vector3(influenceY, 0, -influenceX) * TiltInfluenceFactor;
+            var tiltDisplacement = IsTiltDisplacementEnabled
+                ? new Vector3(0, -tilt.x , 0) * 0.002f
+                : Vector3.zero;
 
             gamepadPositionTween?.Kill();
             gamepadPositionTween = DOTween.To(
                 () => anchor.Transform.Position,
                 delegate(Vector3 it) { anchor.Transform.Position = it; },
-                RootAnchorPosition + displacement * 0.001f * DisplacementInfluenceFactor,
+                displacement * 0.001f * DisplacementInfluenceFactor + tiltDisplacement,
                 0.1f
             ).SetEase(Ease.OutBack);
 
@@ -81,7 +83,7 @@ namespace FlameStream {
             gamepadRotationTween = DOTween.To(
                 () => anchor.Transform.Rotation,
                 delegate(Vector3 it) { anchor.Transform.Rotation = it; },
-                RootAnchorRotation + tilt * TiltInfluenceFactor,
+                tilt,
                 0.1f
             ).SetEase(Ease.Linear);
         }

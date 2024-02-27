@@ -4,7 +4,6 @@ using System.Linq;
 using UnityEngine;
 using Warudo.Core;
 using Warudo.Core.Attributes;
-using Warudo.Core.Data;
 using Warudo.Core.Scenes;
 using Warudo.Plugins.Core.Assets;
 using Warudo.Plugins.Core.Assets.Character;
@@ -168,16 +167,26 @@ namespace FlameStream
                 } else {
                     list.Add(idleLayer);
                 }
-                // Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}", list.ToArray(), true);
+                // Plugin Mode
+                Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}", list.ToArray(), true);
+                // Playground Mode
+                // Character.OverlappingAnimations =  list.ToArray();
+                // Character.BroadcastDataInput(nameof(Character.OverlappingAnimations));
 
             } else {
 
                 var idx = Array.IndexOf(Character.OverlappingAnimations, idleLayer);
-                // Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}.{idx}.Animation", IdleFingerAnimation, true);
+                // Plugin Mode
+                Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}.{idx}.Animation", IdleFingerAnimation, true);
+                // Playground Mode
+                // Character.OverlappingAnimations[idx].Animation = IdleFingerAnimation;
+                // Character.BroadcastDataInput(nameof(Character.OverlappingAnimations));
             }
         }
 
         void ApplyBasicSetup() {
+
+            IsHandEnabled = true;
 
             AnchorAsset rootAnchor = Scene.AddAsset<AnchorAsset>();
             rootAnchor.Name = "⚓-🔥🎮 Mover";
@@ -248,6 +257,7 @@ namespace FlameStream
             leftAnchor.Broadcast();
             rightAnchor.Broadcast();
             Gamepad.Broadcast();
+            Broadcast();
 
             var idleLayer = Character.OverlappingAnimations?.FirstOrDefault(d => d.CustomLayerID == LAYER_NAME_IDLE);
             var idx = Array.IndexOf(Character.OverlappingAnimations, idleLayer);

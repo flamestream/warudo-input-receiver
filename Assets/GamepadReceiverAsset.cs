@@ -124,6 +124,10 @@ Make target controller hold controller in wanted neutral position, then set up a
         [FloatSlider(0.1f, 10f, 0.01f)]
         float DisplacementInfluenceFactor = 1.0f;
 
+        [DataInput]
+        [DisabledIf(nameof(IsBasicSetupNotDone))]
+        public bool IsTiltDisplacementEnabled;
+
         /// <summary>
         /// HAND TRACKER
         /// </summary>
@@ -217,7 +221,7 @@ Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** 
         public GamepadStickAnimationData RightStickAnimationData;
 
         [Trigger]
-        [Description("Modifies your character to support finger animation.")]
+        [Description("Modifies your character to support currently defined finger animations.")]
         public void TriggerSyncCharacterOverlayingAnimations() {
             SyncCharacterOverlayingAnimations();
         }
