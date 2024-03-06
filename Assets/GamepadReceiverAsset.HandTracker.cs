@@ -114,7 +114,7 @@ namespace FlameStream
                 () => rightAnchor.Transform.Position,
                 delegate(Vector3 it) { rightAnchor.Transform.Position = it; },
                 RightHandAnchorPosition,
-                ReturnTime
+                ReturnTransitionTime
             ).SetEase(ReturnEasing);
 
             rightHandRotationTween?.Kill();
@@ -122,7 +122,7 @@ namespace FlameStream
                 () => rightAnchor.Transform.Rotation,
                 delegate(Vector3 it) { rightAnchor.Transform.Rotation = it; },
                 RightHandAnchorRotation,
-                ReturnTime
+                ReturnTransitionTime
             ).SetEase(ReturnEasing);
 
             leftHandPositionTween?.Kill();
@@ -130,7 +130,7 @@ namespace FlameStream
                 () => leftAnchor.Transform.Position,
                 delegate(Vector3 it) { leftAnchor.Transform.Position = it; },
                 LeftHandAnchorPosition,
-                ReturnTime
+                ReturnTransitionTime
             ).SetEase(ReturnEasing);
 
             leftHandRotationTween?.Kill();
@@ -138,7 +138,7 @@ namespace FlameStream
                 () => leftAnchor.Transform.Rotation,
                 delegate(Vector3 it) { leftAnchor.Transform.Rotation = it; },
                 LeftHandAnchorRotation,
-                ReturnTime
+                ReturnTransitionTime
             ).SetEase(ReturnEasing);
         }
     }

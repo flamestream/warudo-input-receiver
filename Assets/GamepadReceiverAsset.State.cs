@@ -86,7 +86,7 @@ namespace FlameStream
                 LeftFaceHoverInputId = DPadLabelName(DPad);
             } else {
                 var buttonId = Array.Find(LeftFaceButtonIdsSwitch, b => ActivatedButtonFlag(b));
-                if (buttonId != SwitchProButton.None) {
+                if (buttonId != 0) {
                     LeftFaceHoverInputId = buttonId.ToString();
                 }
             }
@@ -96,7 +96,7 @@ namespace FlameStream
                 RightFaceHoverInputId = "RightStick";
             } else {
                 var buttonId = Array.Find(RightFaceButtonIdsSwitch, b => ActivatedButtonFlag(b));
-                if (buttonId != SwitchProButton.None) {
+                if (buttonId != 0) {
                     RightFaceHoverInputId = buttonId.ToString();
                 }
             }
@@ -133,6 +133,18 @@ namespace FlameStream
                             }
                         }
                         break;
+                    case GamepadType.Xbox360Controller:
+                        if (!IsLeftStickActive()) {
+                            if (DPad != 5) {
+                                return DPadLabelName(DPad);
+                            } else {
+                                var buttonId = Array.Find(LeftFaceButtonIdsXbox360, b => ActivatedButtonFlag(b));
+                                if (buttonId != 0) {
+                                    return buttonId.ToString();
+                                }
+                            }
+                        }
+                        break;
 
                 }
                 return "LeftStick";
@@ -158,7 +170,14 @@ namespace FlameStream
                             }
                         }
                         break;
-
+                    case GamepadType.Xbox360Controller:
+                        if (!IsRightStickActive()) {
+                            var buttonId = Array.Find(RightFaceButtonIdsXbox360, b => ActivatedButtonFlag(b));
+                            if (buttonId != 0) {
+                                return buttonId.ToString();
+                            }
+                        }
+                        break;
                 }
                 return "RightStick";
             }
@@ -173,9 +192,27 @@ namespace FlameStream
         public bool ButtonFlag(PS5Button val) {
             return ButtonFlag((int) val - 1);
         }
+        public bool ButtonFlag(Xbox360Button val) {
+            switch(val) {
+                case Xbox360Button.LT:
+                    return LZ > 32767;
+                case Xbox360Button.RT:
+                    return LZ < 32767;
+            }
+            return ButtonFlag((int) val - 1);
+        }
 
         public bool LastButtonFlag(int idx) {
             return (LastButtonFlags >> idx & 1) == 1;
+        }
+        public bool LastButtonFlag(Xbox360Button val) {
+            switch(val) {
+                case Xbox360Button.LT:
+                    return LastLZ > 32767;
+                case Xbox360Button.RT:
+                    return LastLZ < 32767;
+            }
+            return LastButtonFlag((int) val - 1);
         }
 
         public bool ActivatedButtonFlag(int idx) {
@@ -185,6 +222,14 @@ namespace FlameStream
             return ActivatedButtonFlag((int) val - 1);
         }
         public bool ActivatedButtonFlag(PS5Button val) {
+            return ActivatedButtonFlag((int) val - 1);
+        }
+        public bool ActivatedButtonFlag(Xbox360Button val) {
+            switch(val) {
+                case Xbox360Button.LT:
+                case Xbox360Button.RT:
+                    return ButtonFlag(val) && !LastButtonFlag(val);
+            }
             return ActivatedButtonFlag((int) val - 1);
         }
 
@@ -197,12 +242,21 @@ namespace FlameStream
         public bool DeactivatedButtonFlag(PS5Button val) {
             return DeactivatedButtonFlag((int) val - 1);
         }
+        public bool DeactivatedButtonFlag(Xbox360Button val) {
+            switch(val) {
+                case Xbox360Button.LT:
+                case Xbox360Button.RT:
+                    return !ButtonFlag(val) && LastButtonFlag(val);
+            }
+            return DeactivatedButtonFlag((int) val - 1);
+        }
 
         public float LeftStickX {
             get {
                 switch(TargetGamepadType) {
                     case GamepadType.SwitchProController:
                     case GamepadType.PS5Controller:
+                    case GamepadType.Xbox360Controller:
                         return (LX / (float)ushort.MaxValue - 0.5f) * 2f;
 
                 }
@@ -215,6 +269,7 @@ namespace FlameStream
                 switch(TargetGamepadType) {
                     case GamepadType.SwitchProController:
                     case GamepadType.PS5Controller:
+                    case GamepadType.Xbox360Controller:
                         return (LY / (float)ushort.MaxValue - 0.5f) * -2f;
                 }
                 return 0;
@@ -225,6 +280,7 @@ namespace FlameStream
             get {
                 switch(TargetGamepadType) {
                     case GamepadType.SwitchProController:
+                    case GamepadType.Xbox360Controller:
                         return (LrX / (float)ushort.MaxValue - 0.5f) * 2f;
                     case GamepadType.PS5Controller:
                         return (LZ / (float)ushort.MaxValue - 0.5f) * 2f;
@@ -237,6 +293,7 @@ namespace FlameStream
             get {
                 switch(TargetGamepadType) {
                     case GamepadType.SwitchProController:
+                    case GamepadType.Xbox360Controller:
                         return (LrY / (float)ushort.MaxValue - 0.5f) * -2f;
                     case GamepadType.PS5Controller:
                         return (LrZ / (float)ushort.MaxValue - 0.5f) * -2f;
@@ -262,6 +319,8 @@ namespace FlameStream
                         return Array.Find(FaceButtonIdsSwitch, v => ActivatedButtonFlag(v)) != 0;
                     case GamepadType.PS5Controller:
                         return Array.Find(FaceButtonIdsPS5, v => ActivatedButtonFlag(v)) != 0;
+                    case GamepadType.Xbox360Controller:
+                        return Array.Find(FaceButtonIdsXbox360, v => ActivatedButtonFlag(v)) != 0;
 
                 }
                 return false;
@@ -275,6 +334,8 @@ namespace FlameStream
                         return Array.Find(FaceButtonIdsSwitch, v => ButtonFlag(v)) != 0;
                     case GamepadType.PS5Controller:
                         return Array.Find(FaceButtonIdsPS5, v => ButtonFlag(v)) != 0;
+                    case GamepadType.Xbox360Controller:
+                        return Array.Find(FaceButtonIdsXbox360, v => ButtonFlag(v)) != 0;
                 }
                 return false;
             }
@@ -287,6 +348,8 @@ namespace FlameStream
                         return Array.Find(ShoulderButtonIdsSwitch, v => ActivatedButtonFlag(v)) != 0;
                     case GamepadType.PS5Controller:
                         return Array.Find(ShoulderButtonIdsPS5, v => ActivatedButtonFlag(v)) != 0;
+                    case GamepadType.Xbox360Controller:
+                        return Array.Find(ShoulderButtonIdsXbox360, v => ActivatedButtonFlag(v)) != 0;
                 }
                 return false;
             }
@@ -299,6 +362,8 @@ namespace FlameStream
                         return Array.Find(ShoulderButtonIdsSwitch, v => ButtonFlag(v)) != 0;
                     case GamepadType.PS5Controller:
                         return Array.Find(ShoulderButtonIdsPS5, v => ButtonFlag(v)) != 0;
+                    case GamepadType.Xbox360Controller:
+                        return Array.Find(ShoulderButtonIdsXbox360, v => ButtonFlag(v)) != 0;
                 }
                 return false;
             }
@@ -398,10 +463,54 @@ namespace FlameStream
         };
 
         public static readonly PS5Button[] RightShoulderButtonIdsPS5 = {
-            PS5Button.R2,
+            PS5Button.R1,
             PS5Button.R2,
         };
 
         public static readonly PS5Button[] ShoulderButtonIdsPS5 = LeftShoulderButtonIdsPS5.Union(RightShoulderButtonIdsPS5).ToArray();
+
+        public enum Xbox360Button : int {
+            None = 0,
+            A = 1,
+            B = 2,
+            X = 3,
+            Y = 4,
+            LB = 5,
+            RB = 6,
+            LT = 100,
+            RT = 101,
+            Back = 7,
+            Start = 8,
+            LeftStick = 9,
+            RightStick = 10,
+        };
+
+        public static readonly Xbox360Button[] LeftFaceButtonIdsXbox360 = {
+            Xbox360Button.LeftStick,
+            Xbox360Button.Back,
+        };
+
+        public static readonly Xbox360Button[] RightFaceButtonIdsXbox360 = {
+            Xbox360Button.A,
+            Xbox360Button.B,
+            Xbox360Button.X,
+            Xbox360Button.Y,
+            Xbox360Button.RightStick,
+            Xbox360Button.Start,
+        };
+
+        public static readonly Xbox360Button[] FaceButtonIdsXbox360 = LeftFaceButtonIdsXbox360.Union(RightFaceButtonIdsXbox360).ToArray();
+
+        public static readonly Xbox360Button[] LeftShoulderButtonIdsXbox360 = {
+            Xbox360Button.LB,
+            Xbox360Button.LT,
+        };
+
+        public static readonly Xbox360Button[] RightShoulderButtonIdsXbox360 = {
+            Xbox360Button.RB,
+            Xbox360Button.RT,
+        };
+
+        public static readonly Xbox360Button[] ShoulderButtonIdsXbox360 = LeftShoulderButtonIdsXbox360.Union(RightShoulderButtonIdsXbox360).ToArray();
     }
 }

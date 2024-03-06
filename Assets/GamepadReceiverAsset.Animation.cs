@@ -24,28 +24,33 @@ namespace FlameStream
             }
         }
 
-        void GenerateButtonAnimationTemplate() {
+        void GenerateButtonAnimationDataTemplate() {
+            var buttonType = typeof(SwitchProButton);
             switch (TargetGamepadType) {
-                case GamepadType.SwitchProController:
-                default:
-                    ButtonAnimationData = Enum.GetValues(typeof(SwitchProButton))
-                        .Cast<SwitchProButton>()
-                        .Where(e => e != SwitchProButton.None)
-                        .Select(e => {
-                            var old = Array.Find(ButtonAnimationData, d => (SwitchProButton)d.ButtonId == e);
-
-                            var o = StructuredData.Create<GamepadButtonAnimationData>();
-                            o.TargetControllerType = GamepadType.SwitchProController;
-                            o.ButtonId = (int)e;
-                            o.PropLayerName = old?.PropLayerName ?? e.ToString();
-                            o.FingerHoverAnimation = old?.FingerHoverAnimation ?? null;
-                            o.FingerPressAnimation = old?.FingerPressAnimation ?? null;
-                            o.MaskRight = old?.MaskRight ?? false;
-                            return o;
-                        })
-                        .ToArray();
+                case GamepadType.PS5Controller:
+                    buttonType = typeof(PS5Button);
+                    break;
+                case GamepadType.Xbox360Controller:
+                    buttonType = typeof(Xbox360Button);
                     break;
             }
+
+            ButtonAnimationData = Enum.GetValues(buttonType)
+                .Cast<SwitchProButton>()
+                .Where(e => e != 0)
+                .Select(e => {
+                    var old = Array.Find(ButtonAnimationData, d => d.ButtonId == (int)e);
+
+                    var o = StructuredData.Create<GamepadButtonAnimationData>();
+                    o.TargetControllerType = TargetGamepadType;
+                    o.ButtonId = (int)e;
+                    o.PropLayerName = old?.PropLayerName ?? e.ToString();
+                    o.FingerHoverAnimation = old?.FingerHoverAnimation ?? null;
+                    o.FingerPressAnimation = old?.FingerPressAnimation ?? null;
+                    o.MaskRight = old?.MaskRight ?? false;
+                    return o;
+                })
+                .ToArray();
 
             DPadAnimationData = Enum.GetValues(typeof(DPadDirection))
                 .Cast<DPadDirection>()
@@ -297,10 +302,12 @@ Please note that they do not have to be all filled. You may remove unused fields
 
         GetGamepadReceiverDataNode CreateReceiverNode(Graph graph) {
             switch(TargetGamepadType) {
-                case GamepadType.PS5Controller:
-                    return graph.AddNode<GetGamepadReceiverDataPs5Node>();
                 case GamepadType.SwitchProController:
                     return graph.AddNode<GetGamepadReceiverDataSwitchNode>();
+                case GamepadType.PS5Controller:
+                    return graph.AddNode<GetGamepadReceiverDataPs5Node>();
+                case GamepadType.Xbox360Controller:
+                    return graph.AddNode<GetGamepadReceiverDataXbox360Node>();
             }
             return null;
         }
@@ -612,9 +619,13 @@ Please note that they do not have to be all filled. You may remove unused fields
                 get {
                     switch(TargetControllerType) {
                         case GamepadType.SwitchProController:
-                        default:
                             return Enum.GetName(typeof(SwitchProButton), ButtonId);
+                        case GamepadType.PS5Controller:
+                            return Enum.GetName(typeof(PS5Button), ButtonId);
+                        case GamepadType.Xbox360Controller:
+                            return Enum.GetName(typeof(Xbox360Button), ButtonId);
                     }
+                    return $"Button ID {ButtonId}";
                 }
             }
 

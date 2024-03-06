@@ -5,11 +5,9 @@ using UnityEngine;
 using Warudo.Core;
 using Warudo.Core.Attributes;
 using Warudo.Core.Scenes;
-using Warudo.Core.Utils;
 using Warudo.Plugins.Core.Assets;
 using Warudo.Plugins.Core.Assets.Character;
 using Warudo.Plugins.Core.Assets.Utility;
-using Warudo.Plugins.Core.Nodes;
 using static Warudo.Plugins.Core.Assets.Character.CharacterAsset;
 
 namespace FlameStream
@@ -78,6 +76,8 @@ namespace FlameStream
             SwitchProController,
             [Label("PlayStation 5 Controller")]
             PS5Controller,
+            [Label("Xbox 360 Controller")]
+            Xbox360Controller,
         }
 
         public AnchorAsset RootAnchor {

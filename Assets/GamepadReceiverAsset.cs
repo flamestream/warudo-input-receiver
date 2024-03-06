@@ -30,20 +30,20 @@ namespace FlameStream
         /// <summary>
         /// GENERAL
         /// </summary>
-        [Section("General Configuration")]
+        [Section("GENERAL_CONFIGURATION")]
 
         [DataInput]
-        [Label("Game Controller Type")]
+        [Label("GAME_CONTROLLER_TYPE")]
         public GamepadType TargetGamepadType;
 
         [DataInput]
-        [Label("Default Controller Hand")]
+        [Label("DEFAULT_CONTROLLER_HAND")]
         public GamepadHandSide DefaultAnchorSide;
 
         /// <summary>
         /// BASIC SETUP
         /// </summary>
-        [Section("Basic Hand and Prop Setup")]
+        [Section("BASIC_HAND_AND_PROP_SETUP")]
 
         [Markdown]
         [HiddenIf(nameof(IsBasicSetupDone))]
@@ -53,17 +53,19 @@ Make target controller hold controller in wanted neutral position, then set up a
 
         [DataInput]
         [DisabledIf(nameof(IsBasicSetupDone))]
+        [Label("CHARACTER")]
         public CharacterAsset Character;
 
         [DataInput]
         [PreviewGallery]
         [AutoCompleteResource("CharacterAnimation", null)]
         [DisabledIf(nameof(IsBasicSetupDone))]
+        [Label("IDLE_FINGER_ANIMATION")]
         public string IdleFingerAnimation;
 
         [DataInput]
         [DisabledIf(nameof(IsBasicSetupDone))]
-        [Label("Game Controller")]
+        [Label("CONTROLLER")]
         public PropAsset Gamepad;
 
         [Trigger]
@@ -79,7 +81,7 @@ Make target controller hold controller in wanted neutral position, then set up a
         public bool IsHandEnabled;
 
         [Trigger]
-        [Label("🔁 Reset All Anchors")]
+        [Label("RESET_ALL_ANCHORS")]
         [HiddenIf(nameof(IsBasicSetupNotDone))]
         public void TriggerResetAllAnchors() {
             ResetAllAnchors();
@@ -87,7 +89,7 @@ Make target controller hold controller in wanted neutral position, then set up a
 
         [Trigger]
         [HiddenIf(nameof(IsBasicSetupNotDone))]
-        [Label("💣 Clear All Anchors")]
+        [Label("CLEAR_ALL_ANCHORS")]
         public void TriggerClearAllAnchors() {
             ClearAllAnchors();
         }
@@ -95,7 +97,7 @@ Make target controller hold controller in wanted neutral position, then set up a
         /// <summary>
         /// SHAKING AND TILTING MOTION
         /// </summary>
-        [Section("Shaking and Tilting Motion")]
+        [Section("SHAKING_AND_TILTING_MOTION")]
 
         [Markdown]
         [HiddenIf(nameof(CanConfigureShaking))]
@@ -117,21 +119,25 @@ Make target controller hold controller in wanted neutral position, then set up a
         [DataInput]
         [HiddenIf(nameof(CannotConfigureShaking))]
         [FloatSlider(0.1f, 10f, 0.01f)]
+        [Label("TILT_INFLUENCE_FACTOR")]
         float TiltInfluenceFactor = 1.0f;
 
         [DataInput]
         [HiddenIf(nameof(CannotConfigureShaking))]
         [FloatSlider(0.1f, 10f, 0.01f)]
+        [Label("DISPLACEMENT_INFLUENCE_FACTOR")]
         float DisplacementInfluenceFactor = 1.0f;
 
         [DataInput]
+        [HiddenIf(nameof(CannotConfigureShaking))]
         [DisabledIf(nameof(IsBasicSetupNotDone))]
+        [Label("TILT_DISPLACEMENT_ENABLED")]
         public bool IsTiltDisplacementEnabled;
 
         /// <summary>
         /// HAND TRACKER
         /// </summary>
-        [Section("Hand Tracker")]
+        [Section("HAND_TRACKER")]
 
         [Markdown]
         [HiddenIf(nameof(CanConfigureHandTracker))]
@@ -157,44 +163,54 @@ Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** 
 
         [DataInput]
         [HiddenIf(nameof(CannotConfigureHandTracker))]
+        [Label("HOLD_LEFT_HAND_TILT")]
         public Vector3 HoldLeftHandTilt = new Vector3(30f, 10f, 0f);
         [DataInput]
         [HiddenIf(nameof(CannotConfigureHandTracker))]
+        [Label("HOLD_LEFT_HAND_DISPLACEMENT")]
         public Vector3 HoldLeftHandDisplacement = new Vector3(0f, -0.05f, -0.02f);
 
         [DataInput]
         [HiddenIf(nameof(CannotConfigureHandTracker))]
+        [Label("HOLD_RIGHT_HAND_TILT")]
         public Vector3 HoldRightHandTilt = new Vector3(30f, 10f, 0f);
         [DataInput]
         [HiddenIf(nameof(CannotConfigureHandTracker))]
+        [Label("HOLD_RIGHT_HAND_DISPLACEMENT")]
         public Vector3 HoldRightHandDisplacement = new Vector3(0f, -0.05f, -0.02f);
 
         [DataInput]
         [HiddenIf(nameof(CannotConfigureHandTracker))]
         [FloatSlider(0f, 2f, 0.01f)]
+        [Label("TILT_TRANSITION_TIME")]
         public float TiltTransitionTime = 1.0f;
         [DataInput]
         [HiddenIf(nameof(CannotConfigureHandTracker))]
+        [Label("TILT_EASING")]
         public Ease TiltEasing = Ease.OutCubic;
         [DataInput]
         [HiddenIf(nameof(CannotConfigureHandTracker))]
         [FloatSlider(0f, 2f, 0.01f)]
+        [Label("DISPLACEMENT_TRANSITION_TIME")]
         public float DisplacementTransitionTime = 1.5f;
         [DataInput]
         [HiddenIf(nameof(CannotConfigureHandTracker))]
+        [Label("DISPLACEMENT_EASING")]
         public Ease DisplacementEasing = Ease.OutBack;
         [DataInput]
         [HiddenIf(nameof(CannotConfigureHandTracker))]
         [FloatSlider(0f, 2f, 0.01f)]
-        public float ReturnTime = 0.2f;
+        [Label("RETURN_TRANSITION_TIME")]
+        public float ReturnTransitionTime = 0.2f;
         [DataInput]
         [HiddenIf(nameof(CannotConfigureHandTracker))]
+        [Label("RETURN_EASING")]
         public Ease ReturnEasing = Ease.OutBack;
 
         /// <summary>
         /// ANIMATION
         /// </summary>
-        [Section("Finger and Prop Animation")]
+        [Section("FINGER_AND_PROP_ANIMATION")]
         [Markdown]
         public string AnimationInstructions = @"### Game Controller Prop Setup
 * The prop must have an Animator component with multiple named **Additive blending** layers for each wanted buttons
@@ -204,29 +220,38 @@ Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** 
 * Idle finger pose must be resting thumbs on the two sticks";
 
         [Trigger]
-        public void TriggerGenerateButtonAnimationTemplate() {
-            GenerateButtonAnimationTemplate();
+        [Label("GENERATE_BUTTON_ANIMATION_DATA_TEMPLATE")]
+        public void TriggerGenerateButtonAnimationDataTemplate() {
+            GenerateButtonAnimationDataTemplate();
         }
 
         [DataInput]
+        [Label("BUTTON_ANIMATION_DATA")]
         public GamepadButtonAnimationData[] ButtonAnimationData;
 
         [DataInput]
+        [Label("DPAD_ANIMATION_DATA")]
         public GamepadDPadAnimationData[] DPadAnimationData;
 
         [DataInput]
+        [Label("LEFT_STICK_ANIMATION_DATA")]
         public GamepadStickAnimationData LeftStickAnimationData;
 
         [DataInput]
+        [Label("RIGHT_STICK_ANIMATION_DATA")]
         public GamepadStickAnimationData RightStickAnimationData;
 
+        [Markdown]
+        public string TriggerInstructions = @"The below operations need to be executed once, every time the above inputs are changed.";
+
         [Trigger]
-        [Description("Modifies your character to support currently defined finger animations.")]
+        [Label("SYNC_CHARACTER_OVERLAYING_ANIMATION")]
         public void TriggerSyncCharacterOverlayingAnimations() {
             SyncCharacterOverlayingAnimations();
         }
 
         [Trigger]
+        [Label("GENERATE_ANIMATION_BLUEPRINT")]
         public void TriggerGenerateAnimationBlueprint() {
             GenerateAnimationBlueprint();
         }

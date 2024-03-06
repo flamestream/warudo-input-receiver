@@ -4,7 +4,7 @@ using static FlameStream.GamepadReceiverAsset;
 
 namespace FlameStream {
 [NodeType(
-    Id = "FlameStream.Node.GetPs5GamepadReceiverDataNode",
+    Id = "FlameStream.Node.GetPs5GamepadReceiverData",
     Title = "NODE_TITLE_GAMEPAD_RECEIVER_PS5",
     Category = "NODE_CATEGORY"
 )]
