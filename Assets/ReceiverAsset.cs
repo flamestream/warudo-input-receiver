@@ -16,14 +16,14 @@ namespace FlameStream {
 
         protected string lastState;
 
-        [DataInput]
+        [DataInput(0)]
         [Label("ENABLE")]
         public bool IsEnabled;
 
-        [Markdown]
+        [Markdown(0)]
         public string Message = "RECEIVER_NOT_STARTED".Localized();
 
-        [DataInput]
+        [DataInput(0)]
         [Label("PORT")]
         public int Port;
 

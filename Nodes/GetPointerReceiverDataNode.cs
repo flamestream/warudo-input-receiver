@@ -37,5 +37,17 @@ namespace FlameStream {
         [DataOutput]
         [Label("POINTER_BUTTON_2")]
         public bool Button2() => Receiver != null && Receiver.Button2;
+
+        [DataOutput]
+        [Label("HAND_STATE")]
+        public string HandState() => Receiver?.handState?.Label;
+
+        [DataOutput]
+        [Label("BODY_STATE")]
+        public string BodyState() => Receiver?.bodyState?.Label;
+
+        [DataOutput]
+        [Label("PROP_STATE")]
+        public string PropState() => Receiver?.propState?.Label;
     }
 }

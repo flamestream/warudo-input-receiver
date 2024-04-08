@@ -369,10 +369,6 @@ namespace FlameStream
             }
         }
 
-        protected override void Log(string msg) {
-            UnityEngine.Debug.Log($"[FlameStream.Asset.GamepadReceiver] {msg}");
-        }
-
         // NOTE: Buttons indices are offset by one to allow dummy default at 0./
         public enum SwitchProButton : int {
             None = 0,

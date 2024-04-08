@@ -296,8 +296,8 @@ Please note that they do not have to be all filled. You may remove unused fields
             AnimationGraphId = graph.Id;
             base.Scene.AddGraph(graph);
             Context.Service.PromptMessage("SUCCESS", $"Blueprint {graph.Name} has been succesfully generated.");
-            Context.Service.BroadcastOpenedScene();
             Context.Service.NavigateToGraph(AnimationGraphId, receiverNode.Id);
+            Context.Service.BroadcastOpenedScene();
         }
 
         GetGamepadReceiverDataNode CreateReceiverNode(Graph graph) {

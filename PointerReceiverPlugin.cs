@@ -7,7 +7,7 @@ namespace FlameStream {
         Name = "PLUGIN_NAME",
         Description = "PLUGIN_DESCRIPTION",
         Author = "FlameStream",
-        Version = "3.1.0",
+        Version = "3.2.0",
         AssetTypes = new[] {
             typeof(GamepadReceiverAsset),
             typeof(PointerReceiverAsset)
@@ -25,7 +25,7 @@ namespace FlameStream {
             typeof(GetGamepadReceiverDataPs5Node),
             typeof(GetGamepadReceiverDataSwitchNode),
             typeof(GetGamepadReceiverDataXbox360Node),
-            typeof(GetPointerReceiverDataNode),
+            typeof(GetPointerReceiverDataNode)
         })]
     public class PointerReceiverPlugin : Plugin {}
 }
