@@ -27,7 +27,9 @@ namespace FlameStream {
         [Hidden]
         public string Label;
 
-        bool isReady;
+        public int animationLayerPriority;
+
+        int onReadyCountdown = 5;
 
         public GameObjectState() {}
         public GameObjectState(string label) {
@@ -45,9 +47,6 @@ namespace FlameStream {
             Watch(nameof(Enabled), delegate {
                 SyncEnabledUI();
             });
-            Watch(nameof(Label), delegate {
-                Transform.LocalizationKey = GetLabelLocalizationKey();
-            });
             SyncEnabledUI();
         }
 
@@ -63,11 +62,10 @@ namespace FlameStream {
             base.OnUpdate();
 
             // OnReady: One-time execution before update events are sent
-            // This is needed because assets are loaded in order, triggering OnCreate events immediately
-            // which may be an issue if some of them are dependent on other assets that are yet to be loaded.
-            if (!isReady) {
-                isReady = true;
-                OnReady();
+            // Delay if a few tick is needed because things are for settled
+            if (onReadyCountdown > 0) {
+                --onReadyCountdown;
+                if (onReadyCountdown == 0) OnReady();
             }
         }
 
@@ -90,7 +88,7 @@ namespace FlameStream {
 
         public string GetAnimationLayerId(string prefix = "") {
             if (Label == null) return null;
-            return $"{prefix} {Label}";
+            return $"{prefix} [{animationLayerPriority}]{Label}";
         }
     }
 
@@ -98,15 +96,16 @@ namespace FlameStream {
 
         [DataInput]
         [Label("ACTIVE_STATE")]
-        public ActiveGameObjectState ActiveState = Create<ActiveGameObjectState>(st => {
-            st.Enabled = true;
-        });
+        public ActiveGameObjectState ActiveState;
 
         public BaseState() {}
         public BaseState(string label) : base(label) {}
 
         protected override void OnReady() {
             base.OnReady();
+            Transform.OnCopy = () => { CopyFromActive(); };
+            Transform.SetCopyTriggerLabel("COPY_FROM_ACTIVE");
+
             ActiveState.Label = $"{Label} Active";
             ActiveState.RefreshInfo(true);
             ActiveState.OnApplyAnchor = (p, tr,  a) => { OnApplyAnchor?.Invoke(p, tr, a); };
@@ -114,12 +113,32 @@ namespace FlameStream {
             ActiveState.OnEnterVisualSetup = (p) => { OnEnterVisualSetup?.Invoke(p); };
             ActiveState.OnExitVisualSetup = (p, ia) => { OnExitVisualSetup?.Invoke(p, ia); };
             ActiveState.SyncEnabledUI();
+
+            ActiveState.Transform.OnCopy = () => { CopyToActive(); };
+            ActiveState.Transform.SetCopyTriggerLabel("COPY_FROM_BASE");
+
+            // ActiveState's label watch is not working, so set it here ourselves
+            ActiveState.Transform.LocalizationKey = ActiveState.GetLabelLocalizationKey();
         }
 
         public override void SyncEnabledUI() {
             base.SyncEnabledUI();
             GetDataInputPort(nameof(ActiveState)).Properties.hidden = !Enabled;
             BroadcastDataInputProperties(nameof(ActiveState));
+        }
+
+        public void CopyFromActive() {
+            Transform.Position = ActiveState.Transform.Position;
+            Transform.Rotation = ActiveState.Transform.Rotation;
+            Transform.Scale = ActiveState.Transform.Scale;
+            Transform.Broadcast();
+        }
+
+        public void CopyToActive() {
+            ActiveState.Transform.Position = Transform.Position;
+            ActiveState.Transform.Rotation = Transform.Rotation;
+            ActiveState.Transform.Scale = Transform.Scale;
+            ActiveState.Transform.Broadcast();
         }
     }
 
@@ -144,13 +163,20 @@ namespace FlameStream {
         protected override void OnCreate() {
             base.OnCreate();
             Watch(nameof(Animation), delegate {
+                UnityEngine.Debug.Log("T ANIM CHANGE????");
                 OnAnimationChange?.Invoke(this);
             });
-            Watch(nameof(Transform), delegate {
-                if (Transform == null) return;
-                Transform.GetDataInputPort(nameof(Transform.Scale)).Properties.hidden = true;
-                Transform.BroadcastDataInputProperties(nameof(Transform.Scale));
-            });
+        }
+
+        protected override void OnReady() {
+            base.OnReady();
+            UnityEngine.Debug.Log("===== Transform.OnAnimationChange primed!");
+            Transform.OnAnimationChange = (animation) => {
+                UnityEngine.Debug.Log("GO ANIMATION CHANGE");
+                Animation = animation;
+                OnAnimationChange.Invoke(this);
+            };
+            Transform.HideScale();
         }
 
         public override void SyncEnabledUI() {
@@ -167,9 +193,13 @@ namespace FlameStream {
 
         public void StartAnimationTransition(bool inTransition) {
             var targetWeight = inTransition ? 1f : 0f;
+            UnityEngine.Debug.Log($"{Label}: {animationWeight} => {targetWeight}");
             if (animationWeight == targetWeight) return;
+            UnityEngine.Debug.Log($"{Label}: GO");
 
-            animationWeightTween?.Kill(true);
+            var ratio = Math.Abs(targetWeight - animationWeight);
+
+            animationWeightTween?.Kill();
             if (EnterTransition.Time > 0f) {
                 OnAnimationWeightChange?.Invoke(this, animationWeight, inTransition);
                 animationWeightTween = DOTween.To(
@@ -179,7 +209,7 @@ namespace FlameStream {
                         OnAnimationWeightChange?.Invoke(this, animationWeight, false);
                     },
                     targetWeight,
-                    EnterTransition.Time
+                    EnterTransition.Time * ratio
                 ).SetEase(EnterTransition.Ease);
             } else {
                 animationWeight = targetWeight;
@@ -193,7 +223,6 @@ namespace FlameStream {
         [DataInput]
         [Label("ACTIVE_STATE")]
         public ActivePoseState ActiveState = Create<ActivePoseState>(st => {
-            st.Enabled = true;
             st.SyncEnabledUI();
         });
 
@@ -202,7 +231,11 @@ namespace FlameStream {
 
         protected override void OnReady() {
             base.OnReady();
+            Transform.OnCopy = () => { CopyFromActive(); };
+            Transform.SetCopyTriggerLabel("COPY_FROM_ACTIVE");
+
             ActiveState.Label = $"{Label} Active";
+            ActiveState.animationLayerPriority = animationLayerPriority + 1;
             ActiveState.RefreshInfo(true);
             ActiveState.OnAnimationChange = (p) => { OnAnimationChange?.Invoke(p); };
             ActiveState.OnAnimationWeightChange = (p, w, r) => { OnAnimationWeightChange?.Invoke(p, w, r); };
@@ -210,12 +243,32 @@ namespace FlameStream {
             ActiveState.OnCreateAnchor = (p, tr, a) => { OnCreateAnchor?.Invoke(p, tr, a); };
             ActiveState.OnEnterVisualSetup = (p) => { OnEnterVisualSetup?.Invoke(p); };
             ActiveState.OnExitVisualSetup = (p, ia) => { OnExitVisualSetup?.Invoke(p, ia); };
+
+            ActiveState.Transform.OnCopy = () => { CopyToActive(); };
+            ActiveState.Transform.SetCopyTriggerLabel("COPY_FROM_BASE");
+
+            // ActiveState's label watch is not working, so set it here ourselves
+            ActiveState.Transform.LocalizationKey = ActiveState.GetLabelLocalizationKey();
         }
 
         public override void SyncEnabledUI() {
             base.SyncEnabledUI();
             GetDataInputPort(nameof(ActiveState)).Properties.hidden = !Enabled;
             BroadcastDataInputProperties(nameof(ActiveState));
+        }
+
+        public void CopyFromActive() {
+            Transform.Position = ActiveState.Transform.Position;
+            Transform.Rotation = ActiveState.Transform.Rotation;
+            Transform.Scale = ActiveState.Transform.Scale;
+            Transform.Broadcast();
+        }
+
+        public void CopyToActive() {
+            ActiveState.Transform.Position = Transform.Position;
+            ActiveState.Transform.Rotation = Transform.Rotation;
+            ActiveState.Transform.Scale = Transform.Scale;
+            ActiveState.Transform.Broadcast();
         }
     }
 
@@ -229,8 +282,9 @@ namespace FlameStream {
     public class MouseHandState : BasePoseState {
         public MouseHandState() : base("Mouse Hand") {}
 
-            protected override void OnCreate() {
+        protected override void OnCreate() {
             Enabled = true;
+            animationLayerPriority = 30;
             base.OnCreate();
             GetDataInputPort(nameof(Enabled)).Properties.hidden = true;
             BroadcastDataInputProperties(nameof(Enabled));;
@@ -238,11 +292,15 @@ namespace FlameStream {
     }
 
     public class PenHandState : BasePoseState {
-        public PenHandState() : base("Pen Hand") {}
+        public PenHandState() : base("Pen Hand") {
+            animationLayerPriority = 40;
+        }
     }
 
     public class MouseBodyState : BasePoseState {
-        public MouseBodyState() : base("Mouse Body") {}
+        public MouseBodyState() : base("Mouse Body") {
+            animationLayerPriority = 10;
+        }
 
         protected override void OnCreate() {
             Enabled = true;
@@ -253,7 +311,9 @@ namespace FlameStream {
     }
 
     public class PenBodyState : BasePoseState {
-        public PenBodyState() : base("Pen Body") {}
+        public PenBodyState() : base("Pen Body") {
+            animationLayerPriority = 20;
+        }
     }
 
     public class MousePropState : BaseState {

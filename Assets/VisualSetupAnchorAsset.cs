@@ -1,3 +1,5 @@
+using System;
+using System.Diagnostics;
 using Warudo.Core.Attributes;
 using Warudo.Plugins.Core.Assets.Utility;
 
@@ -25,8 +27,20 @@ namespace FlameStream {
             Parent.Apply(this);
         }
 
+        [DataInput(11)]
+        [PreviewGallery]
+        [AutoCompleteResource("CharacterAnimation", null)]
+        [Label("ANIMATION")]
+        public string Animation;
+
+        public Action<string> OnAnimationChange;
+
         protected override void OnCreate() {
             base.OnCreate();
+            Watch(nameof(Animation), delegate {
+                UnityEngine.Debug.Log($"VSA ANIMATION CHANGE {OnAnimationChange}");
+                OnAnimationChange?.Invoke(Animation);
+            });
             GetDataInputPort(nameof(Enabled)).Properties.alwaysHidden = true;
             GetDataInputPort(nameof(Enabled)).Properties.hidden = true;
             GetDataInputPort(nameof(Attachable.Parent)).Properties.alwaysDisabled = true;

@@ -6,6 +6,7 @@ using UnityEngine;
 using Warudo.Core.Data;
 using Warudo.Core.Localization;
 using Warudo.Plugins.Core.Assets.Utility;
+using Warudo.Plugins.Core.Nodes;
 using static Warudo.Plugins.Core.Assets.Character.CharacterAsset;
 
 namespace FlameStream
@@ -17,6 +18,8 @@ namespace FlameStream
         PoseState setupModeBodyState;
         Tween tweenBodyPosition;
         Tween tweenBodyRotation;
+        Tween tweenBodyProgress;
+        float bodyTweenProgress = 1f;
         Vector3 bodyPosition;
         Vector3 bodyRotation;
         Vector3 bodyPositionOffset;
@@ -58,17 +61,27 @@ namespace FlameStream
             if (cursorAnchorAsset == null) return;
 
             if (inSetupMode) {
+                bodyState = setupModeBodyState;
                 if (setupModeBodyState != null) {
-                    var t = setupModeBodyState.Transform.setupAnchor.GameObject.transform;
-                    bodySetupRootAnchor.Transform.Position = cursorAnchorAsset.GameObject.transform.position;
+                    var cursorWorldPosition = cursorAnchorAsset.GameObject.transform.position;
+                    bodySetupRootAnchor.Transform.Position = cursorWorldPosition;
                     bodySetupRootAnchor.Transform.Rotation = Vector3.zero;
-                    bodySetupRootAnchor.Transform.Broadcast();
-                    bodyPosition = t.position;
-                    bodyRotation = t.rotation.eulerAngles;
 
-                    if (debugSphereCharacterTargetPosition != null) {
-                        debugSphereCharacterTargetPosition.transform.position = t.position;
+                    var t = setupModeBodyState.Transform.setupAnchor.Transform;
+
+                    if (setupModeBodyState == BodyMouseMode) {
+                        bodyPosition = cursorWorldPosition + t.Position;
+                        bodyRotation = t.Rotation;
+                        bodyPositionOffset = Vector3.zero;
+                        bodyRotationOffset = Vector3.zero;
+                    } else {
+                        bodyPosition = bodySetupRootAnchor.Transform.Position += BodyMouseMode.Transform.Position;
+                        bodyRotation = bodySetupRootAnchor.Transform.Rotation += BodyMouseMode.Transform.Rotation;
+                        bodyPositionOffset = t.Position;
+                        bodyRotationOffset = t.Rotation;
                     }
+
+                    bodySetupRootAnchor.Transform.Broadcast();
                 }
             } else {
                 bodyState = GetBodyState(Source, Button1);
@@ -76,7 +89,7 @@ namespace FlameStream
                 if (bodyState != null) {
 
                     // Body position
-                    targetBodyPosition = cursorAnchorAsset.GameObject.transform.position + bodyState.Transform.Position;
+                    targetBodyPosition = cursorAnchorAsset.GameObject.transform.position + BodyMouseMode.Transform.Position;
                     bodyDistanceFactor = screenAsset.GameObject.transform.InverseTransformPoint(targetBodyPosition) - screenAsset.GameObject.transform.InverseTransformPoint(Character.Transform.Position);
                     bodyDistanceFactor.x *= -1;
                     bodyRotation = BodyDynamicRotation.Evaluate(bodyDistanceFactor);
@@ -106,18 +119,20 @@ namespace FlameStream
                         bodyPosition = Vector3.zero;
                     }
                 }
-
-                if (lastBodyState != bodyState) {
-                    OnBodyStateChange();
-                }
-
-                if (debugSphereCharacterTargetPosition != null) {
-                    debugSphereCharacterTargetPosition.transform.position = targetBodyPosition;
-                }
             }
 
+            if (lastBodyState != bodyState) {
+                OnBodyStateChange();
+            }
 
-            Character.Transform.Position = bodyPosition;
+            if (debugSphereCharacterTargetBasePosition != null) {
+                debugSphereCharacterTargetBasePosition.transform.position = bodyPosition;
+            }
+            if (debugSphereCharacterTargetPosition != null) {
+                debugSphereCharacterTargetPosition.transform.position = targetBodyPosition + bodyPositionOffset;
+            }
+
+            Character.Transform.Position = bodyPosition + bodyPositionOffset;
             Character.Transform.Rotation = bodyRotation;
             Character.Transform.Broadcast();
 
@@ -138,20 +153,21 @@ namespace FlameStream
             BroadcastDataInputProperties(nameof(BodyDynamicRotation));
         }
 
-        void OnBodyStateChange(bool immediate = false) {
-
+        void OnBodyStateChange() {
             var st = setupModeBodyState ?? bodyState;
             if (st == null) return;
 
-            var pos = st.Transform.Position;
-            var rot = st.Transform.Rotation;
-            var time = immediate ? 0 : st.EnterTransition.Time;
+            var pos = st == BodyMouseMode ? Vector3.zero : st.Transform.Position;
+            var rot = st == BodyMouseMode ? Vector3.zero : st.Transform.Rotation;
+            var time = inSetupMode ? 0 : st.EnterTransition.Time;
             var ease = st.EnterTransition.Ease;
 
             SetBodyOffsetTransforms(pos, rot, time, ease);
 
-            BodyMouseMode.StartAnimationTransition(st == BodyMouseMode);
+            BodyMouseMode.StartAnimationTransition(true);
             BodyMouseMode.ActiveState.StartAnimationTransition(st == BodyMouseMode.ActiveState);
+            BodyPenMode.StartAnimationTransition(st == BodyPenMode || st == BodyPenMode.ActiveState);
+            BodyPenMode.ActiveState.StartAnimationTransition(st == BodyPenMode.ActiveState);
         }
 
         void OnBodyEnabledSettingChange() {
@@ -162,6 +178,20 @@ namespace FlameStream
         }
 
         void SetBodyOffsetTransforms(Vector3 pos, Vector3 rot, float time = 0, Ease ease = Ease.Linear) {
+            // Tween doesn't seen to have a progress getter, so we're creating our own
+            time *= bodyTweenProgress;
+            bodyTweenProgress = 1 - bodyTweenProgress;
+            tweenBodyProgress?.Kill();
+            if (time == 0) {
+                bodyTweenProgress = 1f;
+            } else {
+                tweenBodyProgress = DOTween.To(
+                    () => bodyTweenProgress,
+                    delegate(float it) { bodyTweenProgress = it; },
+                    1f,
+                    time
+                ).SetEase(Ease.Linear);
+            }
 
             tweenBodyPosition?.Kill();
             if (time == 0) {
@@ -233,8 +263,6 @@ namespace FlameStream
             tweenBodyPosition?.Kill();
             tweenBodyRotation?.Kill();
 
-            OnBodyStateChange();
-
             if (setupModeBodyState == BodyMouseMode) {
                 GetHandState(0, false)?.Transform.EnterVisualSetup(false);
                 GetPropState(0, false)?.Transform.EnterVisualSetup(false);
@@ -252,12 +280,13 @@ namespace FlameStream
 
         void HandleBodyExitVisualSetup(PoseState p, bool isApply) {
             if (setupModeBodyState == null) return;
+
             CleanDestroy(bodySetupRootAnchor);
             ExitSetupModeMinimal();
             setupModeBodyState = null;
             tweenHandPosition?.Kill();
             tweenHandRotation?.Kill();
-            OnBodyStateChange();
+
             NeutralHandPosition.ExitVisualSetup(isApply);
             setupModeHandState?.Transform.ExitVisualSetup(isApply);
             setupModePropState?.Transform.ExitVisualSetup(isApply);
@@ -267,35 +296,36 @@ namespace FlameStream
             var title = "SETUP_ANCHOR_NAME_BODY_ROOT".Localized();
             bodySetupRootAnchor.Name = $"🔒⌛⚓-{title}";
             Scene.UpdateNewAssetName(bodySetupRootAnchor);
+
             a.Attachable.Parent = bodySetupRootAnchor;
+            a.Animation = p.Animation;
+            // a.OnAnimationChange = (p) => HandleBodyAnimationChange(p);
         }
         void HandleBodyAnimationChange(PoseState p) {
+            var userLayers = Character.OverlappingAnimations.Where(d => !d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
+            var pointerLayers = Character.OverlappingAnimations.Where(d => d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
+
             var layerId = p.GetAnimationLayerId(LAYER_NAME_PREFIX);
-            var layer = Character.OverlappingAnimations?.FirstOrDefault(d => d.CustomLayerID == layerId);
+            var layer = pointerLayers.FirstOrDefault(d => d.CustomLayerID == layerId);
             if (layer == null) {
                 layer = StructuredData.Create<OverlappingAnimationData>();
-                layer.Weight = 0f;
+                layer.Weight = setupModeBodyState == p ? 1f : 0f;
                 layer.Speed = 1f;
                 layer.Masked = false;
                 layer.Additive = false;
                 layer.Looping = false;
                 layer.CustomLayerID = layerId;
 
-                var list = Character.OverlappingAnimations?.ToList() ?? new List<OverlappingAnimationData>();
-                // Ensure that it's before the hand poses
-                var firstLayerElement = list.Find(d => d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX));
-                var idx = list.IndexOf(firstLayerElement);
-                if (idx >= 0) {
-                    list.Insert(idx, layer);
-                } else {
-                    list.Add(layer);
-                }
-                Character.SetDataInput($"{nameof(Character.OverlappingAnimations)}", list.ToArray(), true);
+                pointerLayers.Add(layer);
             }
-            // layer.Animation = p.Animation;
-            // layer.Broadcast();
-            var idx2 = Array.IndexOf(Character.OverlappingAnimations, layer);
-            Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}.{idx2}.{nameof(layer.Animation)}", p.Animation, true);
+            // Update values
+            layer.Animation = p.Animation;
+
+            // Reorder layers
+            pointerLayers.Sort((x, y) => x.CustomLayerID.CompareTo(y.CustomLayerID));
+            userLayers.AddRange(pointerLayers);
+
+            Character.SetDataInput($"{nameof(Character.OverlappingAnimations)}", userLayers.ToArray(), true);
         }
 
         void HandleBodyAnimationWeightChange(PoseState p, float weight, bool resetAnimation = false) {
@@ -310,14 +340,16 @@ namespace FlameStream
             );
             if (animationData == null) return;
 
+            animationData.Weight = weight;
+            animationData.BroadcastDataInput("Weight");
+
             int animancerIdx = 1 + Array.IndexOf(Character.OverlappingAnimations, animationData);
 
             var layer = Character.Animancer.Layers[animancerIdx];
             layer.SetWeight(weight);
             var layer2 = Character.CloneAnimancer.Layers[animancerIdx];
             layer2.SetWeight(weight);
-            animationData.Weight = weight;
-            animationData.BroadcastDataInput("Weight");
+
 
             if (resetAnimation) {
                 layer.Play(layer.CurrentState).Time = 0;

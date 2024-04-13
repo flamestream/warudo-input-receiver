@@ -9,10 +9,13 @@ namespace FlameStream {
         [Label("ENABLE")]
         public bool Enabled;
         [DataInput]
+        [Hidden]
         public DistanceInputMathExpression X;
         [DataInput]
+        [Hidden]
         public DistanceInputMathExpression Y;
         [DataInput]
+        [Hidden]
         public DistanceInputMathExpression Z;
 
         public Vector3 Evaluate(Vector3 v) {
@@ -42,6 +45,7 @@ result: {result}
         public string DebugMessage;
 
         [Trigger]
+        [Hidden]
         [Label("TOGGLE_DEBUG_MODE")]
         public void ToggleDebugModeTrigger() {
             debugMode = !debugMode;
@@ -55,7 +59,6 @@ result: {result}
         protected override void OnCreate() {
             base.OnCreate();
             Watch(nameof(Enabled), delegate { OnEnabledChanged(); });
-            OnEnabledChanged();
         }
 
         void OnEnabledChanged() {
@@ -70,6 +73,24 @@ result: {result}
             BroadcastDataInputProperties(nameof(Z));
             BroadcastDataInputProperties(nameof(DebugMessage));
             BroadcastTriggerProperties(nameof(ToggleDebugModeTrigger));
+        }
+    }
+
+    public class HandRotationDynamicVector3 : DynamicVector3 {
+        public HandRotationDynamicVector3() {
+            Z = StructuredData.Create<DistanceInputMathExpression>((me) => {
+                me.Expression = "min(2 * abs(dx), 1) * (atan2(abs(dy), abs(dx)) * (180 / pi) - 90) * -sign(dx)";
+            });
+            Z.OnExpressionChange();
+        }
+    }
+
+    public class BodyRotationDynamicVector3 : DynamicVector3 {
+        public BodyRotationDynamicVector3() {
+            Z = StructuredData.Create<DistanceInputMathExpression>((me) => {
+                me.Expression = "min(0.15 * abs(dx), 1) * atan2(-abs(dx), abs(dy)) * 4 / pi * (180 / pi) * sign(dx)";
+            });
+            Z.OnExpressionChange();
         }
     }
 }

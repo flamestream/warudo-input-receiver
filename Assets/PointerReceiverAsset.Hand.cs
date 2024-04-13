@@ -5,6 +5,7 @@ using DG.Tweening;
 using UnityEngine;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
+using Warudo.Core.Localization;
 using Warudo.Plugins.Core.Assets.Utility;
 using static Warudo.Plugins.Core.Assets.Character.CharacterAsset;
 
@@ -21,9 +22,14 @@ namespace FlameStream
         PoseState setupModeHandState;
         Tween tweenHandPosition;
         Tween tweenHandRotation;
+        Tween tweenHandProgress;
+        float handTweenProgress = 1f;
         Vector3 handPosition;
+        Vector3 handPositionOffset;
         Vector3 handRotation;
+        Vector3 handRotationOffset;
         AnchorAsset handAnchor;
+        AnchorAsset handSetupRootAnchor;
 
         void OnCreateMoveHand() {
             Watch(nameof(IsHandEnabled), delegate { OnInputAffectingHandIKChange(); });
@@ -63,47 +69,71 @@ namespace FlameStream
             if (handAnchor == null) return;
 
             if (inSetupMode) {
+                handState = setupModeHandState;
                 if (setupModeHandState != null) {
-                    var tr = setupModeHandState.Transform.setupAnchor.Transform;
-                    var r = tr.Rotation;
-                    handPosition = tr.Position;
-                    handRotation = new Vector3(r.z, r.y, -r.x);
+                    var t = setupModeHandState.Transform.setupAnchor.Transform;
+                    var r = t.Rotation;
+                    var adjustedRotation = new Vector3(r.z, r.y, -r.x);
                     if (IsRightHanded) {
-                        handRotation.x *= -1;
-                        handRotation.z *= -1;
+                        adjustedRotation.x *= -1;
+                        adjustedRotation.z *= -1;
                     }
+
+                    if (setupModeHandState == HandMouseMode) {
+                        handSetupRootAnchor.Transform.Position = Vector3.zero;
+                        handSetupRootAnchor.Transform.Rotation = Vector3.zero;
+                        handPosition = t.Position;
+                        handRotation = adjustedRotation;
+                        handPositionOffset = Vector3.zero;
+                        handRotationOffset = Vector3.zero;
+                    } else {
+                        handSetupRootAnchor.Transform.Position = HandMouseMode.Transform.Position;
+                        handSetupRootAnchor.Transform.Rotation = HandMouseMode.Transform.Rotation;
+                        handPosition = HandMouseMode.Transform.Position;
+                        handRotation = HandMouseMode.Transform.Rotation;
+                        handPositionOffset = t.Position;
+                        handRotationOffset = adjustedRotation;
+                    }
+                    handSetupRootAnchor.Transform.Broadcast();
                 }
             } else {
+                handPosition = HandMouseMode.Transform.Position;
+                handRotation = HandMouseMode.Transform.Rotation;
                 handState = GetHandState(Source, Button1);
+            }
 
-                if (lastHandState != handState) {
-                    OnHandStateChange();
-                }
+            if (lastHandState != handState) {
+                OnHandStateChange();
             }
 
             var ikt = handAnchor.Transform;
-            ikt.Position = handPosition;
+            ikt.Position = handPosition + handPositionOffset;
             ikt.Rotation = IsRightHanded
                 ? IK_BASIS_RIGHT_HANDED
                 : IK_BASIS_LEFT_HANDED;
-            ikt.Rotation += handRotation;
+            ikt.Rotation += handRotation + handRotationOffset;
             ikt.Broadcast();
 
             lastHandState = handState;
         }
 
-        void OnHandStateChange(bool immediate = false) {
-            if (handState == null) return;
+        void OnHandStateChange() {
+            var st = setupModeHandState ?? handState;
+            if (st == null) return;
 
-            var pos = handState.Transform.Position;
-            var rot = handState.Transform.Rotation;
-            var time = immediate ? 0 : handState.EnterTransition.Time;
+            var pos = st == HandMouseMode ? Vector3.zero : st.Transform.Position;
+            var rot = st == HandMouseMode ? Vector3.zero : st.Transform.Rotation;
+            var time = inSetupMode ? 0 : handState.EnterTransition.Time;
             var ease = handState.EnterTransition.Ease;
 
-            SetHandTransforms(pos, rot, time, ease);
+            SetHandOffsetTransforms(pos, rot, time, ease);
 
-            HandMouseMode.StartAnimationTransition(handState == HandMouseMode);
-            HandMouseMode.ActiveState.StartAnimationTransition(handState == HandMouseMode.ActiveState);
+            Debug.Log($"ANIMTAION SET {st == HandMouseMode.ActiveState} {st?.Label}");
+
+            HandMouseMode.StartAnimationTransition(true);
+            HandMouseMode.ActiveState.StartAnimationTransition(st == HandMouseMode.ActiveState);
+            HandPenMode.StartAnimationTransition(st == HandPenMode || st == HandPenMode.ActiveState);
+            HandPenMode.ActiveState.StartAnimationTransition(st == HandPenMode.ActiveState);
         }
 
         void OnHandStateSettingChange() {
@@ -111,7 +141,6 @@ namespace FlameStream
         }
 
         void OnInputAffectingHandIKChange() {
-            if (!isReady) return;
             if (Character == null) return;
 
             handAnchor = GetHandIK();
@@ -156,15 +185,29 @@ namespace FlameStream
             limb.Broadcast();
         }
 
-        void SetHandTransforms(Vector3 pos, Vector3 rot, float time = 0, Ease ease = Ease.Linear) {
+        void SetHandOffsetTransforms(Vector3 pos, Vector3 rot, float time = 0, Ease ease = Ease.Linear) {
+            // Tween doesn't seen to have a progress getter, so we're creating our own
+            time *= handTweenProgress;
+            handTweenProgress = 1 - handTweenProgress;
+            tweenHandProgress?.Kill();
+            if (time == 0) {
+                handTweenProgress = 1f;
+            } else {
+                tweenHandProgress = DOTween.To(
+                    () => handTweenProgress,
+                    delegate(float it) { handTweenProgress = it; },
+                    1f,
+                    time
+                ).SetEase(Ease.Linear);
+            }
 
             tweenHandPosition?.Kill();
             if (time == 0) {
-                handPosition = pos;
+                handPositionOffset = pos;
             } else {
                 tweenHandPosition = DOTween.To(
-                    () => handPosition,
-                    delegate(Vector3 it) { handPosition = it; },
+                    () => handPositionOffset,
+                    delegate(Vector3 it) { handPositionOffset = it; },
                     pos,
                     time
                 ).SetEase(ease);
@@ -172,11 +215,11 @@ namespace FlameStream
 
             tweenHandRotation?.Kill();
             if (time == 0) {
-                handRotation = rot;
+                handRotationOffset = rot;
             } else {
                 tweenHandRotation = DOTween.To(
-                    () => handRotation,
-                    delegate(Vector3 it) { handRotation = it; },
+                    () => handRotationOffset,
+                    delegate(Vector3 it) { handRotationOffset = it; },
                     rot,
                     time
                 ).SetEase(ease);
@@ -204,9 +247,6 @@ namespace FlameStream
             tweenHandPosition?.Kill();
             tweenHandRotation?.Kill();
 
-            HandMouseMode.StartAnimationTransition(setupModeHandState == HandMouseMode);
-            HandMouseMode.ActiveState.StartAnimationTransition(setupModeHandState == HandMouseMode.ActiveState);
-
             if (setupModeHandState == HandMouseMode) {
                 GetBodyState(0, false)?.Transform.EnterVisualSetup(false);
                 GetPropState(0, false)?.Transform.EnterVisualSetup(false);
@@ -224,18 +264,26 @@ namespace FlameStream
 
         void HandleHandExitVisualSetup(PoseState p, bool isApply) {
             if (setupModeHandState == null) return;
+
+            CleanDestroy(handSetupRootAnchor);
             ExitSetupModeMinimal();
             setupModeHandState = null;
             tweenHandPosition?.Kill();
             tweenHandRotation?.Kill();
-            OnHandStateChange();
+
             NeutralHandPosition.ExitVisualSetup(isApply);
             setupModeBodyState?.Transform.ExitVisualSetup(isApply);
             setupModePropState?.Transform.ExitVisualSetup(isApply);
         }
 
         void HandleHandCreateAnchor(PoseState p, VisualSetupTransform tr, VisualSetupAnchorAsset a) {
-            a.Attachable.Parent = cursorAnchorAsset;
+            handSetupRootAnchor = Scene.AddAsset<AnchorAsset>();
+            handSetupRootAnchor.Attachable.Parent = cursorAnchorAsset;
+            var title = "SETUP_ANCHOR_NAME_HAND_ROOT".Localized();
+            handSetupRootAnchor.Name = $"🔒⌛⚓-{title}";
+            Scene.UpdateNewAssetName(handSetupRootAnchor);
+
+            a.Attachable.Parent = handSetupRootAnchor;
             a.Transform.Position = tr.Position;
             var r = tr.Rotation;
             if (IsRightHanded) {
@@ -243,6 +291,7 @@ namespace FlameStream
                 r.z *= -1;
             }
             a.Transform.Rotation = new Vector3(-r.z, r.y, r.x);
+            a.Animation = p.Animation;
         }
 
         void HandleHandApplyAnchor(PoseState p, VisualSetupTransform tr, VisualSetupAnchorAsset a) {
@@ -256,60 +305,64 @@ namespace FlameStream
         }
 
         void HandleHandAnimationChange(PoseState p) {
+            Debug.Log("HandleHandAnimationChange");
+            var userLayers = Character.OverlappingAnimations.Where(d => !d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
+            var pointerLayers = Character.OverlappingAnimations.Where(d => d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
+
             var layerId = p.GetAnimationLayerId(LAYER_NAME_PREFIX);
-            var layer = Character.OverlappingAnimations?.FirstOrDefault(d => d.CustomLayerID == layerId);
+            var layer = pointerLayers.FirstOrDefault(d => d.CustomLayerID == layerId);
             if (layer == null) {
                 layer = StructuredData.Create<OverlappingAnimationData>();
-                layer.Weight = 0f;
+                layer.Weight = setupModeHandState == p ? 1f : 0f;
                 layer.Speed = 1f;
                 layer.Masked = true;
                 layer.Additive = false;
                 layer.Looping = false;
                 layer.CustomLayerID = layerId;
 
-                var list = Character.OverlappingAnimations?.ToList() ?? new List<OverlappingAnimationData>();
-                // Ensure that it's after the body poses
-                var firstLayerElement = list.FindLast(d => d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX));
-                var idx = list.IndexOf(firstLayerElement);
-                if (idx >= 0) {
-                    list.Insert(idx + 1, layer);
-                } else {
-                    list.Add(layer);
-                }
-                Character.SetDataInput($"{nameof(Character.OverlappingAnimations)}", list.ToArray(), true);
+                pointerLayers.Add(layer);
             }
+            // Update values
             layer.MaskedBodyParts = IsRightHanded
                 ? new AnimationMaskedBodyPart[] { AnimationMaskedBodyPart.RightFingers }
                 : new AnimationMaskedBodyPart[] { AnimationMaskedBodyPart.LeftFingers };
-            // layer.Animation = p.Animation;
-            // layer.Broadcast();
-            var idx2 = Array.IndexOf(Character.OverlappingAnimations, layer);
-            Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}.{idx2}.{nameof(layer.Animation)}", p.Animation, true);
+            layer.Animation = p.Animation;
+
+            // Reorder layers
+            pointerLayers.Sort((x, y) => x.CustomLayerID.CompareTo(y.CustomLayerID));
+            userLayers.AddRange(pointerLayers);
+
+            Character.SetDataInput($"{nameof(Character.OverlappingAnimations)}", userLayers.ToArray(), true);
         }
 
         void HandleHandAnimationWeightChange(PoseState p, float weight, bool resetAnimation = false) {
             if (Character == null) return;
 
             var layerId = p.GetAnimationLayerId(LAYER_NAME_PREFIX);
+Debug.Log($"{p.Label}: layerId {layerId}");
             if (layerId == null) return;
 
             var animationData = Array.Find(
                 Character.OverlappingAnimations,
                 (a) => a.CustomLayerID == layerId
             );
+Debug.Log($"{p.Label}: animationData {animationData}");
             if (animationData == null) return;
 
+            animationData.Weight = weight;
+            animationData.BroadcastDataInput("Weight");
+
             // Sanity: If no animation is set, then animancer layer is null
+Debug.Log($"{p.Label}: animationData {animationData}");
             if (animationData.Animation == null) return;
             int animancerIdx = 1 + Array.IndexOf(Character.OverlappingAnimations, animationData);
 
             var layer = Character.Animancer.Layers[animancerIdx];
             var layer2 = Character.CloneAnimancer.Layers[animancerIdx];
-
+Debug.Log($"{p.Label}: {weight}");
             layer.SetWeight(weight);
             layer2.SetWeight(weight);
-            animationData.Weight = weight;
-            animationData.BroadcastDataInput("Weight");
+
 
             if (resetAnimation) {
                 // NOTE: Crash would occur if layer has no animation

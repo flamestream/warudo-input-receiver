@@ -10,7 +10,9 @@ namespace FlameStream {
         Version = "3.2.0",
         AssetTypes = new[] {
             typeof(GamepadReceiverAsset),
-            typeof(PointerReceiverAsset)
+            typeof(PointerReceiverAsset),
+            typeof(DrawingScreenAsset),
+            typeof(VisualSetupAnchorAsset)
         },
         NodeTypes = new[] {
             typeof(CharacterAssetReferenceNode),

@@ -67,11 +67,7 @@ namespace FlameStream {
 
         [DataInput]
         [Label("DYNAMIC_ROTATION")]
-        public DynamicVector3 HandDynamicRotation = StructuredData.Create<DynamicVector3>((dv) => {
-            dv.Z = StructuredData.Create<DistanceInputMathExpression>((me) => {
-                me.Expression = "min(2 * abs(dx), 1) * (atan2(abs(dy), abs(dx)) * (180 / pi) - 90) * -sign(dx)";
-            });
-        });
+        public HandRotationDynamicVector3 HandDynamicRotation;
 
         /// <summary>
         /// HAND PROP CONTROL
@@ -121,11 +117,7 @@ namespace FlameStream {
 
         [DataInput]
         [Label("DYNAMIC_ROTATION")]
-        public DynamicVector3 BodyDynamicRotation = StructuredData.Create<DynamicVector3>((dv) => {
-            dv.Z = StructuredData.Create<DistanceInputMathExpression>((me) => {
-                me.Expression = "min(0.15 * abs(dx), 1) * atan2(-abs(dx), abs(dy)) * 4 / pi * (180 / pi) * sign(dx)";
-            });
-        });
+        public BodyRotationDynamicVector3 BodyDynamicRotation;
 
         /// <summary>
         /// ADVANCED

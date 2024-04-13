@@ -20,6 +20,18 @@ namespace FlameStream {
         public Vector3 Scale = Vector3.one;
 
         [Trigger]
+        [Label("MINIMIZE_ROTATION")]
+        public void NormalizeRotationAnglesTrigger() {
+            NormalizeRotationAngles();
+        }
+
+        [Trigger]
+        [Hidden]
+        public void CopyTrigger() {
+            OnCopy?.Invoke();
+        }
+
+        [Trigger]
         [Label("ENTER_VISUAL_SETUP")]
         public void EnterVisualSetupTrigger() {
             EnterVisualSetup(true);
@@ -39,6 +51,8 @@ namespace FlameStream {
         public Action<VisualSetupTransform, VisualSetupAnchorAsset> OnApplyAnchor;
         public Action<VisualSetupTransform> OnEnterVisualSetup;
         public Action<bool> OnExitVisualSetup;
+        public Action OnCopy;
+        public Action<string> OnAnimationChange;
 
         protected override void OnDestroy() {
             base.OnDestroy();
@@ -62,6 +76,12 @@ namespace FlameStream {
             OnCreateAnchor?.Invoke(this, setupAnchor);
             setupAnchor.Broadcast();
             Scene.UpdateNewAssetName(setupAnchor);
+
+            setupAnchor.OnAnimationChange = (a) => {
+                UnityEngine.Debug.Log($"VST ANIMATION CHANGE {OnAnimationChange}");
+                OnAnimationChange.Invoke(a);
+            };
+
             return setupAnchor;
         }
 
@@ -121,6 +141,21 @@ namespace FlameStream {
             BroadcastDataInput(nameof(Scale));
             ExitVisualSetup(true);
         }
+
+        public void HideScale() {
+            GetDataInputPort(nameof(Scale)).Properties.hidden = true;
+            BroadcastDataInputProperties(nameof(Scale));
+        }
+
+        public void SetCopyTriggerLabel(string label) {
+            GetTriggerPort(nameof(CopyTrigger)).Properties.label = label;
+            // GetTriggerPort(nameof(CopyTrigger)).Properties.hidden = false;
+            BroadcastTriggerProperties(nameof(CopyTrigger));
+        }
+
+        public void NormalizeRotationAngles() {
+            SetDataInput(nameof(Rotation), Helper.NormalizeRotationAngles(Rotation), true);
+        }
     }
 
     public class NaturalPositionVisualSetupTransform : VisualSetupTransform {
@@ -135,6 +170,9 @@ namespace FlameStream {
             GetDataInputPort(nameof(Scale)).Properties.hidden = true;
             BroadcastDataInputProperties(nameof(Position));
             BroadcastDataInputProperties(nameof(Rotation));
+
+            GetTriggerPort(nameof(NormalizeRotationAnglesTrigger)).Properties.hidden = true;
+            BroadcastTriggerProperties(nameof(NormalizeRotationAnglesTrigger));
         }
 
         protected override void OnUpdate() {

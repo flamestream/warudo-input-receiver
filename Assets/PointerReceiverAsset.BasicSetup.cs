@@ -38,14 +38,16 @@ namespace FlameStream
         GameObject debugSphereNeutralPosition;
         GameObject debugSphereCharacterPosition;
         GameObject debugSphereCharacterTargetPosition;
+        GameObject debugSphereCharacterTargetBasePosition;
         Material debugSphereCursorScreenPositionMaterial;
         Material debugSphereNeutralPositionMaterial;
         Material debugSphereCharacterPositionMaterial;
         Material debugSphereCharacterTargetPositionMaterial;
+        Material debugSphereCharacterTargetBasePositionMaterial;
 
         Vector3 cursorScreenPosition;
 
-        bool isReady;
+        int onReadyCountdown = 3;
         bool isDebugModeForced;
         bool inSetupMode;
         bool isBasicSetupComplete;
@@ -82,13 +84,14 @@ namespace FlameStream
             if (Character == null) return;
 
             // OnReady: One-time execution before update events are sent
-            // This is needed because assets are loaded in order, triggering OnCreate events immediately
-            // which may be an issue if some of them are dependent on other assets that are yet to be loaded.
-            if (!isReady) {
-                isReady = true;
-                OnReadyHand();
-                OnReadyBody();
-                OnReadyProp();
+            // Delay if a few tick is needed because things are for settled
+            if (onReadyCountdown > 0) {
+                --onReadyCountdown;
+                if (onReadyCountdown == 0) {
+                    OnReadyHand();
+                    OnReadyBody();
+                    OnReadyProp();
+                };
             }
 
             OnUpdateState();
@@ -310,7 +313,11 @@ namespace FlameStream
             if (debugSphereCursorScreenPosition) return debugSphereCursorScreenPosition;
             if (skipAutoCreate) return null;
 
-            var s = CreateDebugSphere(ref debugSphereCursorScreenPosition, ref debugSphereCursorScreenPositionMaterial, Color.red);
+            var s = CreateDebugSphere(
+                ref debugSphereCursorScreenPosition,
+                ref debugSphereCursorScreenPositionMaterial,
+                new Color(1f, 0f, 0f, 0.8f)
+            );
             s.transform.position = Vector3.zero;
             s.transform.SetParent(cursorAnchorAsset.GameObject.transform, false);
             return s;
@@ -320,7 +327,11 @@ namespace FlameStream
             if (debugSphereNeutralPosition) return debugSphereNeutralPosition;
             if (skipAutoCreate) return null;
 
-            var s = CreateDebugSphere(ref debugSphereNeutralPosition, ref debugSphereNeutralPositionMaterial, Color.yellow);
+            var s = CreateDebugSphere(
+                ref debugSphereNeutralPosition,
+                ref debugSphereNeutralPositionMaterial,
+                Color.yellow
+            );
             s.transform.position = Vector3.zero;
             s.transform.SetParent(screenAsset.GameObject.transform, false);
             return s;
@@ -330,7 +341,11 @@ namespace FlameStream
             if (debugSphereCharacterPosition) return debugSphereCharacterPosition;
             if (skipAutoCreate) return null;
 
-            var s = CreateDebugSphere(ref debugSphereCharacterPosition, ref debugSphereCharacterPositionMaterial, Color.green);
+            var s = CreateDebugSphere(
+                ref debugSphereCharacterPosition,
+                ref debugSphereCharacterPositionMaterial,
+                Color.green
+            );
             s.transform.position = Vector3.zero;
             s.transform.SetParent(Character.GameObject.transform, false);
             return s;
@@ -340,7 +355,25 @@ namespace FlameStream
             if (debugSphereCharacterTargetPosition) return debugSphereCharacterTargetPosition;
             if (skipAutoCreate) return null;
 
-            var s = CreateDebugSphere(ref debugSphereCharacterTargetPosition, ref debugSphereCharacterTargetPositionMaterial, Color.blue);
+            var s = CreateDebugSphere(
+                ref debugSphereCharacterTargetPosition,
+                ref debugSphereCharacterTargetPositionMaterial,
+                new Color(1f, 0f, 1f, 0.5f)
+            );
+            s.transform.position = Vector3.zero;
+            s.transform.SetParent(cursorAnchorAsset.GameObject.transform, false);
+            return s;
+        }
+
+        GameObject GetDebugSphereCharacterTargetBasePosition(bool skipAutoCreate = false) {
+            if (debugSphereCharacterTargetBasePosition) return debugSphereCharacterTargetBasePosition;
+            if (skipAutoCreate) return null;
+
+            var s = CreateDebugSphere(
+                ref debugSphereCharacterTargetBasePosition,
+                ref debugSphereCharacterTargetBasePositionMaterial,
+                Color.blue
+            );
             s.transform.position = Vector3.zero;
             s.transform.SetParent(cursorAnchorAsset.GameObject.transform, false);
             return s;
@@ -348,7 +381,7 @@ namespace FlameStream
 
         GameObject CreateDebugSphere(ref GameObject go, ref Material m, Color c) {
             go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            go.transform.position = new Vector3(0, 1.5f, 0);
+            go.transform.localPosition = Vector3.zero;
             go.transform.localScale = new Vector3(0.1f, 0.1f, 0.1f);
 
             m = new Material(Shader.Find("Standard"));
@@ -356,7 +389,7 @@ namespace FlameStream
             m.SetColor("_EmissionColor", c);
             m.SetFloat("_EmissionIntensity", 1.0f);
             m.color = c;
-            // pointerSphereMaterial.SetFloat("_Mode", 3); // Unlit
+            m.SetFloat("_Mode", 3); // Unlit
             go.GetComponent<Renderer>().material = m;
 
             return go;
@@ -368,6 +401,7 @@ namespace FlameStream
             GetDebugSphereNeutralPosition();
             GetDebugSphereCharacterPosition();
             GetDebugSphereCharacterTargetPosition();
+            GetDebugSphereCharacterTargetBasePosition();
             ApplyDisplayPointerSphereScale();
         }
 
@@ -383,10 +417,13 @@ namespace FlameStream
                 debugSphereNeutralPosition.gameObject.transform.localScale = scale2 * 0.99f;
             }
             if (debugSphereCharacterPosition != null) {
-                debugSphereCharacterPosition.gameObject.transform.localScale = scale * 0.99f;
+                debugSphereCharacterPosition.gameObject.transform.localScale = scale;
             }
             if (debugSphereCharacterTargetPosition != null) {
-                debugSphereCharacterTargetPosition.gameObject.transform.localScale = scale;
+                debugSphereCharacterTargetPosition.gameObject.transform.localScale = scale * 0.99f;
+            }
+            if (debugSphereCharacterTargetBasePosition != null) {
+                debugSphereCharacterTargetBasePosition.gameObject.transform.localScale = scale * 0.98f;
             }
         }
 
@@ -403,6 +440,8 @@ namespace FlameStream
             Material.Destroy(debugSphereCharacterPositionMaterial);
             GameObject.Destroy(debugSphereCharacterTargetPosition);
             Material.Destroy(debugSphereCharacterTargetPositionMaterial);
+            GameObject.Destroy(debugSphereCharacterTargetBasePosition);
+            Material.Destroy(debugSphereCharacterTargetBasePositionMaterial);
         }
     }
 }

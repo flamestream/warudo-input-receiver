@@ -25,9 +25,10 @@ namespace FlameStream {
         protected override void OnCreate() {
             base.OnCreate();
             Watch(nameof(Expression), delegate { OnExpressionChange(); });
+            OnExpressionChange();
         }
 
-        void OnExpressionChange() {
+        public void OnExpressionChange() {
             if (Expression == null || Expression == "") {
                 compiledExpression = null;
                 CompilationError = null;

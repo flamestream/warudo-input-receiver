@@ -22,6 +22,8 @@ namespace FlameStream
         Tween tweenPropPosition;
         Tween tweenPropRotation;
         Tween tweenPropScale;
+        Tween tweenPropProgress;
+        float propTweenProgress = 1f;
         Vector3 propPosition;
         Vector3 propRotation;
         Vector3 propScale;
@@ -87,7 +89,7 @@ namespace FlameStream
         }
 
         void OnInputAffectingPropChange() {
-            if (!isReady) return;
+            // if (!isReady) return;
             if (!IsPropEnabled) return;
             if (PropSource == null) {
                 var p = GetProp(true);
@@ -191,6 +193,20 @@ namespace FlameStream
         }
 
         void SetPropTransforms(Vector3 pos, Vector3 rot, Vector3 sca, float time = 0, Ease ease = Ease.Linear) {
+            // Tween doesn't seen to have a progress getter, so we're creating our own
+            time *= propTweenProgress;
+            propTweenProgress = 1 - propTweenProgress;
+            tweenPropProgress?.Kill();
+            if (time == 0) {
+                propTweenProgress = 1f;
+            } else {
+                tweenPropProgress = DOTween.To(
+                    () => propTweenProgress,
+                    delegate(float it) { propTweenProgress = it; },
+                    1f,
+                    time
+                ).SetEase(Ease.Linear);
+            }
 
             tweenPropPosition?.Kill();
             if (time == 0) {
