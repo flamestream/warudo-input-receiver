@@ -1,10 +1,10 @@
 using System;
 using System.Diagnostics;
+using System.Linq.Expressions;
 using DG.Tweening;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
 using Warudo.Core.Localization;
-using Warudo.Core.Utils;
 
 namespace FlameStream {
     public class GameObjectState : StructuredData {
@@ -108,7 +108,7 @@ namespace FlameStream {
 
             ActiveState.Label = $"{Label} Active";
             ActiveState.RefreshInfo(true);
-            ActiveState.OnApplyAnchor = (p, tr,  a) => { OnApplyAnchor?.Invoke(p, tr, a); };
+            ActiveState.OnApplyAnchor = (p, tr, a) => { OnApplyAnchor?.Invoke(p, tr, a); };
             ActiveState.OnCreateAnchor = (p, tr, a) => { OnCreateAnchor?.Invoke(p, tr, a); };
             ActiveState.OnEnterVisualSetup = (p) => { OnEnterVisualSetup?.Invoke(p); };
             ActiveState.OnExitVisualSetup = (p, ia) => { OnExitVisualSetup?.Invoke(p, ia); };
@@ -163,16 +163,13 @@ namespace FlameStream {
         protected override void OnCreate() {
             base.OnCreate();
             Watch(nameof(Animation), delegate {
-                UnityEngine.Debug.Log("T ANIM CHANGE????");
                 OnAnimationChange?.Invoke(this);
             });
         }
 
         protected override void OnReady() {
             base.OnReady();
-            UnityEngine.Debug.Log("===== Transform.OnAnimationChange primed!");
             Transform.OnAnimationChange = (animation) => {
-                UnityEngine.Debug.Log("GO ANIMATION CHANGE");
                 Animation = animation;
                 OnAnimationChange.Invoke(this);
             };
@@ -193,9 +190,7 @@ namespace FlameStream {
 
         public void StartAnimationTransition(bool inTransition) {
             var targetWeight = inTransition ? 1f : 0f;
-            UnityEngine.Debug.Log($"{Label}: {animationWeight} => {targetWeight}");
-            if (animationWeight == targetWeight) return;
-            UnityEngine.Debug.Log($"{Label}: GO");
+            // if (animationWeight == targetWeight) return;
 
             var ratio = Math.Abs(targetWeight - animationWeight);
 
@@ -318,6 +313,13 @@ namespace FlameStream {
 
     public class MousePropState : BaseState {
         public MousePropState() : base("Mouse Prop") {}
+
+        protected override void OnCreate() {
+            Enabled = true;
+            base.OnCreate();
+            GetDataInputPort(nameof(Enabled)).Properties.hidden = true;
+            BroadcastDataInputProperties(nameof(Enabled));
+        }
     }
 
     public class PenPropState : BaseState {

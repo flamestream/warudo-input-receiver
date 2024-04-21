@@ -34,6 +34,7 @@ namespace FlameStream
         Vector2 cursorToScreenScaleFactor;
         Tween cursorMoveTween;
 
+        GameObject calculator;
         GameObject debugSphereCursorScreenPosition;
         GameObject debugSphereNeutralPosition;
         GameObject debugSphereCharacterPosition;
@@ -47,6 +48,7 @@ namespace FlameStream
 
         Vector3 cursorScreenPosition;
 
+        bool isReady;
         int onReadyCountdown = 3;
         bool isDebugModeForced;
         bool inSetupMode;
@@ -55,17 +57,7 @@ namespace FlameStream
         protected override void OnCreate() {
             if (Port == 0) Port = DEFAULT_PORT;
             base.OnCreate();
-
-            // Has to be before #OnBasicSettingChange
-            Watch(nameof(DisplayName), delegate { OnSurfaceSettingChange(); });
-
-            Watch(nameof(IsHandEnabled), delegate { OnBasicSettingChange(); });
-            Watch(nameof(Character), delegate { OnBasicSettingChange(); });
-            Watch(nameof(DisplayName), delegate { OnBasicSettingChange(); });
-            OnBasicSettingChange();
-
-            Watch(nameof(DebugSphereScaleFactor), delegate { ApplyDisplayPointerSphereScale(); });
-
+            OnCreateBasicSetup();
             OnCreateMoveHand();
             OnCreateProp();
             OnCreateMoveBody();
@@ -76,6 +68,7 @@ namespace FlameStream
 
             DestroyDebugSpheres(true);
             CleanDestroy(bodySetupRootAnchor);
+            GameObject.Destroy(calculator);
         }
 
         public override void OnUpdate() {
@@ -88,6 +81,7 @@ namespace FlameStream
             if (onReadyCountdown > 0) {
                 --onReadyCountdown;
                 if (onReadyCountdown == 0) {
+                    isReady = true;
                     OnReadyHand();
                     OnReadyBody();
                     OnReadyProp();
@@ -96,9 +90,22 @@ namespace FlameStream
 
             OnUpdateState();
             OnUpdateBasicSetup();
-            OnUpdateMoveHand();
+            OnUpdateHand();
             OnUpdateProp();
-            OnUpdateMoveBody();
+            OnUpdateBody();
+        }
+
+        void OnCreateBasicSetup() {
+            calculator = new GameObject();
+            // Has to be before #OnBasicSettingChange
+            Watch(nameof(DisplayName), delegate { OnSurfaceSettingChange(); });
+
+            Watch(nameof(IsHandEnabled), delegate { OnBasicSettingChange(); });
+            Watch(nameof(Character), delegate { OnBasicSettingChange(); });
+            Watch(nameof(DisplayName), delegate { OnBasicSettingChange(); });
+            OnBasicSettingChange();
+
+            Watch(nameof(DebugSphereScaleFactor), delegate { ApplyDisplayPointerSphereScale(); });
         }
 
         void OnUpdateBasicSetup() {
@@ -107,17 +114,12 @@ namespace FlameStream
             if (cursorAnchorAsset == null) return;
 
             var anchorTransform = cursorAnchorAsset.Transform;
+            anchorTransform.Rotation = IsRightHanded
+                ? IK_BASIS_RIGHT_HANDED
+                : IK_BASIS_LEFT_HANDED;
 
             if (inSetupMode) {
-                if (NeutralHandPosition.InVisualSetupMode) {
-                    // Setup Neutral hand
-                    anchorTransform.Rotation = NeutralHandPosition.setupAnchor.Transform.Rotation;
-                    anchorTransform.Position = NeutralHandPosition.setupAnchor.Transform.Position;
-                } else {
-                    // Pin to neutral hand
-                    anchorTransform.Rotation = Vector3.zero;
-                    anchorTransform.Position = NeutralHandPosition.Position;
-                }
+                anchorTransform.Position = NeutralHandPosition.setupAnchor?.Transform.Position ?? NeutralHandPosition.Position;
             } else {
                 // Follow pointer
                 var targetPlanarPosition = new Vector3(
@@ -140,10 +142,11 @@ namespace FlameStream
 
                 anchorTransform.Position = cursorScreenPosition;
 
+                // TODO: Improve this by using hand offset delta
                 Vector3 delta = IsBodyEnabled
                     ? bodyDistanceFactor
                     : NeutralHandPosition.Position - cursorAnchorAsset.Transform.Position;
-                anchorTransform.Rotation = HandDynamicRotation.Evaluate(delta);
+                anchorTransform.Rotation += HandDynamicRotation.Evaluate(delta);
             }
 
             if (debugSphereNeutralPosition != null) {
@@ -169,7 +172,6 @@ namespace FlameStream
             GetDataInputPort(nameof(IsRightHanded)).Properties.hidden = !IsHandEnabled;
             GetDataInputPort(nameof(DisplayName)).Properties.hidden = !IsHandEnabled;
             GetDataInputPort(nameof(CursorSmoothness)).Properties.hidden = !IsHandEnabled;
-
             BroadcastDataInputProperties(nameof(Character));
             BroadcastDataInputProperties(nameof(IsRightHanded));
             BroadcastDataInputProperties(nameof(DisplayName));
@@ -181,7 +183,6 @@ namespace FlameStream
             GetDataInputPort(nameof(HandMouseMode)).Properties.hidden = !isBasicSetupComplete;
             GetDataInputPort(nameof(HandPenMode)).Properties.hidden = !isBasicSetupComplete;
             GetDataInputPort(nameof(HandDynamicRotation)).Properties.hidden = !isBasicSetupComplete;
-
             BroadcastDataInputProperties(nameof(NeutralHandPosition));
             BroadcastDataInputProperties(nameof(HandMouseMode));
             BroadcastDataInputProperties(nameof(HandPenMode));
@@ -193,12 +194,10 @@ namespace FlameStream
 
             GetDataInputPort(nameof(IsBodyEnabled)).Properties.hidden = !isBasicSetupComplete;
             BroadcastDataInputProperties(nameof(IsBodyEnabled));
-            OnMoveCharacterEnabledChanged();
+            OnBodyEnabledChanged();
 
             GetDataInputPort(nameof(PointerFactorCorrection)).Properties.hidden = !isBasicSetupComplete;
             GetDataInputPort(nameof(DebugSphereScaleFactor)).Properties.hidden = !isBasicSetupComplete;
-            OnDebugSettingChange();
-
             BroadcastDataInputProperties(nameof(PointerFactorCorrection));
             BroadcastDataInputProperties(nameof(DebugSphereScaleFactor));
             OnDebugSettingChange();
@@ -237,6 +236,19 @@ namespace FlameStream
             inSetupMode = true;
             ResetCharacterPosition();
             DisplayDebugSpheres();
+        }
+
+        public void TriggerOtherEnterSetupModes(int source, bool button1) {
+            NeutralHandPosition.EnterVisualSetup(false);
+            if (setupModeHandState == null) {
+                GetHandState(source, button1)?.Transform.EnterVisualSetup(false);
+            }
+            if (setupModePropState == null) {
+                GetPropState(source, button1)?.Transform.EnterVisualSetup(false);
+            }
+            if (setupModeBodyState == null) {
+                GetBodyState(source, button1)?.Transform.EnterVisualSetup(false);
+            }
         }
 
         public void ExitSetupModeMinimal() {
@@ -442,6 +454,14 @@ namespace FlameStream
             Material.Destroy(debugSphereCharacterTargetPositionMaterial);
             GameObject.Destroy(debugSphereCharacterTargetBasePosition);
             Material.Destroy(debugSphereCharacterTargetBasePositionMaterial);
+        }
+
+        Transform GetGlobalCalculatorTransform() {
+            var tr = calculator.transform;
+            tr.position = Vector3.zero;
+            tr.rotation = Quaternion.identity;
+            tr.localScale = Vector3.one;
+            return tr;
         }
     }
 }

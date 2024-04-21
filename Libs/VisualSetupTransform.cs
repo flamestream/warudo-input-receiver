@@ -4,6 +4,7 @@ using Warudo.Core;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
 using Warudo.Core.Localization;
+using Warudo.Core.Utils;
 
 namespace FlameStream {
     public class VisualSetupTransform : StructuredData {
@@ -78,7 +79,6 @@ namespace FlameStream {
             Scene.UpdateNewAssetName(setupAnchor);
 
             setupAnchor.OnAnimationChange = (a) => {
-                UnityEngine.Debug.Log($"VST ANIMATION CHANGE {OnAnimationChange}");
                 OnAnimationChange.Invoke(a);
             };
 

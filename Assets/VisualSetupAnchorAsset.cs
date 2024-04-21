@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using Warudo.Core.Attributes;
 using Warudo.Plugins.Core.Assets.Utility;
 
@@ -38,7 +37,6 @@ namespace FlameStream {
         protected override void OnCreate() {
             base.OnCreate();
             Watch(nameof(Animation), delegate {
-                UnityEngine.Debug.Log($"VSA ANIMATION CHANGE {OnAnimationChange}");
                 OnAnimationChange?.Invoke(Animation);
             });
             GetDataInputPort(nameof(Enabled)).Properties.alwaysHidden = true;

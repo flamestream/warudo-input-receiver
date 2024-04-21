@@ -78,10 +78,10 @@ result: {result}
 
     public class HandRotationDynamicVector3 : DynamicVector3 {
         public HandRotationDynamicVector3() {
-            Z = StructuredData.Create<DistanceInputMathExpression>((me) => {
-                me.Expression = "min(2 * abs(dx), 1) * (atan2(abs(dy), abs(dx)) * (180 / pi) - 90) * -sign(dx)";
+            X = StructuredData.Create<DistanceInputMathExpression>((me) => {
+                me.Expression = "min(2 * abs(dx), 1) * (atan2(abs(dy), abs(dx)) * (180 / pi) - 90) * sign(dx)";
             });
-            Z.OnExpressionChange();
+            X.OnExpressionChange();
         }
     }
 
