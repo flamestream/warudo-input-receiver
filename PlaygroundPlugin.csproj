@@ -5,6 +5,7 @@
     <TargetFramework>net4.8</TargetFramework>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <LangVersion>8.0</LangVersion>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">
@@ -40,6 +41,12 @@
     </Reference>
     <Reference Include="UMod-Interface">
       <HintPath>../../../Managed/UMod-Interface.dll</HintPath>
+    </Reference>
+    <Reference Include="uDesktopDuplication.Runtime">
+      <HintPath>../../../Managed/uDesktopDuplication.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.XRModule.Runtime">
+      <HintPath>../../../Managed/UnityEngine.XRModule.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

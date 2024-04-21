@@ -1,3 +1,4 @@
+using System.Text;
 using UnityEngine;
 using Warudo.Plugins.Core.Assets;
 using Warudo.Plugins.Core.Assets.Character;
@@ -79,6 +80,21 @@ namespace FlameStream {
             transform.Position = unityTransform.position;
             transform.Rotation = unityTransform.rotation.eulerAngles;
             transform.Scale = unityTransform.lossyScale;
+        }
+
+        public static Vector3 NormalizeRotationAngles(Vector3 r) {
+            return new Vector3(
+                NormalizeAngle(r.x),
+                NormalizeAngle(r.y),
+                NormalizeAngle(r.z)
+            );
+        }
+
+        public static float NormalizeAngle(float angle) {
+            angle %= 360.0f;
+            if (angle > 180.0f) return angle - 360.0f;
+            if (angle <= -180.0f) return angle + 360.0f;
+            return angle;
         }
     }
 }

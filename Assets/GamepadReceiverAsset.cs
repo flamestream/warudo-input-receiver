@@ -9,7 +9,8 @@ namespace FlameStream
 {
     [AssetType(
         Id = "FlameStream.Asset.GamepadReceiver",
-        Title = "ASSET_TITLE_GAMEPAD"
+        Title = "ASSET_TITLE_GAMEPAD",
+        Category = "CATEGORY_INPUT"
     )]
     public partial class GamepadReceiverAsset : ReceiverAsset {
 
@@ -25,6 +26,10 @@ namespace FlameStream
             base.OnUpdate();
             PerformStateUpdateLoop();
             PerformShakingMotionLoop();
+        }
+
+        protected override void Log(string msg) {
+            UnityEngine.Debug.Log($"[FlameStream.Asset.GamepadReceiver] {msg}");
         }
 
         /// <summary>
