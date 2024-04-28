@@ -28,6 +28,9 @@ namespace FlameStream
         Vector3 handRotationOffset;
         AnchorAsset handAnchor;
         AnchorAsset handSetupRootAnchor;
+        Tween tweenLeftIK;
+        Tween tweenRightIK;
+
 
         void OnCreateMoveHand() {
             Watch(nameof(IsHandEnabled), delegate { OnInputAffectingHandSetupChange(); });
@@ -159,7 +162,8 @@ namespace FlameStream
             if (!isReady) return;
             if (Character == null) return;
 
-            if (!IsHandEnabled) {
+            var isHandEnabled = IsHandEnabled && !isHandDisabledByOutOfBound;
+            if (!isHandEnabled) {
                 handState = null;
                 OnHandStateChange();
             }
@@ -168,8 +172,8 @@ namespace FlameStream
             handAnchor.Attachable.Parent = GetCursorAnchor();
             handAnchor.Broadcast();
 
-            EnableLimb(IsHandEnabled && !IsRightHanded, Character.LeftHandIK, handAnchor);
-            EnableLimb(IsHandEnabled && IsRightHanded, Character.RightHandIK, handAnchor);
+            EnableLimb(isHandEnabled && !IsRightHanded, Character.LeftHandIK, handAnchor, tweenLeftIK);
+            EnableLimb(isHandEnabled && IsRightHanded, Character.RightHandIK, handAnchor, tweenRightIK);
         }
 
         void OnHandSideChange() {
@@ -217,15 +221,28 @@ namespace FlameStream
             return GetAsset<AnchorAsset>(ref HandAnchorAssetId, skipAutoCreate, newAssetName: $"🔒⚓-{LAYER_NAME_PREFIX} Hand IK");
         }
 
-        void EnableLimb(bool isEnabled, LimbIKData limb, AnchorAsset anchor) {
-            if (isEnabled) {
-                limb.Enabled = true;
-                limb.IkTarget = anchor;
-                limb.PositionWeight = 1.0f;
-                limb.RotationWeight = 1.0f;
+        void EnableLimb(bool isEnabled, LimbIKData limb, AnchorAsset anchor, Tween tween) {
+            limb.Enabled = true;
+            limb.IkTarget = anchor;
+
+            var targetValue = isEnabled ? 1.0f : 0.0f;
+            tween?.Kill();
+            if (ActiveTransition.Time == 0) {
+                limb.PositionWeight = targetValue;
+                limb.RotationWeight = targetValue;
+                limb.BendGoalWeight = targetValue;
             } else {
-                limb.Enabled = false;
-                limb.IkTarget = null;
+                tween = DOTween.To(
+                    () => limb.PositionWeight,
+                    delegate(float it) {
+                        limb.PositionWeight = it;
+                        limb.RotationWeight = it;
+                        limb.BendGoalWeight = it;
+                        limb.Broadcast();
+                    },
+                    targetValue,
+                    ActiveTransition.Time
+                ).SetEase(ActiveTransition.Ease);
             }
             limb.Broadcast();
         }

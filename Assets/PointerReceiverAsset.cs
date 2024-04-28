@@ -23,6 +23,10 @@ namespace FlameStream {
         public bool IsHandEnabled;
 
         [DataInput]
+        [Label("ACTIVE_TRANSITION")]
+        public ActiveTransition ActiveTransition;
+
+        [DataInput]
         [Label("CHARACTER")]
         [Description("CHARACTER_DESC")]
         public CharacterAsset Character;
@@ -42,6 +46,16 @@ namespace FlameStream {
                 label = it.name,
                 value = it.name
             }).ToList());
+        }
+
+        [DataInput]
+        [Label("OUT_OF_BOUND_HANDLING")]
+        public OutOfBoundMode OutOfBoundHandling = 0;
+        public enum OutOfBoundMode {
+            Overflow = 0,
+            Clamp = 1,
+            Freeze = 2,
+            DisableHand = 3,
         }
 
         [DataInput]

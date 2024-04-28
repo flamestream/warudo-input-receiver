@@ -104,9 +104,7 @@ namespace FlameStream {
     }
 
     public enum MovementMode {
-        [Label("FOLLOW")]
         Follow,
-        [Label("ELASTIC")]
         Elastic,
     }
 }

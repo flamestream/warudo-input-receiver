@@ -15,6 +15,13 @@ namespace FlameStream
         public Ease Ease = Ease.Linear;
     }
 
+    public class ActiveTransition : Transition {
+        public ActiveTransition() {
+            Time = 0.2f;
+            Ease = Ease.Linear;
+        }
+    }
+
     public class PoseTransition : Transition {
         public PoseTransition() {
             Time = 0.05f;
