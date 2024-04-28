@@ -16,6 +16,9 @@ namespace FlameStream {
 
         protected string lastState;
 
+        [Markdown(0)]
+        public string VersionUpdate = "FS_INPUT_RECEIVER_VERSION_UPDATE".Localized();
+
         [DataInput(0)]
         [Label("ENABLE")]
         public bool IsEnabled;

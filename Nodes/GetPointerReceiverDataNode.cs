@@ -27,6 +27,15 @@ namespace FlameStream {
         public int Y() => Receiver == null ? 0 : Receiver.Y;
 
         [DataOutput]
+        public int AdjustedX() => Receiver == null ? 0 : Receiver.adjustedX;
+
+        [DataOutput]
+        public int AdjustedY() => Receiver == null ? 0 : Receiver.adjustedY;
+
+        [DataOutput]
+        public bool IsOutOfBound() => Receiver != null && Receiver.isOutOfBound;
+
+        [DataOutput]
         [Label("POINTER_SOURCE")]
         public int Source() => Receiver == null ? 0 : Receiver.Source;
 

@@ -2,6 +2,7 @@
     "en": {
         "A_BUTTON": "A",
         "ACTIVE_STATE": "Active State",
+        "ACTIVE_TRANSITION": "Active Transition",
         "APPLY_TRANSFORM": "✅ Apply Transform",
         "ASSET_TITLE_GAMEPAD": "FS Gamepad Input Receiver",
         "ASSET_TITLE_POINTER": "FS Pointer Input Receiver",
@@ -60,6 +61,7 @@
         "FINGER_AND_PROP_ANIMATION": "Finger and Prop Animation",
         "FOLLOW": "Follow",
         "FORCE_DEBUG_MODE": "Force Debug Mode",
+        "FS_INPUT_RECEIVER_VERSION_UPDATE": "### Version 3.3.0 (2024-04-28)\n\n* Introduce new Pointer Receiver Asset setting: Out of bound handling\n* Add transition animation when toggling hand\n\nFull release notes at https://github.com/flamestream/warudo-input-receiver/releases/latest",
         "GAME_CONTROLLER_TYPE": "Game Controller Type",
         "GAMEOBJECT_ASSET": "GameObject Asset",
         "GENERAL_CONFIGURATION": "General Configuration",
@@ -117,6 +119,7 @@
         "NODE_TITLE_GAMEPAD_STICK_HAND_ANIMATOR": "🔥🎮 Stick Hand Animator",
         "NODE_TITLE_GAMEPAD_STICK_PROP_ANIMATOR": "🔥🎮 Stick Prop Animator",
         "NODE_TITLE_POINTER": "Get FS Input Pointer Data",
+        "OUT_OF_BOUND_HANDLING": "Out of Bound Handling",
         "PEN_MODE": "🖊️Pen Mode",
         "PLUGIN_DESCRIPTION": "Custom FS receivers for input signals",
         "PLUGIN_NAME": "FS Input Receivers",

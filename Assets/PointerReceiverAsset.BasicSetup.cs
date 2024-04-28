@@ -53,6 +53,13 @@ namespace FlameStream
         bool isDebugModeForced;
         bool inSetupMode;
         bool isBasicSetupComplete;
+        public int adjustedX;
+        public int adjustedY;
+        int lastX;
+        int lastY;
+        public bool isOutOfBound;
+        bool lastIsOutOfBound;
+        bool isHandDisabledByOutOfBound;
 
         protected override void OnCreate() {
             if (Port == 0) Port = DEFAULT_PORT;
@@ -113,6 +120,28 @@ namespace FlameStream
             if (monitor == null) return;
             if (cursorAnchorAsset == null) return;
 
+            adjustedX = X;
+            adjustedY = Y;
+            var inX = Mathf.Clamp(adjustedX, monitor.left, monitor.right);
+            var inY = Mathf.Clamp(adjustedY, monitor.top, monitor.bottom);
+            isOutOfBound = inX != X || inY != Y;
+
+            if (OutOfBoundHandling != OutOfBoundMode.Overflow) {
+                adjustedX = inX;
+                adjustedY = inY;
+                if (OutOfBoundHandling == OutOfBoundMode.DisableHand) {
+                    if (isOutOfBound != lastIsOutOfBound) {
+                        isHandDisabledByOutOfBound = isOutOfBound;
+                        OnInputAffectingHandSetupChange();
+                    }
+                } else if (OutOfBoundHandling == OutOfBoundMode.Freeze) {
+                    if (isOutOfBound) {
+                        adjustedX = lastX;
+                        adjustedY = lastY;
+                    }
+                }
+            }
+
             var anchorTransform = cursorAnchorAsset.Transform;
             anchorTransform.Rotation = IsRightHanded
                 ? IK_BASIS_RIGHT_HANDED
@@ -121,10 +150,11 @@ namespace FlameStream
             if (inSetupMode) {
                 anchorTransform.Position = NeutralHandPosition.setupAnchor?.Transform.Position ?? NeutralHandPosition.Position;
             } else {
+
                 // Follow pointer
                 var targetPlanarPosition = new Vector3(
-                    -(X - cursorToScreenCenterOffset.x) * screenAsset.Transform.Scale.x * SCREEN_PIXEL_TO_WORLD_FACTOR,
-                    -(Y - cursorToScreenCenterOffset.y) * screenAsset.Transform.Scale.y * SCREEN_PIXEL_TO_WORLD_FACTOR,
+                    -(adjustedX - cursorToScreenCenterOffset.x) * screenAsset.Transform.Scale.x * SCREEN_PIXEL_TO_WORLD_FACTOR,
+                    -(adjustedY - cursorToScreenCenterOffset.y) * screenAsset.Transform.Scale.y * SCREEN_PIXEL_TO_WORLD_FACTOR,
                     0
                 ) * PointerFactorCorrection;
 
@@ -161,6 +191,9 @@ namespace FlameStream
             }
 
             anchorTransform.Broadcast();
+            lastX = adjustedX;
+            lastY = adjustedY;
+            lastIsOutOfBound = isOutOfBound;
         }
 
         protected override void Log(string msg) {
@@ -172,10 +205,12 @@ namespace FlameStream
             GetDataInputPort(nameof(IsRightHanded)).Properties.hidden = !IsHandEnabled;
             GetDataInputPort(nameof(DisplayName)).Properties.hidden = !IsHandEnabled;
             GetDataInputPort(nameof(CursorSmoothness)).Properties.hidden = !IsHandEnabled;
+            GetDataInputPort(nameof(OutOfBoundHandling)).Properties.hidden = !IsHandEnabled;
             BroadcastDataInputProperties(nameof(Character));
             BroadcastDataInputProperties(nameof(IsRightHanded));
             BroadcastDataInputProperties(nameof(DisplayName));
             BroadcastDataInputProperties(nameof(CursorSmoothness));
+            BroadcastDataInputProperties(nameof(OutOfBoundHandling));
 
             isBasicSetupComplete = IsHandEnabled && Character != null && monitor != null;
 

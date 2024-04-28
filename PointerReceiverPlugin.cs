@@ -7,7 +7,7 @@ namespace FlameStream {
         Name = "PLUGIN_NAME",
         Description = "PLUGIN_DESCRIPTION",
         Author = "FlameStream",
-        Version = "3.2.0",
+        Version = "3.3.0",
         AssetTypes = new[] {
             typeof(GamepadReceiverAsset),
             typeof(PointerReceiverAsset),
