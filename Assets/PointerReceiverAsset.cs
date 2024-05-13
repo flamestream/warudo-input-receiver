@@ -49,19 +49,13 @@ namespace FlameStream {
         }
 
         [DataInput]
-        [Label("OUT_OF_BOUND_HANDLING")]
-        public OutOfBoundMode OutOfBoundHandling = 0;
-        public enum OutOfBoundMode {
-            Overflow = 0,
-            Clamp = 1,
-            Freeze = 2,
-            DisableHand = 3,
-        }
-
-        [DataInput]
         [Label("CURSOR_SMOOTHNESS")]
         [FloatSlider(0f, 0.1f, 0.01f)]
         public float CursorSmoothness = 0.05f;
+
+        [DataInput]
+        [Label("CURSOR_MODE")]
+        public CursorMode CursorMode;
 
         /// <summary>
         /// HAND MOVEMENT

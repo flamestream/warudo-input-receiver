@@ -400,7 +400,8 @@ namespace FlameStream
             );
             if (animationData == null) return;
 
-            animationData.SetDataInput(nameof(animationData.Weight), weight, true);
+            // Not broatcasting here because it causes all animation layers to be reloaded.
+            animationData.SetDataInput(nameof(animationData.Weight), weight, false);
 
             // Sanity: If no animation is set, then animancer layer is null
             if (animationData.Animation == null) return;
