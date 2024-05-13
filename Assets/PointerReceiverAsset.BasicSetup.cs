@@ -57,6 +57,8 @@ namespace FlameStream
         public int adjustedY;
         int lastX;
         int lastY;
+        int lastAdjustedX;
+        int lastAdjustedY;
         public bool isOutOfBound;
         bool lastIsOutOfBound;
         bool isHandDisabledByOutOfBound;
@@ -120,24 +122,59 @@ namespace FlameStream
             if (monitor == null) return;
             if (cursorAnchorAsset == null) return;
 
-            adjustedX = X;
-            adjustedY = Y;
+            if (CursorMode.Mode == CursorMode.CursorModeValue.FixedDelta) {
+                adjustedX = 0;
+                adjustedY = 0;
+                if (X != lastX) {
+                    var midX = (monitor.left + monitor.right) / 2;
+                    if (X != midX) {
+                        adjustedX = (int)((X - midX) * CursorMode.DisplacementFactor);
+                    }
+                }
+                if (Y != lastY) {
+                    var midY = (monitor.top + monitor.bottom) / 2;
+                    if (Y != midY) {
+                        adjustedY = (int)((Y - midY) * CursorMode.DisplacementFactor);
+                    }
+                }
+                adjustedX += lastAdjustedX;
+                adjustedY += lastAdjustedY;
+            } else {
+                adjustedX = X;
+                adjustedY = Y;
+            }
+
             var inX = Mathf.Clamp(adjustedX, monitor.left, monitor.right);
             var inY = Mathf.Clamp(adjustedY, monitor.top, monitor.bottom);
             isOutOfBound = inX != X || inY != Y;
 
-            if (OutOfBoundHandling != OutOfBoundMode.Overflow) {
-                adjustedX = inX;
-                adjustedY = inY;
-                if (OutOfBoundHandling == OutOfBoundMode.DisableHand) {
-                    if (isOutOfBound != lastIsOutOfBound) {
-                        isHandDisabledByOutOfBound = isOutOfBound;
-                        OnInputAffectingHandSetupChange();
-                    }
-                } else if (OutOfBoundHandling == OutOfBoundMode.Freeze) {
-                    if (isOutOfBound) {
-                        adjustedX = lastX;
-                        adjustedY = lastY;
+
+            if (CursorMode.Mode == CursorMode.CursorModeValue.FixedDelta) {
+                switch (CursorMode.OutOfBoundFixedDeltaHandling) {
+                    case CursorMode.OutOfBoundFixedDeltaHandlingValue.BackToCenter:
+                        if (adjustedX != inX) adjustedX = (monitor.left + monitor.right) / 2;
+                        if (adjustedY != inY) adjustedY = (monitor.top + monitor.bottom) / 2;
+                        break;
+                    case CursorMode.OutOfBoundFixedDeltaHandlingValue.Clamped:
+                    default:
+                        adjustedX = inX;
+                        adjustedY = inY;
+                        break;
+                }
+            } else {
+                if (CursorMode.OutOfBoundRawTrackingHandling != CursorMode.OutOfBoundRawTrackingHandlingValue.Overflow) {
+                    adjustedX = inX;
+                    adjustedY = inY;
+                    if (CursorMode.OutOfBoundRawTrackingHandling == CursorMode.OutOfBoundRawTrackingHandlingValue.DisableHand) {
+                        if (isOutOfBound != lastIsOutOfBound) {
+                            isHandDisabledByOutOfBound = isOutOfBound;
+                            OnInputAffectingHandSetupChange();
+                        }
+                    } else if (CursorMode.OutOfBoundRawTrackingHandling == CursorMode.OutOfBoundRawTrackingHandlingValue.Freeze) {
+                        if (isOutOfBound) {
+                            adjustedX = lastAdjustedX;
+                            adjustedY = lastAdjustedY;
+                        }
                     }
                 }
             }
@@ -191,8 +228,10 @@ namespace FlameStream
             }
 
             anchorTransform.Broadcast();
-            lastX = adjustedX;
-            lastY = adjustedY;
+            lastX = X;
+            lastY = Y;
+            lastAdjustedX = adjustedX;
+            lastAdjustedY = adjustedY;
             lastIsOutOfBound = isOutOfBound;
         }
 
@@ -205,12 +244,12 @@ namespace FlameStream
             GetDataInputPort(nameof(IsRightHanded)).Properties.hidden = !IsHandEnabled;
             GetDataInputPort(nameof(DisplayName)).Properties.hidden = !IsHandEnabled;
             GetDataInputPort(nameof(CursorSmoothness)).Properties.hidden = !IsHandEnabled;
-            GetDataInputPort(nameof(OutOfBoundHandling)).Properties.hidden = !IsHandEnabled;
+            GetDataInputPort(nameof(CursorMode)).Properties.hidden = !IsHandEnabled;
             BroadcastDataInputProperties(nameof(Character));
             BroadcastDataInputProperties(nameof(IsRightHanded));
             BroadcastDataInputProperties(nameof(DisplayName));
             BroadcastDataInputProperties(nameof(CursorSmoothness));
-            BroadcastDataInputProperties(nameof(OutOfBoundHandling));
+            BroadcastDataInputProperties(nameof(CursorMode));
 
             isBasicSetupComplete = IsHandEnabled && Character != null && monitor != null;
 
