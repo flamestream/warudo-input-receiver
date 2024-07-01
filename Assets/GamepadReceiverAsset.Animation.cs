@@ -313,12 +313,12 @@ Please note that they do not have to be all filled. You may remove unused fields
         }
 
         void AddFlowConnection(Graph graph, Node n1, string s1, Node n2, string s2) {
-            UnityEngine.Debug.Log($"[FlameStream.Asset.GamepadReceiver.Animation] FLOW {n1.GetType().Name}#{s1} => {n2.GetType().Name}#{s2}");
+            UnityEngine.Debug.Log($"[FlameStream.Asset.GamepadReceiver.Animation] FLOW {n1.Name}#{s1} => {n2.Name}#{s2}");
             graph.AddFlowConnection(n1, s1, n2, s2);
         }
 
         void AddDataConnection(Graph graph, Node n1, string s1, Node n2, string s2) {
-            UnityEngine.Debug.Log($"[FlameStream.Asset.GamepadReceiver.Animation] DATA {n1.GetType().Name}#{s1} => {n2.GetType().Name}#{s2}");
+            UnityEngine.Debug.Log($"[FlameStream.Asset.GamepadReceiver.Animation] DATA {n1.Name}#{s1} => {n2.Name}#{s2}");
             graph.AddDataConnection(n1, s1, n2, s2);
         }
 
