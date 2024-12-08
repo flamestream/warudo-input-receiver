@@ -6,7 +6,7 @@ namespace FlameStream {
 [NodeType(
     Id = "FlameStream.Node.GetPs5GamepadReceiverData",
     Title = "NODE_TITLE_GAMEPAD_RECEIVER_PS5",
-    Category = "NODE_CATEGORY"
+    Category = "FS_NODE_CATEGORY_GAMEPAD"
 )]
     public class GetGamepadReceiverDataPs5Node : GetGamepadReceiverDataNode {
 

@@ -7,7 +7,7 @@ namespace FlameStream
     [NodeType(
     Id = "FlameStream.Node.GetGamepadReceiverData",
     Title = "NODE_TITLE_GAMEPAD_RECEIVER_SWITCH",
-    Category = "NODE_CATEGORY"
+    Category = "FS_NODE_CATEGORY_GAMEPAD"
 )]
     public class GetGamepadReceiverDataSwitchNode: GetGamepadReceiverDataNode {
 

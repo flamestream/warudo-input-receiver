@@ -7,7 +7,7 @@ namespace FlameStream
     [NodeType(
     Id = "FlameStream.Node.GetGamepadReceiverDataXbox360",
     Title = "NODE_TITLE_GAMEPAD_RECEIVER_XBOX360",
-    Category = "NODE_CATEGORY"
+    Category = "FS_NODE_CATEGORY_GAMEPAD"
 )]
     public class GetGamepadReceiverDataXbox360Node: GetGamepadReceiverDataNode {
 

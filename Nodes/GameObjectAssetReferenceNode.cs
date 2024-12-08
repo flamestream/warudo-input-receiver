@@ -7,7 +7,7 @@ namespace FlameStream {
 [NodeType(
     Id = "FlameStream.Node.GameObjectAssetReference",
     Title = "NODE_TITLE_GAMEOBJ_ASSET_REF",
-    Category = "NODE_CATEGORY")
+    Category = "FS_NODE_CATEGORY_MISC")
 ]
     public class GameObjectAssetReferenceNode : Node {
 
