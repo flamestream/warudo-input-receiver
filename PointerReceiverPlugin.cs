@@ -7,11 +7,12 @@ namespace FlameStream {
         Name = "PLUGIN_NAME",
         Description = "PLUGIN_DESCRIPTION",
         Author = "FlameStream",
-        Version = "3.4.0",
+        Version = "3.5.0",
         AssetTypes = new[] {
-            typeof(GamepadReceiverAsset),
-            typeof(PointerReceiverAsset),
             typeof(DrawingScreenAsset),
+            typeof(GamepadReceiverAsset),
+            typeof(KeyboardReceiverAsset),
+            typeof(PointerReceiverAsset),
             typeof(VisualSetupAnchorAsset)
         },
         NodeTypes = new[] {
@@ -22,12 +23,20 @@ namespace FlameStream {
             typeof(GamepadDPadHandAnimatorNode),
             typeof(GamepadDPadPropAnimatorNode),
             typeof(GamepadHandTrackerNode),
+            typeof(GamepadReceiverIsButtonDownNode),
+            typeof(GamepadReceiverOnButtonDownNode),
+            typeof(GamepadReceiverOnButtonUpNode),
             typeof(GamepadStickHandAnimatorNode),
             typeof(GamepadStickPropAnimatorNode),
+            typeof(GetGamepadReceiverDataGenericAxisNode),
             typeof(GetGamepadReceiverDataPs5Node),
             typeof(GetGamepadReceiverDataSwitchNode),
             typeof(GetGamepadReceiverDataXbox360Node),
-            typeof(GetPointerReceiverDataNode)
+            typeof(GetKeyboardReceiverKeyNode),
+            typeof(GetPointerReceiverDataNode),
+            typeof(KeyboardReceiverIsKeyDownNode),
+            typeof(KeyboardReceiverOnKeyDownNode),
+            typeof(KeyboardReceiverOnKeyUpNode),
         })]
     public class PointerReceiverPlugin : Plugin {}
 }

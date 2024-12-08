@@ -6,7 +6,7 @@ namespace FlameStream
     [NodeType(
     Id = "FlameStream.Node.GamepadButtonHandAnimator",
     Title = "NODE_TITLE_GAMEPAD_BUTTON_HAND_ANIMATOR",
-    Category = "NODE_CATEGORY")]
+    Category = "FS_NODE_CATEGORY_GAMEPAD")]
     public class GamepadButtonHandAnimatorNode : GamepadHandAnimatorNode {
 
         [DataInput(99)]

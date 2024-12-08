@@ -9,8 +9,8 @@ namespace FlameStream
 {
     [AssetType(
         Id = "FlameStream.Asset.GamepadReceiver",
-        Title = "ASSET_TITLE_GAMEPAD",
-        Category = "CATEGORY_INPUT"
+        Title = "FS_ASSET_TITLE_GAMEPAD",
+        Category = "FS_ASSET_CATEGORY_INPUT"
     )]
     public partial class GamepadReceiverAsset : ReceiverAsset {
 

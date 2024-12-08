@@ -9,8 +9,8 @@ using Warudo.Plugins.Core.Assets.Character;
 namespace FlameStream {
     [AssetType(
         Id = "FlameStream.Asset.PointerReceiver",
-        Title = "ASSET_TITLE_POINTER",
-        Category = "CATEGORY_INPUT"
+        Title = "FS_ASSET_TITLE_POINTER",
+        Category = "FS_ASSET_CATEGORY_INPUT"
     )]
     public partial class PointerReceiverAsset : ReceiverAsset {
         /// <summary>

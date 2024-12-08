@@ -6,7 +6,7 @@ namespace FlameStream {
     [AssetType(
         Id = "Flamestream.Asset.VisualSetupAnchor",
         Title = "VISUAL_SETUP_TEMP_ANCHOR",
-        Category = "CATEGORY_INTERNAL"
+        Category = "FS_ASSET_CATEGORY_INTERNAL"
     )]
     public class VisualSetupAnchorAsset : AnchorAsset {
         public VisualSetupTransform Parent;

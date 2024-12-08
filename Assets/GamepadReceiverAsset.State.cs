@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Warudo.Core.Attributes;
 
 namespace FlameStream
 {
@@ -367,6 +368,82 @@ namespace FlameStream
                 }
                 return false;
             }
+        }
+
+        public static float ShortToFloatScale(ushort v) {
+            return (v / (float)ushort.MaxValue - 0.5f) * 2f;
+        }
+
+        public static float ShortToFloatScale(ushort? v) {
+            return v.HasValue ? ShortToFloatScale(v.Value) : 0f;
+        }
+
+        public enum Button
+        {
+            [Label("Button 0")]
+            Button0 = 0,
+            [Label("Button 1")]
+            Button1 = 1,
+            [Label("Button 2")]
+            Button2 = 2,
+            [Label("Button 3")]
+            Button3 = 3,
+            [Label("Button 4")]
+            Button4 = 4,
+            [Label("Button 5")]
+            Button5 = 5,
+            [Label("Button 6")]
+            Button6 = 6,
+            [Label("Button 7")]
+            Button7 = 7,
+            [Label("Button 8")]
+            Button8 = 8,
+            [Label("Button 9")]
+            Button9 = 9,
+            [Label("Button 10")]
+            Button10 = 10,
+            [Label("Button 11")]
+            Button11 = 11,
+            [Label("Button 12")]
+            Button12 = 12,
+            [Label("Button 13")]
+            Button13 = 13,
+            [Label("Button 14")]
+            Button14 = 14,
+            [Label("Button 15")]
+            Button15 = 15,
+            [Label("Button 16")]
+            Button16 = 16,
+            [Label("Button 17")]
+            Button17 = 17,
+            [Label("Button 18")]
+            Button18 = 18,
+            [Label("Button 19")]
+            Button19 = 19,
+            [Label("Button 20")]
+            Button20 = 20,
+            [Label("Button 21")]
+            Button21 = 21,
+            [Label("Button 22")]
+            Button22 = 22,
+            [Label("Button 23")]
+            Button23 = 23,
+            [Label("Button 24")]
+            Button24 = 24,
+            [Label("Button 25")]
+            Button25 = 25,
+            [Label("Button 26")]
+            Button26 = 26,
+            [Label("Button 27")]
+            Button27 = 27,
+            [Label("Button 28")]
+            Button28 = 28,
+            [Label("Button 29")]
+            Button29 = 29,
+            [Label("Button 30")]
+            Button30 = 30,
+            [Label("Button 31")]
+            Button31 = 31
         }
 
         // NOTE: Buttons indices are offset by one to allow dummy default at 0./

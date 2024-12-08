@@ -5,7 +5,7 @@ namespace FlameStream {
 [NodeType(
     Id = "FlameStream.Node.GetPointerReceiverDataNode",
     Title = "NODE_TITLE_POINTER",
-    Category = "NODE_CATEGORY"
+    Category = "FS_NODE_CATEGORY_POINTER"
 )]
     public class GetPointerReceiverDataNode : Node {
 
