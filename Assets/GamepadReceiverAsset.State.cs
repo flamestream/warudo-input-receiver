@@ -7,7 +7,7 @@ namespace FlameStream
     public partial class GamepadReceiverAsset : ReceiverAsset {
 
         public const float DEAD_ZONE_RADIUS = 0.1f;
-        const ushort PROTOCOL_VERSION = 2;
+        const ushort PROTOCOL_VERSION = 3;
         const int DEFAULT_PORT = 40611;
 
         public enum DPadDirection : int {
@@ -71,14 +71,57 @@ namespace FlameStream
             LastLrZ = LrZ;
             LastDPad = DPad;
 
-            uint.TryParse(parts[1], out ButtonFlags);
-            ushort.TryParse(parts[2], out LX);
-            ushort.TryParse(parts[3], out LY);
-            ushort.TryParse(parts[4], out LZ);
-            ushort.TryParse(parts[5], out LrX);
-            ushort.TryParse(parts[6], out LrY);
-            ushort.TryParse(parts[7], out LrZ);
-            byte.TryParse(parts[8], out DPad);
+            ButtonFlags = Convert.ToUInt32(parts[1], 2);
+
+            var switches = parts[2].Split('|');
+            byte.TryParse(switches[0], out DPad);
+            // Convert to legacy value
+            switch (DPad) {
+                case 1:
+                    DPad = 8;
+                    break;
+                case 2:
+                    DPad = 9;
+                    break;
+                case 3:
+                    DPad = 6;
+                    break;
+                case 4:
+                    DPad = 3;
+                    break;
+                case 5:
+                    DPad = 2;
+                    break;
+                case 6:
+                    DPad = 1;
+                    break;
+                case 7:
+                    DPad = 4;
+                    break;
+                case 8:
+                    DPad = 7;
+                    break;
+                default:
+                    DPad = 5;
+                    break;
+            }
+
+            var axes = parts[3].Split('|');
+            float.TryParse(axes[0], out float _LX);
+            float.TryParse(axes[1], out float _LY);
+            float.TryParse(axes[2], out float _LZ);
+            float.TryParse(axes[3], out float _LrX);
+            float.TryParse(axes[4], out float _LrY);
+            float.TryParse(axes[5], out float _LrZ);
+            // Convert to legacy value
+            LX = (ushort)(_LX * ushort.MaxValue);
+            LY = (ushort)(_LY * ushort.MaxValue);
+            LZ = (ushort)(_LZ * ushort.MaxValue);
+            LrX = (ushort)(_LrX * ushort.MaxValue);
+            LrY = (ushort)(_LrY * ushort.MaxValue);
+            LrZ = (ushort)(_LrZ * ushort.MaxValue);
+            // float.TryParse(axes[6], out rglSlider);
+            // float.TryParse(axes[7], out rglSlider2);
 
             // Left Face
             if (IsLeftStickActive()) {

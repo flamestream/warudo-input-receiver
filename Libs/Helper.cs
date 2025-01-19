@@ -8,6 +8,14 @@ using Warudo.Plugins.Core.Assets.Utility;
 namespace FlameStream {
     public class Helper {
 
+        public static void CopyTransform(Warudo.Core.Data.Models.TransformData from, Warudo.Core.Data.Models.TransformData to, bool isBroadcastWanted = false) {
+            to.Position = from.Position;
+            to.Rotation = from.Rotation;
+            to.Scale = from.Scale;
+
+            if (isBroadcastWanted) to.Broadcast();
+        }
+
         public static void SetParent(AnchorAsset child, AnchorAsset parent) {
             _SetParent(child, parent);
             child.Attachable.Parent = parent;

@@ -1,14 +1,14 @@
 ## Warudo Plugin: Input Device Receiver and Tools for Pen and Game Controller
 
 Enhance Warudo with abilities around device inputs, tailored for artists and gamers.
-Available from the [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3221461980).
+Available from the [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3279857531).
 
 ### Features
 
 * Pen detection support (Wacom Intuos Pro)
-* Game controller support (Nintendo Switch, PS5, Xbox 360)
+* Modern game controller support via GameInput (New Xbox Controllers)
+* Controller, wheel, pedal and other device support via DirectInput
 * Full visual setup for mouse/pen tracking
-* Setup wizard to generate blueprints
 * Finger animation tied to controller input
 * Prop button animations tied to controller input
 * Low level nodes to read mouse, pen and game controller input

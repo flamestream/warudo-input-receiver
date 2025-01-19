@@ -9,7 +9,7 @@ namespace FlameStream
 {
     [AssetType(
         Id = "FlameStream.Asset.GamepadReceiver",
-        Title = "FS_ASSET_TITLE_GAMEPAD",
+        Title = "FS_ASSET_TITLE_LEGACY_DIRECTINPUT",
         Category = "FS_ASSET_CATEGORY_INPUT"
     )]
     public partial class GamepadReceiverAsset : ReceiverAsset {
@@ -25,7 +25,7 @@ namespace FlameStream
         public override void OnUpdate() {
             base.OnUpdate();
             PerformStateUpdateLoop();
-            PerformShakingMotionLoop();
+            PerformPropMotionLoop();
         }
 
         protected override void Log(string msg) {

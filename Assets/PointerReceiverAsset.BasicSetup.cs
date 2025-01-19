@@ -83,6 +83,8 @@ namespace FlameStream
         public override void OnUpdate() {
             base.OnUpdate();
 
+            OnUpdateState();
+
             if (Character == null) return;
 
             // OnReady: One-time execution before update events are sent
@@ -97,7 +99,6 @@ namespace FlameStream
                 };
             }
 
-            OnUpdateState();
             OnUpdateBasicSetup();
             OnUpdateHand();
             OnUpdateProp();

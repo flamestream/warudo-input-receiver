@@ -8,7 +8,7 @@ namespace FlameStream
         Tween gamepadRotationTween;
         Tween gamepadPositionTween;
 
-        void PerformShakingMotionLoop() {
+        void PerformPropMotionLoop() {
             if (!IsShakingEnabled) {
                 return;
             }

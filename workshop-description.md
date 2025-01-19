@@ -1,12 +1,15 @@
-Input Receiver and Tools for Mouse/Pen/Gamepad (Switch/PS5/Xbox360)
+Input Receiver and Tools for Mouse/Pen/Gamepad/Keyboard/Remote PC
 
+===
 
 Provides a framework to animate hands and props around artist and gamer needs.
 
 Features:
 * Full visual setup for mouse/pen tracking (https://youtu.be/yxjbKF1MpVU)
-* Controller animation framework for prop and finger (https://youtu.be/jPY5_QvYEpI)
-* Low level nodes to read mouse, pen and game controller inputs
+* Device animation framework for prop and finger (Controller, Joystick) (https://youtu.be/jPY5_QvYEpI)
+* All Keyboard keys (as opposed to key strokes)
+* Remote PC input signals
+* Low level nodes to read mouse, pen, keyboard and game controller inputs (suitable for wheel, pedals, DJ consoles, etc.)
 * Extra nodes to do more advanced adjustments
 
 Requires

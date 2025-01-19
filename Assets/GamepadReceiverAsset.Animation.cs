@@ -112,7 +112,7 @@ Please note that they do not have to be all filled. You may remove unused fields
 
             Graph graph = new Graph
             {
-                Name = "🔥🎮 Animators",
+                Name = "🔥🎮 Legacy Animators",
                 Enabled = true
             };
 
