@@ -5,7 +5,7 @@ namespace FlameStream {
     [AssetType(
         Id = "Flamestream.Asset.Test",
         Title = "TEST",
-        Category = "CATEGORY_INTERNAL"
+        Category = "FS_ASSET_CATEGORY_INTERNAL"
     )]
     public class TestAsset : ReceiverAsset {
         [DataInput]
