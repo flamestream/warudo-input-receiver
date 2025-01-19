@@ -9,7 +9,7 @@ namespace FlameStream
     [NodeType(
     Id = "FlameStream.Node.GamepadStickPropAnimator",
     Title = "NODE_TITLE_GAMEPAD_STICK_PROP_ANIMATOR",
-    Category ="NODE_CATEGORY")]
+    Category = "FS_NODE_CATEGORY_GAMEPAD")]
     public class GamepadStickPropAnimatorNode : GamepadStickAnimatorNode {
 
         [DataInput]

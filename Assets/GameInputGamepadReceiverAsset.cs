@@ -8,8 +8,8 @@ using Warudo.Plugins.Core.Assets.Prop;
 namespace FlameStream
 {
     [AssetType(
-        Id = "FlameStream.Asset.GamepadReceiver",
-        Title = "FS_ASSET_TITLE_LEGACY_DIRECTINPUT",
+        Id = "FlameStream.Asset.GameInputGamepadReceiver",
+        Title = "FS_ASSET_TITLE_GAMEINPUT_GAMEPAD",
         Category = "FS_ASSET_CATEGORY_INPUT"
     )]
     public partial class GamepadReceiverAsset : ReceiverAsset {
@@ -25,7 +25,7 @@ namespace FlameStream
         public override void OnUpdate() {
             base.OnUpdate();
             PerformStateUpdateLoop();
-            PerformPropMotionLoop();
+            PerformShakingMotionLoop();
         }
 
         protected override void Log(string msg) {

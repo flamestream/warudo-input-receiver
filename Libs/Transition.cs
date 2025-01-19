@@ -13,6 +13,12 @@ namespace FlameStream
         [DataInput]
         [Label("TRANSITION_EASING")]
         public Ease Ease = Ease.Linear;
+
+        public string ShortLabel {
+            get {
+                return $"{Time}s";
+            }
+        }
     }
 
     public class ActiveTransition : Transition {
@@ -33,6 +39,19 @@ namespace FlameStream
         public BodyFollowMovementTransition() {
             Time = 3f;
             Ease = Ease.OutCirc;
+        }
+    }
+
+    public class DelayableTransition : Transition {
+        [DataInput]
+        [Label("DELAY_TIME")]
+        [FloatSlider(0f, 3f, 0.01f)]
+        public float DelayTime = 0f;
+
+        public new string ShortLabel {
+            get {
+                return $"{Time}(+{DelayTime})s";
+            }
         }
     }
 }

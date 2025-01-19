@@ -4,15 +4,15 @@ using Warudo.Core.Graphs;
 
 namespace FlameStream {
 [NodeType(
-    Id = "FlameStream.Node.GamepadHandTracker",
-    Title = "NODE_TITLE_GAMEPAD_HAND_TRACKER",
-    Category = "FS_NODE_CATEGORY_GAMEPAD")
+    Id = "FlameStream.Node.InputReceiverHandTracker",
+    Title = "NODE_TITLE_INPUT_RECEIVER_HAND_TRACKER",
+    Category = "FS_NODE_CATEGORY_INPUT_RECEIVER")
 ]
-    public class GamepadHandTrackerNode : Node {
+    public class InputReceiverHandTrackerNode : Node {
 
         [DataInput]
         [Label("RECEIVER")]
-        public GamepadReceiverAsset Receiver;
+        public InputReceiverAsset Receiver;
 
         [DataInput]
         [Label("IS_LEFT_HAND_TRACKED")]

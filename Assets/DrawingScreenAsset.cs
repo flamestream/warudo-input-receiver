@@ -2,7 +2,7 @@ using Warudo.Core.Attributes;
 using Warudo.Plugins.Core.Assets.Prop;
 
 namespace FlameStream {
-    [AssetType(Id = "Flamestream.Asset.DrawingScreen", Title = "DRAWING_SCREEN", Category = "CATEGORY_INTERNAL")]
+    [AssetType(Id = "Flamestream.Asset.DrawingScreen", Title = "DRAWING_SCREEN", Category = "FS_ASSET_CATEGORY_INTERNAL")]
     public class DrawingScreenAsset : ScreenAsset {
 
         public DrawingScreenAsset() {

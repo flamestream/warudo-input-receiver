@@ -8,7 +8,7 @@ namespace FlameStream {
 [NodeType(
     Id = "FlameStream.Node.CharacterAssetReference",
     Title = "NODE_TITLE_CHARA_ASSET_REF",
-    Category = "NODE_CATEGORY")]
+    Category = "FS_NODE_CATEGORY_MISC")]
     public class CharacterAssetReferenceNode : Node {
 
         [DataInput]

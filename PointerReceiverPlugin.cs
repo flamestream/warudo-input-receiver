@@ -7,11 +7,14 @@ namespace FlameStream {
         Name = "PLUGIN_NAME",
         Description = "PLUGIN_DESCRIPTION",
         Author = "FlameStream",
-        Version = "3.4.0",
+        Version = "4.0.0",
         AssetTypes = new[] {
-            typeof(GamepadReceiverAsset),
-            typeof(PointerReceiverAsset),
             typeof(DrawingScreenAsset),
+            typeof(DirectInputReceiverAsset),
+            typeof(GameInputReceiverAsset),
+            typeof(GamepadReceiverAsset),
+            typeof(KeyboardReceiverAsset),
+            typeof(PointerReceiverAsset),
             typeof(VisualSetupAnchorAsset)
         },
         NodeTypes = new[] {
@@ -22,12 +25,28 @@ namespace FlameStream {
             typeof(GamepadDPadHandAnimatorNode),
             typeof(GamepadDPadPropAnimatorNode),
             typeof(GamepadHandTrackerNode),
+            typeof(GamepadReceiverIsButtonDownNode),
+            typeof(GamepadReceiverOnButtonDownNode),
+            typeof(GamepadReceiverOnButtonUpNode),
             typeof(GamepadStickHandAnimatorNode),
             typeof(GamepadStickPropAnimatorNode),
+            typeof(GetGameInputReceiverDataNode),
+            typeof(GetGamepadReceiverDataGenericAxisNode),
             typeof(GetGamepadReceiverDataPs5Node),
             typeof(GetGamepadReceiverDataSwitchNode),
             typeof(GetGamepadReceiverDataXbox360Node),
-            typeof(GetPointerReceiverDataNode)
+            typeof(GetKeyboardReceiverKeyNode),
+            typeof(GetPointerReceiverDataNode),
+            typeof(InputReceiverHandTrackerNode),
+            typeof(InputReceiverIsButtonDownNode),
+            typeof(InputReceiverOnAxisInactive),
+            typeof(InputReceiverOnButtonDownNode),
+            typeof(InputReceiverOnButtonUpNode),
+            typeof(InputReceiverOnLastInputAtLayerChangeNode),
+            typeof(InputReceiverWhileAxisActive),
+            typeof(KeyboardReceiverIsKeyDownNode),
+            typeof(KeyboardReceiverOnKeyDownNode),
+            typeof(KeyboardReceiverOnKeyUpNode),
         })]
     public class PointerReceiverPlugin : Plugin {}
 }
