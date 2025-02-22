@@ -62,7 +62,7 @@ namespace FlameStream {
 
         public VisualSetupAnchorAsset CreateAnchor() {
             DestroyAnchor();
-            setupAnchor = Scene.AddAsset<VisualSetupAnchorAsset>();
+            setupAnchor = Scene.AddAssetToGroup<VisualSetupAnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
             setupAnchor.Parent = this;
             var title = $"SETUP_ANCHOR_NAME_{LocalizationKey}".Localized();
             setupAnchor.Name = $"⌛⚓-{title}";

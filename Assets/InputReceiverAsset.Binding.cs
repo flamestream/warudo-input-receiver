@@ -143,15 +143,15 @@ namespace FlameStream
             }), true);
 
             // Imitate the prop transforms
-            AnchorAsset propAnchor = Scene.AddAsset<AnchorAsset>();
+            AnchorAsset propAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
             var propWorldPosition = propAnchor.Transform.Position = propAnchor.GameObject.transform.position = HeldProp.GameObject.transform.position;
             propAnchor.GameObject.transform.rotation = HeldProp.GameObject.transform.rotation;
             propAnchor.Transform.Rotation = HeldProp.GameObject.transform.rotation.eulerAngles;
             propAnchor.Transform.Scale = HeldProp.Transform.Scale;
 
             // Set anchors' position to where the prop is
-            AnchorAsset moverAnchor = Scene.AddAsset<AnchorAsset>();
-            AnchorAsset targetAnchor = Scene.AddAsset<AnchorAsset>();
+            AnchorAsset moverAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
+            AnchorAsset targetAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
             moverAnchor.Transform.Position = moverAnchor.GameObject.transform.position = propWorldPosition;
             targetAnchor.Transform.Position = targetAnchor.GameObject.transform.position = propWorldPosition;
 
@@ -187,24 +187,22 @@ namespace FlameStream
         }
 
         void ApplyBindingData() {
-            Log($"LOADING MoverAnchorAssetId {MoverAnchorAssetId}");
-            AnchorAsset moverAnchor = Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == MoverAnchorAssetId) ?? Scene.AddAsset<AnchorAsset>();
+            AnchorAsset moverAnchor = Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == MoverAnchorAssetId) ?? Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
             moverAnchor.Name = $"{NAME_PREFIX} Mover";
             Scene.UpdateNewAssetName(moverAnchor);
             MoverAnchorAssetId = moverAnchor.Id;
-            Log($"SAVED MoverAnchorAssetId {MoverAnchorAssetId}");
 
-            AnchorAsset targetAnchor = Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == TargetAnchorAssetId) ?? Scene.AddAsset<AnchorAsset>();
+            AnchorAsset targetAnchor = Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == TargetAnchorAssetId) ?? Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
             targetAnchor.Name = $"{NAME_PREFIX}🔒🎯";
             Scene.UpdateNewAssetName(targetAnchor);
             TargetAnchorAssetId = targetAnchor.Id;
 
-            AnchorAsset leftHandAnchor = Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == LeftHandAnchorAssetId) ?? Scene.AddAsset<AnchorAsset>();
+            AnchorAsset leftHandAnchor = Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == LeftHandAnchorAssetId) ?? Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
             leftHandAnchor.Name = $"{NAME_PREFIX}🔒🫲";
             Scene.UpdateNewAssetName(leftHandAnchor);
             LeftHandAnchorAssetId = leftHandAnchor.Id;
 
-            AnchorAsset rightHandAnchor = Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == RightHandAnchorAssetId) ?? Scene.AddAsset<AnchorAsset>();
+            AnchorAsset rightHandAnchor = Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == RightHandAnchorAssetId) ?? Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
             rightHandAnchor.Name = $"{NAME_PREFIX}🔒🫱";
             Scene.UpdateNewAssetName(rightHandAnchor);
             RightHandAnchorAssetId = rightHandAnchor.Id;
@@ -232,7 +230,7 @@ namespace FlameStream
         }
 
         AnchorAsset CreateIKTargetHandAnchor(HumanBodyBones targetBone, AnchorAsset parent) {
-            AnchorAsset anchor = Scene.AddAsset<AnchorAsset>();
+            AnchorAsset anchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
             anchor.Transform.CopyFromWorldTransform(Character.Animator.GetBoneTransform(targetBone));
             anchor.Transform.ApplyAsWorldTransform(anchor.GameObject.transform);
             Helper.SetParent(anchor, parent);

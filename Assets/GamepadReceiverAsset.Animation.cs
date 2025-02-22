@@ -324,7 +324,7 @@ Please note that they do not have to be all filled. You may remove unused fields
 
         void SyncCharacterOverlayingAnimations() {
 
-            var userLayers = Character.OverlappingAnimations.Where(d => !d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)).ToList();
+            var userLayers = Character.OverlappingAnimations.Where(d => !(d.CustomLayerID?.StartsWith(LAYER_NAME_PREFIX) ?? false)).ToList();
 
             // This one must be before all additive animations
             if (IdleFingerAnimation != null) {
