@@ -120,8 +120,8 @@ namespace FlameStream {
 
             if (Character == null) return;
 
-            var unmanagedLayers = Character.OverlappingAnimations.Where(d => !d.CustomLayerID.StartsWith(NAME_PREFIX) && !d.Animation.IsNullOrEmpty()).ToList() ?? new List<OverlappingAnimationData>();
-            var managedLayers = Character.OverlappingAnimations.Where(d => d.CustomLayerID.StartsWith(NAME_PREFIX) && !d.Animation.IsNullOrEmpty()).ToList() ?? new List<OverlappingAnimationData>();
+            var unmanagedLayers = Character.OverlappingAnimations.Where(d => !d.CustomLayerID?.StartsWith(NAME_PREFIX) ?? false && !d.Animation.IsNullOrEmpty()).ToList() ?? new List<OverlappingAnimationData>();
+            var managedLayers = Character.OverlappingAnimations.Where(d => d.CustomLayerID?.StartsWith(NAME_PREFIX) ?? false && !d.Animation.IsNullOrEmpty()).ToList() ?? new List<OverlappingAnimationData>();
             var newManagedLayers = new List<OverlappingAnimationData>();
 
             var baseAnimationInfo = SavedBindingData?.BaseAnimationLayer;

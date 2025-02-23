@@ -107,12 +107,12 @@ namespace FlameStream
             }
 
             var axes = parts[3].Split('|');
-            float.TryParse(axes[0], out float _LX);
-            float.TryParse(axes[1], out float _LY);
-            float.TryParse(axes[2], out float _LZ);
-            float.TryParse(axes[3], out float _LrX);
-            float.TryParse(axes[4], out float _LrY);
-            float.TryParse(axes[5], out float _LrZ);
+            float.TryParse(axes[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float _LX);
+            float.TryParse(axes[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float _LY);
+            float.TryParse(axes[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float _LZ);
+            float.TryParse(axes[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float _LrX);
+            float.TryParse(axes[4], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float _LrY);
+            float.TryParse(axes[5], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float _LrZ);
             // Convert to legacy value
             LX = (ushort)(_LX * ushort.MaxValue);
             LY = (ushort)(_LY * ushort.MaxValue);
@@ -120,8 +120,8 @@ namespace FlameStream
             LrX = (ushort)(_LrX * ushort.MaxValue);
             LrY = (ushort)(_LrY * ushort.MaxValue);
             LrZ = (ushort)(_LrZ * ushort.MaxValue);
-            // float.TryParse(axes[6], out rglSlider);
-            // float.TryParse(axes[7], out rglSlider2);
+            // float.TryParse(axes[6], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out rglSlider);
+            // float.TryParse(axes[7], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out rglSlider2);
 
             // Left Face
             if (IsLeftStickActive()) {

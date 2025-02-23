@@ -103,6 +103,7 @@ namespace FlameStream
                                     minAnimationData,
                                     null,
                                     minWeight,
+                                    true,
                                     true
                                 );
                                 ProcessPropAnimation(

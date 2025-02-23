@@ -101,7 +101,7 @@ namespace FlameStream
             var axisCount = axisValues.Length;
             for (var i = 0; i < axisCount; ++i) {
                 AxisValueRegistry[i,1] = AxisValueRegistry[i,0];
-                float.TryParse(axisValues[i], out float value);
+                float.TryParse(axisValues[i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float value);
                 AxisValueRegistry[i,0] = value;
 
                 var isLastActive = AxisActiveRegistry[i];

@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEngine;
 using Warudo.Core;
 using Warudo.Core.Attributes;
+using Warudo.Core.Localization;
 using Warudo.Core.Scenes;
 using Warudo.Plugins.Core.Assets;
 using Warudo.Plugins.Core.Assets.Character;
@@ -131,7 +132,7 @@ namespace FlameStream
 
             for (var idx = 0; idx < Character.OverlappingAnimations.Length; ++idx) {
                 var d = Character.OverlappingAnimations[idx];
-                if (!d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)) {
+                if (!(d.CustomLayerID?.StartsWith(LAYER_NAME_PREFIX) ?? false)) {
                     continue;
                 }
 
@@ -177,7 +178,7 @@ namespace FlameStream
                 idleLayer = CreateIdleFingerAnimationData();
 
                 var list = Character.OverlappingAnimations?.ToList() ?? new List<OverlappingAnimationData>();
-                var firstLayerElement = list.Find(d => d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX));
+                var firstLayerElement = list.Find(d => d.CustomLayerID?.StartsWith(LAYER_NAME_PREFIX) ?? false);
                 var idx = list.IndexOf(firstLayerElement);
                 if (idx >= 0) {
                     list.Insert(idx, idleLayer);
@@ -205,12 +206,12 @@ namespace FlameStream
 
             IsHandEnabled = true;
 
-            AnchorAsset rootAnchor = Scene.AddAsset<AnchorAsset>();
+            AnchorAsset rootAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
             rootAnchor.Name = "⚓-🔥🎮 Mover";
             Scene.UpdateNewAssetName(rootAnchor);
             RootAnchorAssetId = rootAnchor.Id;
 
-            AnchorAsset gamepadAnchor = Scene.AddAsset<AnchorAsset>();
+            AnchorAsset gamepadAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
             gamepadAnchor.Name = "⚓-🔥🎮🎯";
             Scene.UpdateNewAssetName(gamepadAnchor);
             GamepadAnchorAssetId = gamepadAnchor.Id;
@@ -297,7 +298,7 @@ namespace FlameStream
             ref Vector3 handPosition,
             ref Vector3 handRotation
         ) {
-            AnchorAsset anchor = Scene.AddAsset<AnchorAsset>();
+            AnchorAsset anchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
             anchor.Name = name;
             Scene.UpdateNewAssetName(anchor);
             anchor.Transform.CopyFromWorldTransform(Character.Animator.GetBoneTransform(targetBone));
