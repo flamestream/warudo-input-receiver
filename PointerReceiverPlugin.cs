@@ -46,7 +46,7 @@ namespace FlameStream {
             typeof(InputReceiverWhileAxisActive),
             typeof(GameInputReceiverOnSwitchActive),
             typeof(GameInputReceiverOnSwitchChange),
-            typeof(GameInputReceiverOnSwitchChange),
+            typeof(GameInputReceiverOnSwitchInactive),
             typeof(KeyboardReceiverIsKeyDownNode),
             typeof(KeyboardReceiverOnKeyDownNode),
             typeof(KeyboardReceiverOnKeyUpNode),
