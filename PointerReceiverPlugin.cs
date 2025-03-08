@@ -7,7 +7,7 @@ namespace FlameStream {
         Name = "PLUGIN_NAME",
         Description = "PLUGIN_DESCRIPTION",
         Author = "FlameStream",
-        Version = "4.0.1",
+        Version = "4.0.2",
         AssetTypes = new[] {
             typeof(DrawingScreenAsset),
             typeof(DirectInputReceiverAsset),
@@ -43,7 +43,10 @@ namespace FlameStream {
             typeof(InputReceiverOnButtonDownNode),
             typeof(InputReceiverOnButtonUpNode),
             typeof(InputReceiverOnLastInputAtLayerChangeNode),
-            typeof(InputReceiverWhileAxisActive),
+            typeof(InputReceiverWhileAxisActive), // Too late to change the name now...
+            typeof(InputReceiverOnSwitchActiveNode),
+            typeof(InputReceiverOnSwitchChangeNode),
+            typeof(InputReceiverOnSwitchInactiveNode),
             typeof(KeyboardReceiverIsKeyDownNode),
             typeof(KeyboardReceiverOnKeyDownNode),
             typeof(KeyboardReceiverOnKeyUpNode),

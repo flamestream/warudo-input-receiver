@@ -9,7 +9,7 @@ namespace FlameStream
     Title = "NODE_TITLE_INPUT_RECEIVER_ON_SWITCH_CHANGE",
     Category = "FS_NODE_CATEGORY_INPUT_RECEIVER"
 )]
-    public class GameInputReceiverOnSwitchChange: Node {
+    public class InputReceiverOnSwitchChangeNode: Node {
 
         [DataInput]
         public InputReceiverAsset Receiver;
