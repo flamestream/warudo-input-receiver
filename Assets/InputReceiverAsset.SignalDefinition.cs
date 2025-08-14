@@ -120,8 +120,18 @@ namespace FlameStream {
 
             if (Character == null) return;
 
-            var unmanagedLayers = Character.OverlappingAnimations.Where(d => !d.CustomLayerID?.StartsWith(NAME_PREFIX) ?? false && !d.Animation.IsNullOrEmpty()).ToList() ?? new List<OverlappingAnimationData>();
-            var managedLayers = Character.OverlappingAnimations.Where(d => d.CustomLayerID?.StartsWith(NAME_PREFIX) ?? false && !d.Animation.IsNullOrEmpty()).ToList() ?? new List<OverlappingAnimationData>();
+            var unmanagedLayers = new List<OverlappingAnimationData>();
+            var managedLayers = new List<OverlappingAnimationData>();
+            foreach (var d in Character.OverlappingAnimations) {
+                if (d.Animation.IsNullOrEmpty()) continue;
+                if (d.CustomLayerID.IsNullOrEmpty()) continue;
+                // Check if the layer ID starts with the prefix
+                if (d.CustomLayerID.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX, StringComparison.Ordinal)) {
+                    managedLayers.Add(d);
+                } else {
+                    unmanagedLayers.Add(d);
+                }
+            }
             var newManagedLayers = new List<OverlappingAnimationData>();
 
             var baseAnimationInfo = SavedBindingData?.BaseAnimationLayer;
@@ -306,8 +316,8 @@ namespace FlameStream {
                 unmanagedLayers.AddRange(newManagedLayers);
             }
 
-            if (unmanagedLayers.Count > 0) {
-                Context.Service.Toast(Warudo.Core.Server.ToastSeverity.Info, Name, $"CHARACTER_ANIMATION_LAYERS_SETUP_NOTIFICATION".Localized(new object[] {unmanagedLayers.Count}));
+            if (newManagedLayers.Count > 0) {
+                Context.Service.Toast(Warudo.Core.Server.ToastSeverity.Info, Name, $"CHARACTER_ANIMATION_LAYERS_SETUP_NOTIFICATION".Localized(new object[] {newManagedLayers.Count}));
             } else {
                 Context.Service.Toast(Warudo.Core.Server.ToastSeverity.Info, Name, $"CHARACTER_ANIMATION_LAYERS_CLEANED_NOTIFICATION");
             }
@@ -851,13 +861,13 @@ You can then customize the animations and transitions for each signal definition
 
             public string HoverLayerId {
                 get {
-                    return $"{NAME_PREFIX} {Parent?.GlobalLayerId}@hover";
+                    return $"{Parent?.Parent?.CHARACTER_ANIM_LAYER_ID_PREFIX} {Parent?.GlobalLayerId}@hover";
                 }
             }
 
             public string PressLayerId {
                 get {
-                    return $"{NAME_PREFIX} {Parent?.GlobalLayerId}@press";
+                    return $"{Parent?.Parent?.CHARACTER_ANIM_LAYER_ID_PREFIX} {Parent?.GlobalLayerId}@press";
                 }
             }
 
@@ -984,7 +994,7 @@ You can then customize the animations and transitions for each signal definition
 
             public string LayerIdPrefix {
                 get {
-                    return $"{NAME_PREFIX} {Parent?.GlobalLayerId}";
+                    return $"{Parent?.Parent?.CHARACTER_ANIM_LAYER_ID_PREFIX} {Parent?.GlobalLayerId}";
                 }
             }
         }
@@ -1047,7 +1057,7 @@ You can then customize the animations and transitions for each signal definition
 
             public string LayerIdPrefix {
                 get {
-                    return $"{NAME_PREFIX} {Parent?.GlobalLayerId}";
+                    return $"{Parent?.Parent?.CHARACTER_ANIM_LAYER_ID_PREFIX} {Parent?.GlobalLayerId}";
                 }
             }
 

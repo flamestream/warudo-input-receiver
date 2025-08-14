@@ -183,7 +183,6 @@ namespace FlameStream
             public Vector3 Translation = new Vector3(0f, -0.05f, -0.02f);
 
             [DataInput]
-            [HiddenIf(nameof(IsHandTrackerEnabled), Is.False)]
             [Label("TRANSLATION_TRANSITION")]
             public UntrackedHandTranslationTransitionDefinition TranslationTransition;
 
@@ -192,12 +191,10 @@ namespace FlameStream
             public Vector3 Rotation = new Vector3(-30f, 10f, 0f);
 
             [DataInput]
-            [HiddenIf(nameof(IsHandTrackerEnabled), Is.False)]
             [Label("ROTATION_TRANSITION")]
             public UntrackedHandRotationTransitionDefinition RotationTransition;
 
             [DataInput]
-            [HiddenIf(nameof(IsHandTrackerEnabled), Is.False)]
             [Label("RETURN_TRANSITION")]
             public UntrackedHandReturnTransitionDefinition ReturnTransition;
 

@@ -13,6 +13,13 @@ namespace FlameStream {
         Category = "FS_ASSET_CATEGORY_INPUT"
     )]
     public partial class PointerReceiverAsset : ReceiverAsset {
+
+        protected override string CHARACTER_ANIM_LAYER_ID_PREFIX {
+            get {
+                return "🔥🖱️";
+            }
+        }
+
         /// <summary>
         /// BASIC SETUP
         /// </summary>

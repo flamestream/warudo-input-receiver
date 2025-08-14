@@ -11,6 +11,8 @@ using Warudo.Core.Scenes;
 namespace FlameStream {
     public abstract class ReceiverAsset : Asset {
 
+        protected abstract string CHARACTER_ANIM_LAYER_ID_PREFIX { get; }
+
         UdpClient udpClient;
         Task listenTask;
 
