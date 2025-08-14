@@ -9,6 +9,13 @@ namespace FlameStream
         Category = "FS_ASSET_CATEGORY_INPUT"
     )]
     public partial class KeyboardReceiverAsset : ReceiverAsset {
+
+        protected override string CHARACTER_ANIM_LAYER_ID_PREFIX {
+            get {
+                return "🔥⌨️";
+            }
+        }
+
         protected override void Log(string msg) {
             UnityEngine.Debug.Log($"[FlameStream.Asset.KeyboardReceiver] {msg}");
         }

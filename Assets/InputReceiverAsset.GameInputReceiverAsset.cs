@@ -27,6 +27,12 @@ namespace FlameStream
             }
         }
 
+        protected override string CHARACTER_ANIM_LAYER_ID_PREFIX {
+            get {
+                return "🔥🎮";
+            }
+        }
+
         protected override void OnGeneratedProfileSelectionChange(SignalProfileType profile) {
             base.OnGeneratedProfileSelectionChange(profile);
             if (profile == SignalProfileType.SwitchProController) {

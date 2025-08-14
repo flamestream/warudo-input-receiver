@@ -27,6 +27,12 @@ namespace FlameStream
             }
         }
 
+        protected override string CHARACTER_ANIM_LAYER_ID_PREFIX {
+            get {
+                return "🔥🕹️";
+            }
+        }
+
         protected override SignalProfileType[] SupportedProfileTypes {
             get {
                 return new SignalProfileType[] {

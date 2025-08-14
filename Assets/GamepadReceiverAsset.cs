@@ -14,6 +14,12 @@ namespace FlameStream
     )]
     public partial class GamepadReceiverAsset : ReceiverAsset {
 
+        protected override string CHARACTER_ANIM_LAYER_ID_PREFIX {
+            get {
+                return "🔥🎮🧓";
+            }
+        }
+
         protected override void OnCreate() {
             if (Port == 0) Port = DEFAULT_PORT;
             base.OnCreate();

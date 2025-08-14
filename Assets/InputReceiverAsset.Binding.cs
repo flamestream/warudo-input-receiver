@@ -188,22 +188,22 @@ namespace FlameStream
 
         void ApplyBindingData() {
             AnchorAsset moverAnchor = Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == MoverAnchorAssetId) ?? Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
-            moverAnchor.Name = $"{NAME_PREFIX} Mover";
+            moverAnchor.Name = $"{CHARACTER_ANIM_LAYER_ID_PREFIX} Mover";
             Scene.UpdateNewAssetName(moverAnchor);
             MoverAnchorAssetId = moverAnchor.Id;
 
             AnchorAsset targetAnchor = Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == TargetAnchorAssetId) ?? Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
-            targetAnchor.Name = $"{NAME_PREFIX}🔒🎯";
+            targetAnchor.Name = $"{CHARACTER_ANIM_LAYER_ID_PREFIX}🔒🎯";
             Scene.UpdateNewAssetName(targetAnchor);
             TargetAnchorAssetId = targetAnchor.Id;
 
             AnchorAsset leftHandAnchor = Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == LeftHandAnchorAssetId) ?? Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
-            leftHandAnchor.Name = $"{NAME_PREFIX}🔒🫲";
+            leftHandAnchor.Name = $"{CHARACTER_ANIM_LAYER_ID_PREFIX}🔒🫲";
             Scene.UpdateNewAssetName(leftHandAnchor);
             LeftHandAnchorAssetId = leftHandAnchor.Id;
 
             AnchorAsset rightHandAnchor = Scene.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == RightHandAnchorAssetId) ?? Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
-            rightHandAnchor.Name = $"{NAME_PREFIX}🔒🫱";
+            rightHandAnchor.Name = $"{CHARACTER_ANIM_LAYER_ID_PREFIX}🔒🫱";
             Scene.UpdateNewAssetName(rightHandAnchor);
             RightHandAnchorAssetId = rightHandAnchor.Id;
 
@@ -253,7 +253,7 @@ namespace FlameStream
             HeldProp.Attachable.AttachToBone = bone;
             HeldProp.Broadcast();
 
-            var prefix = $"{NAME_PREFIX}🔒 ";
+            var prefix = $"{CHARACTER_ANIM_LAYER_ID_PREFIX}🔒 ";
             if (!HeldProp.Name.StartsWith(prefix)) {
                 HeldProp.Name = $"{prefix}{HeldProp.Name}";
                 HeldProp.Broadcast();
@@ -281,7 +281,7 @@ namespace FlameStream
 
             // Detach prop
             Helper.UnsetParent(HeldProp);
-            var prefix = $"{NAME_PREFIX}🔒 ";
+            var prefix = $"{CHARACTER_ANIM_LAYER_ID_PREFIX}🔒 ";
             if (HeldProp.Name.StartsWith(prefix)) {
                 HeldProp.Name = HeldProp.Name.Substring(prefix.Length);
                 HeldProp.Broadcast();

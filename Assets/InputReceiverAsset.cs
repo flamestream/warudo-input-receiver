@@ -51,7 +51,6 @@ namespace FlameStream
         protected Vector3 TranslationDownVeryStrong = new Vector3(0f, -2f, 0f);
         protected Vector3 TranslationUpVeryStrong = new Vector3(0f, 2f, 0f);
 
-        const string NAME_PREFIX = "🔥🎮";
         const int CURRENT_ASSET_VERSION = 1;
 
         protected override void OnCreate() {
