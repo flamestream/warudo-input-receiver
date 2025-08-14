@@ -125,7 +125,7 @@ namespace FlameStream {
             foreach (var d in Character.OverlappingAnimations) {
                 if (d.Animation.IsNullOrEmpty()) continue;
                 if (d.CustomLayerID.IsNullOrEmpty()) continue;
-                // Check if the layer ID starts with the prefix(CHARACTER_ANIM_LAYER_ID_PREFIX)}");
+                // Check if the layer ID starts with the prefix
                 if (d.CustomLayerID.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX, StringComparison.Ordinal)) {
                     managedLayers.Add(d);
                 } else {
