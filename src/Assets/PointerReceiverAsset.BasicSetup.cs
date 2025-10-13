@@ -64,7 +64,6 @@ namespace FlameStream
         bool isHandDisabledByOutOfBound;
 
         protected override void OnCreate() {
-            if (Port == 0) Port = DEFAULT_PORT;
             base.OnCreate();
             OnCreateBasicSetup();
             OnCreateMoveHand();

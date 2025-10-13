@@ -1,5 +1,6 @@
 
 using System;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -11,6 +12,9 @@ using Warudo.Core.Scenes;
 namespace FlameStream {
     public abstract class ReceiverAsset : Asset {
 
+        protected abstract ushort PROTOCOL_VERSION { get; }
+        protected abstract string PROTOCOL_ID { get; }
+        protected abstract int DEFAULT_PORT { get; }
         protected abstract string CHARACTER_ANIM_LAYER_ID_PREFIX { get; }
 
         UdpClient udpClient;
@@ -39,6 +43,7 @@ namespace FlameStream {
         }
 
         protected override void OnCreate() {
+            if (Port == 0) Port = DEFAULT_PORT;
             base.OnCreate();
 
             Watch(nameof(IsEnabled), delegate { OnIsEnabledChange(); });
@@ -140,6 +145,61 @@ namespace FlameStream {
         protected void SetMessage(string msg, bool skipLog = false) {
             if (skipLog) Log(msg);
             Message = msg.Localized();
+        }
+
+        /// <summary>
+        /// Validates protocol version string against expected version and name.
+        /// Supports both old numeric format (e.g., "2") and new number+letter format (e.g., "2G").
+        /// If a letter is present, it will not fall back to numeric validation.
+        /// </summary>
+        /// <param name="inputString">The protocol version string from the incoming data</param>
+        /// <param name="expectedVersion">The expected protocol version number</param>
+        /// <param name="expectedName">The expected protocol ID letter</param>
+        /// <returns>Error message if validation fails, null if valid</returns>
+        protected string CheckValidProtocolVersion(string inputString, ushort expectedVersion, string expectedName) {
+            // Early validation
+            if (string.IsNullOrEmpty(inputString)) {
+                return $"Invalid protocol format '{inputString}'. Expected '{expectedVersion}{expectedName}' or '{expectedVersion}' (legacy)";
+            }
+
+            var expectedNewFormat = $"{expectedVersion}{expectedName}";
+            var expectedLegacyFormat = expectedVersion.ToString();
+            bool hasLetter = inputString.Any(char.IsLetter);
+
+            // Handle legacy format (numeric only) for backward compatibility
+            if (!hasLetter) {
+                if (!ushort.TryParse(inputString, out ushort numericProtocolVersion)) {
+                    return $"Invalid protocol format '{inputString}'. Expected '{expectedLegacyFormat}' (legacy)";
+                }
+
+                if (numericProtocolVersion != expectedVersion) {
+                    return $"Invalid protocol version '{inputString}'. Expected '{expectedLegacyFormat}' (legacy) but got version {numericProtocolVersion}. Please download the latest version of the emitter at https://github.com/flamestream/input-device-emitter/releases/latest";
+                }
+
+                return null; // Valid legacy format
+            }
+
+            // Handle new format (number + letter)
+            if (inputString.Length < 2) {
+                return $"Invalid protocol format '{inputString}'. Expected '{expectedNewFormat}' or '{expectedLegacyFormat}' (legacy)";
+            }
+
+            var protocolNumberPart = inputString.Substring(0, inputString.Length - 1);
+            var protocolNamePart = inputString.Substring(inputString.Length - 1);
+
+            if (!ushort.TryParse(protocolNumberPart, out ushort protocolVersionNumber)) {
+                return $"Invalid protocol format '{inputString}'. Expected '{expectedNewFormat}' or '{expectedLegacyFormat}' (legacy)";
+            }
+
+            if (protocolVersionNumber != expectedVersion) {
+                return $"Invalid protocol version '{inputString}'. Expected '{expectedNewFormat}' but got version {protocolVersionNumber}. Please download the latest version of the emitter at https://github.com/flamestream/input-device-emitter/releases/latest";
+            }
+
+            if (protocolNamePart != expectedName) {
+                return $"Invalid protocol '{inputString}'. Expected '{expectedNewFormat}' but got name '{protocolNamePart}'. Please ensure that the emitter and receiver have matching ports";
+            }
+
+            return null; // Valid new format
         }
 
         abstract protected void Log(string msg);

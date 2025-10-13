@@ -20,8 +20,25 @@ namespace FlameStream
             }
         }
 
+        protected override ushort PROTOCOL_VERSION {
+            get {
+                return 3;
+            }
+        }
+
+        protected override string PROTOCOL_ID {
+            get {
+                return "L";
+            }
+        }
+
+        protected override int DEFAULT_PORT {
+            get {
+                return 40611;
+            }
+        }
+
         protected override void OnCreate() {
-            if (Port == 0) Port = DEFAULT_PORT;
             base.OnCreate();
             Watch(nameof(IsHandEnabled), delegate { OnIsHandEnabledChange(); });
             Watch(nameof(Character), delegate { OnIdleFingerAnimationChange(); });

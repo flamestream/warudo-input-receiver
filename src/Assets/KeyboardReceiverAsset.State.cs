@@ -6,9 +6,6 @@ using Animancer;
 namespace FlameStream {
     public partial class KeyboardReceiverAsset : ReceiverAsset {
 
-        const ushort PROTOCOL_VERSION = 1;
-        const int DEFAULT_PORT = 40612;
-
         const int MIN_VK_CODE = 0;
         const int MAX_VK_CODE = 255;
 
@@ -24,10 +21,13 @@ namespace FlameStream {
             if (lastState == null) return;
 
             var parts = lastState.Split(';');
-            byte.TryParse(parts[0], out byte protocolVersion);
-            if (protocolVersion != PROTOCOL_VERSION) {
+            var protocolVersionString = parts[0];
+
+            // Validate protocol version using helper function
+            var protocolError = CheckValidProtocolVersion(protocolVersionString, PROTOCOL_VERSION, PROTOCOL_ID);
+            if (protocolError != null) {
                 StopReceiver();
-                SetMessage($"Invalid keyboard protocol '{protocolVersion}'. Expected '{PROTOCOL_VERSION}'\n\nPlease download compatible version of emitter at https://github.com/flamestream/input-device-emitter/releases");
+                SetMessage(protocolError);
                 return;
             }
 

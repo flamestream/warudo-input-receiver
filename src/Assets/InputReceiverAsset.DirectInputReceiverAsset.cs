@@ -21,6 +21,13 @@ namespace FlameStream
                 return 3;
             }
         }
+
+        protected override string PROTOCOL_ID {
+            get {
+                return "D";
+            }
+        }
+
         protected override int DEFAULT_PORT {
             get {
                 return 40611;
