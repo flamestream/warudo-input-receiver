@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net4.8</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <LangVersion>8.0</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="UnityEngine">
+      <HintPath>../../../Managed/UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>../../../Managed/UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="Warudo.Core">
+      <HintPath>../../../Managed/Warudo.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Warudo.Plugins.Core">
+      <HintPath>../../../Managed/Warudo.Plugins.Core.dll</HintPath>
+    </Reference>
+    <!-- Feel free to reference other DLLs here. -->
+    <Reference Include="WebSocketSharp">
+      <HintPath>../../../Managed/websocket-sharp.dll</HintPath>
+    </Reference>
+    <Reference Include="UniTask">
+      <HintPath>../../../Managed/UniTask.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>../../../Managed/UnityEngine.AnimationModule.dll</HintPath>
+    </Reference>
+    <Reference Include="DOTween">
+      <HintPath>../../../Managed/DOTween.dll</HintPath>
+    </Reference>
+    <Reference Include="Animancer">
+      <HintPath>../../../Managed/Animancer.dll</HintPath>
+    </Reference>
+    <Reference Include="UMod">
+      <HintPath>../../../Managed/UMod.dll</HintPath>
+    </Reference>
+    <Reference Include="UMod-Interface">
+      <HintPath>../../../Managed/UMod-Interface.dll</HintPath>
+    </Reference>
+    <Reference Include="uDesktopDuplication.Runtime">
+      <HintPath>../../../Managed/uDesktopDuplication.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.XRModule.Runtime">
+      <HintPath>../../../Managed/UnityEngine.XRModule.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
