@@ -13,11 +13,11 @@ namespace FlameStream {
         [Label("Enter (13)")]
         RETURN = 13,
         // Adding a gap for future use (14, 15)
-        [Label("Shift (16)")]
+        [Label("Shift (16) (Unused; use LSHIFT or RSHIFT)")]
         SHIFT = 16,
-        [Label("Control (17)")]
+        [Label("Control (17) (Unused; use LCONTROL or RCONTROL)")]
         CONTROL = 17,
-        [Label("Alt (18)")]
+        [Label("Alt (18) (Unused; use LMENU or RMENU)")]
         MENU = 18,
         [Label("Pause (19)")]
         PAUSE = 19,

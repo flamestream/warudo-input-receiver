@@ -33,10 +33,13 @@ namespace FlameStream
             if (lastState == null) return;
 
             var parts = lastState.Split(';');
-            byte.TryParse(parts[0], out byte protocolVersion);
-            if (protocolVersion != PROTOCOL_VERSION) {
+            var protocolVersionString = parts[0];
+
+            // Validate protocol version using helper function
+            var protocolError = CheckValidProtocolVersion(protocolVersionString, PROTOCOL_VERSION, PROTOCOL_ID);
+            if (protocolError != null) {
                 StopReceiver();
-                SetMessage($"Invalid GameInput protocol '{protocolVersion}'. Expected '{PROTOCOL_VERSION}'\n\nPlease download compatible version of emitter at https://github.com/flamestream/input-device-emitter/releases");
+                SetMessage(protocolError);
                 return;
             }
             if (parts.Length < 4) {
@@ -83,16 +86,48 @@ namespace FlameStream
 
                 // Set current state
                 var currentValue = part2[i] - '0';
-                SwitchSubIndexHistoryRegistry[i,0] = currentValue;
+                UpdateSwitchStateRegistries(i, currentValue);
+            }
 
-                var isJustChanged = SwitchSubIndexJustChangedRegistry[i] = SwitchSubIndexHistoryRegistry[i,1] != SwitchSubIndexHistoryRegistry[i,0];
-                if (isJustChanged) {
-                    SwitchSubIndexChangeHistoryRegistry[i,2] = SwitchSubIndexChangeHistoryRegistry[i,1];
-                    SwitchSubIndexChangeHistoryRegistry[i,1] = SwitchSubIndexChangeHistoryRegistry[i,0];
-                    SwitchSubIndexChangeHistoryRegistry[i,0] = currentValue;
+            // Part 2.1: Switch states Virtual override
+            for (var i = 0; i < SwitchDefinitions.Length; ++i) {
+                var definition = SwitchDefinitions[i];
+                if (!definition.VirtualDefinitionSet.Enabled) {
+                    continue;
                 }
-                SwitchJustActiveRegistry[i] = isJustChanged && SwitchSubIndexHistoryRegistry[i,0] != 0;
-                SwitchJustInactiveRegistry[i] = isJustChanged && SwitchSubIndexHistoryRegistry[i,0] == 0;
+
+                var virtualSet = definition.VirtualDefinitionSet;
+                var targetIdx = definition.Index;
+                var up = virtualSet.UpId >= 0 && IsButtonDown(virtualSet.UpId);
+                var down = virtualSet.DownId >= 0 && IsButtonDown(virtualSet.DownId);
+                var left = virtualSet.LeftId >= 0 && IsButtonDown(virtualSet.LeftId);
+                var right = virtualSet.RightId >= 0 && IsButtonDown(virtualSet.RightId);
+
+                // Mapping:
+                // 0 = none
+                // 1 = Up
+                // 2 = Up-Right
+                // 3 = Right
+                // 4 = Down-Right
+                // 5 = Down
+                // 6 = Down-Left
+                // 7 = Left
+                // 8 = Up-Left
+                var currentValue = 0;
+                if (up) {
+                    if (right) currentValue = 2;
+                    else if (left) currentValue = 8;
+                    else currentValue = 1;
+                } else if (right) {
+                    if (down) currentValue = 4;
+                    else currentValue = 3;
+                } else if (down) {
+                    if (left) currentValue = 6;
+                    else currentValue = 5;
+                } else if (left) {
+                    currentValue = 7;
+                }
+                UpdateSwitchStateRegistries(targetIdx, currentValue);
             }
 
             // Part 3: Axes states
@@ -117,6 +152,20 @@ namespace FlameStream
                 AxisJustActiveRegistry[i] = isCurrentlyActive && !isLastActive;
                 AxisJustInactiveRegistry[i] = !isCurrentlyActive && isLastActive;
             }
+        }
+
+        void UpdateSwitchStateRegistries(int idx, int currentValue) {
+            if (idx < 0 || idx >= MAX_SWITCH_COUNT) return;
+            SwitchSubIndexHistoryRegistry[idx, 0] = currentValue;
+
+            var isJustChanged = SwitchSubIndexJustChangedRegistry[idx] = SwitchSubIndexHistoryRegistry[idx, 1] != SwitchSubIndexHistoryRegistry[idx, 0];
+            if (isJustChanged) {
+                SwitchSubIndexChangeHistoryRegistry[idx, 2] = SwitchSubIndexChangeHistoryRegistry[idx, 1];
+                SwitchSubIndexChangeHistoryRegistry[idx, 1] = SwitchSubIndexChangeHistoryRegistry[idx, 0];
+                SwitchSubIndexChangeHistoryRegistry[idx, 0] = currentValue;
+            }
+            SwitchJustActiveRegistry[idx] = isJustChanged && SwitchSubIndexHistoryRegistry[idx, 0] != 0;
+            SwitchJustInactiveRegistry[idx] = isJustChanged && SwitchSubIndexHistoryRegistry[idx, 0] == 0;
         }
 
         public bool IsButtonDown(int idx) {

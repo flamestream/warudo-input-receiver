@@ -13,8 +13,6 @@ namespace FlameStream
 {
     public abstract partial class InputReceiverAsset : ReceiverAsset {
 
-        protected abstract ushort PROTOCOL_VERSION { get; }
-        protected abstract int DEFAULT_PORT { get; }
         protected abstract SignalProfileType[] SupportedProfileTypes { get; }
         protected abstract void GenerateButtonDefinitions(SignalProfileType profile);
 
@@ -54,7 +52,6 @@ namespace FlameStream
         const int CURRENT_ASSET_VERSION = 1;
 
         protected override void OnCreate() {
-            if (Port == 0) Port = DEFAULT_PORT;
             base.OnCreate();
             SignalDefinitionGeneration.Parent = this;
             OnCreateSignalDefinition();

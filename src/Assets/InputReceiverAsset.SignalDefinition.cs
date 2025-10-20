@@ -522,6 +522,10 @@ You can then customize the animations and transitions for each signal definition
             [Label("PROP_MOTION_FACTOR")]
             public SwitchPropMotionDefinition PropMotionSet;
 
+            [DataInput(50)]
+            [Label("SWITCH_VIRTUAL_DEFINITION")]
+            public SwitchVirtualDefinition VirtualDefinitionSet;
+
             override protected void OnCreate() {
                 base.OnCreate();
                 Watch(nameof(CharacterAnimation), () => {
@@ -570,7 +574,8 @@ You can then customize the animations and transitions for each signal definition
                         icon = "↖️";
                         break;
                 }
-                string name = $"[{Index}] {icon} {AssignedCharacterLayer.Localized()} Switch - {Label}";
+                string type = VirtualDefinitionSet.Enabled ? "Virtual Switch" : "Switch";
+                string name = $"[{Index}] {icon} {AssignedCharacterLayer.Localized()} {type} - {Label}";
                 return name;
             }
 
@@ -1537,6 +1542,37 @@ You can then customize the animations and transitions for each signal definition
                 }
 
                 return str;
+            }
+        }
+
+        // Define class used by switch definition to define "virtual switches". Where the idea is to use 4 button IDs (up, down, left, right) to define a switch direction.
+        // This is to be used inside a switch signal definition to define which buttons correspond to which switch direction.
+        public class SwitchVirtualDefinition : StructuredData, ICollapsibleStructuredData {
+
+            [Markdown(10)]
+            public string Description = "SWITCH_VIRTUAL_DESCRIPTION".Localized();
+
+            [DataInput(20)]
+            public bool Enabled;
+
+            [DataInput(30)]
+            [Label("SWITCH_VIRTUAL_BUTTON_UP_LABEL")]
+            public int UpId;
+
+            [DataInput(40)]
+            [Label("SWITCH_VIRTUAL_BUTTON_DOWN_LABEL")]
+            public int DownId;
+
+            [DataInput(50)]
+            [Label("SWITCH_VIRTUAL_BUTTON_LEFT_LABEL")]
+            public int LeftId;
+
+            [DataInput(60)]
+            [Label("SWITCH_VIRTUAL_BUTTON_RIGHT_LABEL")]
+            public int RightId;
+
+            public string GetHeader() {
+                return Enabled ? "✅ Enabled and overriding slot" : "❌ Disabled";
             }
         }
     }

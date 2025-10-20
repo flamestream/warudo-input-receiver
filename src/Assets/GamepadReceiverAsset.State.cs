@@ -7,8 +7,6 @@ namespace FlameStream
     public partial class GamepadReceiverAsset : ReceiverAsset {
 
         public const float DEAD_ZONE_RADIUS = 0.1f;
-        const ushort PROTOCOL_VERSION = 3;
-        const int DEFAULT_PORT = 40611;
 
         public enum DPadDirection : int {
             None = 0,
@@ -52,10 +50,13 @@ namespace FlameStream
             if (lastState == null) return;
 
             var parts = lastState.Split(';');
-            byte.TryParse(parts[0], out byte protocolVersion);
-            if (protocolVersion != PROTOCOL_VERSION) {
+            var protocolVersionString = parts[0];
+
+            // Validate protocol version using helper function
+            var protocolError = CheckValidProtocolVersion(protocolVersionString, PROTOCOL_VERSION, PROTOCOL_ID);
+            if (protocolError != null) {
                 StopReceiver();
-                SetMessage($"Invalid gamepad protocol '{protocolVersion}'. Expected '{PROTOCOL_VERSION}'\n\nPlease download compatible version of emitter at https://github.com/flamestream/input-device-emitter/releases");
+                SetMessage(protocolError);
                 return;
             }
 
