@@ -8,7 +8,7 @@ using Warudo.Plugins.Core.Assets.Prop;
 namespace FlameStream
 {
     [AssetType(
-        Id = "FlameStream.Asset.GamepadReceiver",
+        Id = "FlameStream.Asset.GamepadReceiver", // Too late to change the ID now without breaking existing setups
         Title = "FS_ASSET_TITLE_LEGACY_DIRECTINPUT",
         Category = "FS_ASSET_CATEGORY_INPUT"
     )]

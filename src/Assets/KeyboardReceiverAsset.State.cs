@@ -1,7 +1,5 @@
-using System;
 using System.Collections;
-using System.IO.Pipes;
-using Animancer;
+using Warudo.Core;
 
 namespace FlameStream {
     public partial class KeyboardReceiverAsset : ReceiverAsset {
@@ -42,6 +40,15 @@ namespace FlameStream {
                     KeyDownRegistry[currentVkCode] = currentValue;
                     if (currentValue) {
                         AnyDown = true;
+
+                        if (IsWaitingForButtonPress) {
+                            Context.Service?.Toast(
+                                Warudo.Core.Server.ToastSeverity.Info,
+                                Name,
+                                $"Button identified with code [{currentVkCode}]"
+                            );
+                            TriggerCancelIdentifyButton();
+                        }
                     }
                 }
             }
