@@ -7,7 +7,7 @@ Available from the [Steam Workshop](https://steamcommunity.com/sharedfiles/filed
 
 * Pen detection support (Wacom Intuos Pro)
 * Modern game controller support via GameInput (New Xbox Controllers)
-* Controller, wheel, pedal and other device support via DirectInput
+* Controller, wheel, pedal and other device support via DirectInput and XInput
 * Full visual setup for mouse/pen tracking
 * Finger animation tied to controller input
 * Prop button animations tied to controller input

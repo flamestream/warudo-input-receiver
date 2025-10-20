@@ -15,7 +15,8 @@ namespace FlameStream {
             typeof(GamepadReceiverAsset),
             typeof(KeyboardReceiverAsset),
             typeof(PointerReceiverAsset),
-            typeof(VisualSetupAnchorAsset)
+            typeof(VisualSetupAnchorAsset),
+            typeof(XInputReceiverAsset),
         },
         NodeTypes = new[] {
             typeof(CharacterAssetReferenceNode),
