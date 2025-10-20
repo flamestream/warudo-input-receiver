@@ -41,7 +41,8 @@ namespace FlameStream
                 StopReceiver();
                 SetMessage(protocolError);
                 return;
-            }            if (parts.Length < 4) {
+            }
+            if (parts.Length < 4) {
                 StopReceiver();
                 SetMessage("Invalid GameInput data format. Are you listening to the right port?");
                 return;
