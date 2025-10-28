@@ -319,7 +319,7 @@ namespace FlameStream
             TargetAnchorAssetId = Guid.Empty;
             CleanDestroy(MoverAnchor);
             MoverAnchorAssetId = Guid.Empty;
-            Context.Service.Toast(Warudo.Core.Server.ToastSeverity.Info, Name, "ASSET_CLEANED_NOTIFICATION".Localized());
+            ShowToast("ASSET_CLEANED_NOTIFICATION".Localized());
         }
 
         void CleanDestroy(GameObjectAsset g) {

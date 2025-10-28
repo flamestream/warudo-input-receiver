@@ -82,19 +82,29 @@ namespace FlameStream
             var part2 = parts[2];
             var switchCount = part2.Length;
             for (var i = 0; i < switchCount; ++i) {
-                SwitchSubIndexHistoryRegistry[i,1] = SwitchSubIndexHistoryRegistry[i,0];
+                var definition = SwitchDefinitions.FirstOrDefault(d => d.Index == i);
+                var isVirtualDefinitionActive = definition != null && definition.VirtualDefinitionSet.Enabled;
+                if (!isVirtualDefinitionActive) {
+                    SwitchSubIndexHistoryRegistry[i,1] = SwitchSubIndexHistoryRegistry[i,0];
+                }
 
                 // Set current state
                 var currentValue = part2[i] - '0';
-                UpdateSwitchStateRegistries(i, currentValue);
+
+                if (!isVirtualDefinitionActive) {
+                    UpdateSwitchStateRegistries(i, currentValue);
+                }
             }
 
             // Part 2.1: Switch states Virtual override
             for (var i = 0; i < SwitchDefinitions.Length; ++i) {
                 var definition = SwitchDefinitions[i];
-                if (!definition.VirtualDefinitionSet.Enabled) {
+                if (!definition.VirtualDefinitionSet.Enabled)
+                {
                     continue;
                 }
+
+                SwitchSubIndexHistoryRegistry[i,1] = SwitchSubIndexHistoryRegistry[i,0];
 
                 var virtualSet = definition.VirtualDefinitionSet;
                 var targetIdx = definition.Index;

@@ -108,11 +108,15 @@ namespace FlameStream
             calculator = new GameObject();
             // Has to be before #OnBasicSettingChange
             Watch(nameof(DisplayName), delegate { OnSurfaceSettingChange(); });
+            // OnSurfaceSettingChange(); // No need; will be called by #OnBasicSettingChange
 
+            Watch(nameof(IsEnabled), delegate { OnBasicSettingChange(); });
             Watch(nameof(IsHandEnabled), delegate { OnBasicSettingChange(); });
             Watch(nameof(Character), delegate { OnBasicSettingChange(); });
             Watch(nameof(DisplayName), delegate { OnBasicSettingChange(); });
             OnBasicSettingChange();
+
+            Watch(nameof(IsScreenDisableBasedOnAssetStateWanted), delegate { OnSurfaceSettingChange(); });
 
             Watch(nameof(DebugSphereScaleFactor), delegate { ApplyDisplayPointerSphereScale(); });
         }
@@ -240,54 +244,49 @@ namespace FlameStream
         }
 
         void OnBasicSettingChange() {
-            GetDataInputPort(nameof(Character)).Properties.hidden = !IsHandEnabled;
-            GetDataInputPort(nameof(IsRightHanded)).Properties.hidden = !IsHandEnabled;
-            GetDataInputPort(nameof(DisplayName)).Properties.hidden = !IsHandEnabled;
-            GetDataInputPort(nameof(CursorSmoothness)).Properties.hidden = !IsHandEnabled;
-            GetDataInputPort(nameof(CursorMode)).Properties.hidden = !IsHandEnabled;
-            BroadcastDataInputProperties(nameof(Character));
-            BroadcastDataInputProperties(nameof(IsRightHanded));
-            BroadcastDataInputProperties(nameof(DisplayName));
-            BroadcastDataInputProperties(nameof(CursorSmoothness));
-            BroadcastDataInputProperties(nameof(CursorMode));
+            SetDataInputPropertyAndBroadcast(nameof(Character), hidden: !IsHandEnabled);
+            SetDataInputPropertyAndBroadcast(nameof(IsRightHanded), hidden: !IsHandEnabled);
+            SetDataInputPropertyAndBroadcast(nameof(DisplayName), hidden: !IsHandEnabled);
+            SetDataInputPropertyAndBroadcast(nameof(CursorSmoothness), hidden: !IsHandEnabled);
+            SetDataInputPropertyAndBroadcast(nameof(CursorMode), hidden: !IsHandEnabled);
 
             isBasicSetupComplete = IsHandEnabled && Character != null && monitor != null;
+            SetDataInputPropertyAndBroadcast(nameof(NeutralHandPosition), hidden: !isBasicSetupComplete);
+            SetDataInputPropertyAndBroadcast(nameof(HandMouseMode), hidden: !isBasicSetupComplete);
+            SetDataInputPropertyAndBroadcast(nameof(HandPenMode), hidden: !isBasicSetupComplete);
+            SetDataInputPropertyAndBroadcast(nameof(HandDynamicRotation), hidden: !isBasicSetupComplete);
+            SetDataInputPropertyAndBroadcast(nameof(IsPropEnabled), hidden: !isBasicSetupComplete);
+            SetDataInputPropertyAndBroadcast(nameof(IsBodyEnabled), hidden: !isBasicSetupComplete);
+            SetDataInputPropertyAndBroadcast(nameof(PointerFactorCorrection), hidden: !isBasicSetupComplete);
+            SetDataInputPropertyAndBroadcast(nameof(DebugSphereScaleFactor), hidden: !isBasicSetupComplete);
 
-            GetDataInputPort(nameof(NeutralHandPosition)).Properties.hidden = !isBasicSetupComplete;
-            GetDataInputPort(nameof(HandMouseMode)).Properties.hidden = !isBasicSetupComplete;
-            GetDataInputPort(nameof(HandPenMode)).Properties.hidden = !isBasicSetupComplete;
-            GetDataInputPort(nameof(HandDynamicRotation)).Properties.hidden = !isBasicSetupComplete;
-            BroadcastDataInputProperties(nameof(NeutralHandPosition));
-            BroadcastDataInputProperties(nameof(HandMouseMode));
-            BroadcastDataInputProperties(nameof(HandPenMode));
-            BroadcastDataInputProperties(nameof(HandDynamicRotation));
-
-            GetDataInputPort(nameof(IsPropEnabled)).Properties.hidden = !isBasicSetupComplete;
-            BroadcastDataInputProperties(nameof(IsPropEnabled));
+            OnSurfaceSettingChange();
             OnPropEnabledChanged();
-
-            GetDataInputPort(nameof(IsBodyEnabled)).Properties.hidden = !isBasicSetupComplete;
-            BroadcastDataInputProperties(nameof(IsBodyEnabled));
             OnBodyEnabledChanged();
-
-            GetDataInputPort(nameof(PointerFactorCorrection)).Properties.hidden = !isBasicSetupComplete;
-            GetDataInputPort(nameof(DebugSphereScaleFactor)).Properties.hidden = !isBasicSetupComplete;
-            BroadcastDataInputProperties(nameof(PointerFactorCorrection));
-            BroadcastDataInputProperties(nameof(DebugSphereScaleFactor));
             OnDebugSettingChange();
         }
 
         void OnSurfaceSettingChange() {
-            screenAsset = GetSurfaceScreen();
-            screenAsset.DataInputPortCollection.SetValueAtPath("DisplayName", DisplayName, true);
-            screenAsset.DataInputPortCollection.SetValueAtPath("Enabled", true, true);
 
+            // Screen check
+            screenAsset = GetSurfaceScreen();
+            if (screenAsset == null) return;
+
+            bool isDisplayMustBeVisible = IsEnabled && IsHandEnabled;
+            if (isDisplayMustBeVisible || IsScreenDisableBasedOnAssetStateWanted) {
+                screenAsset.DataInputPortCollection.SetValueAtPath("Enabled", isDisplayMustBeVisible, true);
+                screenAsset.DataInputPortCollection.SetValueAtPath("DisplayName", DisplayName, true);
+            }
+
+            // Bind cursor anchor to screen
             cursorAnchorAsset = GetCursorAnchor();
             cursorAnchorAsset.Attachable.Parent = screenAsset;
 
+            // Monitor data check
             monitor = Manager.monitors.FirstOrDefault((Monitor it) => it.name == DisplayName);
             if (monitor == null) return;
 
+            // Set parameters based on display data
             cursorToScreenCenterOffset = new Vector2(
                 (monitor.left + monitor.right) * 0.5f,
                 (monitor.bottom + monitor.top) * 0.5f
@@ -371,6 +370,12 @@ namespace FlameStream
 
         T GetAsset<T>(ref Guid assetId, out bool isNewlyCreated, bool skipAutoCreate = false, string newAssetName = null) where T : Asset  {
             isNewlyCreated = false;
+
+            // Return null if Scene is not ready yet (during creation)
+            if (Scene == null) {
+                return null;
+            }
+
             if (assetId != Guid.Empty) {
                 var id = assetId;
                 var fetchResult = Scene.GetAssets<T>().FirstOrDefault(p => p.Id == id);

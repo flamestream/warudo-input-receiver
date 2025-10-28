@@ -34,7 +34,6 @@ namespace FlameStream {
                         ButtonDefinitionsReference[d.Index] = d;
                     }
                 });
-                // Context.Service.Toast(Warudo.Core.Server.ToastSeverity.Info, "ButtonDefinitions Watcher", "Changed!");
             }, false);
             Watch(nameof(SwitchDefinitions), delegate {
                 Array.Clear(SwitchDefinitionsReference, 0, SwitchDefinitionsReference.Length);
@@ -317,9 +316,9 @@ namespace FlameStream {
             }
 
             if (newManagedLayers.Count > 0) {
-                Context.Service.Toast(Warudo.Core.Server.ToastSeverity.Info, Name, $"CHARACTER_ANIMATION_LAYERS_SETUP_NOTIFICATION".Localized(new object[] {newManagedLayers.Count}));
+                ShowToast($"CHARACTER_ANIMATION_LAYERS_SETUP_NOTIFICATION".Localized(new object[] {newManagedLayers.Count}));
             } else {
-                Context.Service.Toast(Warudo.Core.Server.ToastSeverity.Info, Name, $"CHARACTER_ANIMATION_LAYERS_CLEANED_NOTIFICATION");
+                ShowToast($"CHARACTER_ANIMATION_LAYERS_CLEANED_NOTIFICATION");
             }
 
             Character.SetDataInput($"{nameof(Character.OverlappingAnimations)}", unmanagedLayers.ToArray(), true);
