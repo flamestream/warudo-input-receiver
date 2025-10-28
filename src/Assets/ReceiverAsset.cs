@@ -36,6 +36,11 @@ namespace FlameStream {
         [Label("PORT")]
         public int Port;
 
+        [Section("ADVANCED")]
+        [DataInput(1000)]
+        [Label("RECEIVER_ASSET_DEBUG_TOAST_WANTED")]
+        public bool IsDebugToastWanted;
+
         public bool IsReceiving {
             get {
                 return lastState != null;
@@ -202,6 +207,37 @@ namespace FlameStream {
             return null; // Valid new format
         }
 
+        protected void SetDataInputPropertyAndBroadcast(
+            string portName,
+            bool? hidden = null,
+            bool? alwaysHidden = null,
+            bool? disabled = null,
+            bool? alwaysDisabled = null,
+            string description = null
+        ) {
+            if (hidden != null)
+                GetDataInputPort(portName).Properties.hidden = hidden.Value;
+            if (alwaysHidden != null)
+                GetDataInputPort(portName).Properties.alwaysHidden = alwaysHidden.Value;
+            if (disabled != null)
+                GetDataInputPort(portName).Properties.disabled = disabled.Value;
+            if (alwaysDisabled != null)
+                GetDataInputPort(portName).Properties.alwaysDisabled = alwaysDisabled.Value;
+            if (description != null)
+                GetDataInputPort(portName).Properties.description = description;
+
+            BroadcastDataInputProperties(portName);
+        }
+
+        protected void ShowToast(
+            string message,
+            Warudo.Core.Server.ToastSeverity severity = Warudo.Core.Server.ToastSeverity.Info
+        ) {
+            if (!IsDebugToastWanted) return;
+            Warudo.Core.Context.Service.Toast(severity, Name, message);
+        }
+
         abstract protected void Log(string msg);
+
     }
 }

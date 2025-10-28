@@ -33,6 +33,7 @@ namespace FlameStream
 
 
         void OnCreateMoveHand() {
+            Watch(nameof(IsEnabled), delegate { OnInputAffectingHandSetupChange(); });
             Watch(nameof(IsHandEnabled), delegate { OnInputAffectingHandSetupChange(); });
             Watch(nameof(IsRightHanded), delegate { OnInputAffectingHandSetupChange(); });
             Watch(nameof(Character), delegate { OnInputAffectingHandSetupChange(); });
@@ -159,10 +160,11 @@ namespace FlameStream
         }
 
         void OnInputAffectingHandSetupChange() {
+            if (!IsEnabled) return;
             if (!isReady) return;
             if (Character == null) return;
 
-            var isHandEnabled = IsHandEnabled && !isHandDisabledByOutOfBound;
+            var isHandEnabled = IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound;
             if (!isHandEnabled) {
                 handState = null;
                 OnHandStateChange();
