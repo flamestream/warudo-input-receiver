@@ -268,6 +268,9 @@ namespace FlameStream
 
         void OnSurfaceSettingChange() {
 
+            // Scene check
+            if (Scene == null) return;
+
             // Screen check
             screenAsset = GetSurfaceScreen();
             if (screenAsset == null) return;
