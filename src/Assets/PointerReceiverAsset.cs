@@ -155,29 +155,29 @@ namespace FlameStream {
         /// <summary>
         /// ADVANCED
         /// </summary>
-        [DataInput(1000)]
+        [DataInput(1001)]
         [Label("POINTER_RECEIVER_CONTROL_SCREEN_VISIBILITY")]
         public bool IsScreenDisableBasedOnAssetStateWanted;
 
-        [DataInput(1000)]
+        [DataInput(1001)]
         [Label("POINTER_FACTOR_CORRECTION")]
         [Description("POINTER_FACTOR_CORRECTION_DESC")]
         [FloatSlider(0.01f, 2f, 0.01f)]
         public float PointerFactorCorrection = 1;
 
-        [DataInput(1000)]
+        [DataInput(1001)]
         [Label("DEBUG_MODE_SCALE_FACTOR")]
         [FloatSlider(0.01f, 10f, 0.01f)]
         public float DebugSphereScaleFactor = 1;
 
-        [Trigger(1000)]
+        [Trigger(1001)]
         [Label("FORCE_DEBUG_MODE")]
         public void TriggerForceDebugSpheres() {
             DisplayDebugSpheres(true);
             OnDebugSettingChange();
         }
 
-        [Trigger(1000)]
+        [Trigger(1001)]
         [Hidden]
         [Label("DISABLE_DEBUG_MODE")]
         public void TriggerDestroyDebugSpheres() {

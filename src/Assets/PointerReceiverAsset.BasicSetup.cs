@@ -23,15 +23,12 @@ namespace FlameStream
         public Guid CursorAnchorAssetId;
 
         public const string LAYER_NAME_PREFIX = "🔥👆";
-        const float SCREEN_PIXEL_TO_WORLD_FACTOR = 0.00177f;
         static Vector3 IK_BASIS_LEFT_HANDED = new Vector3(0, -90f, -90f);
         static Vector3 IK_BASIS_RIGHT_HANDED = new Vector3(0, 90f, 90f);
 
         Monitor monitor;
         DrawingScreenAsset screenAsset;
         AnchorAsset cursorAnchorAsset;
-        Vector2 cursorToScreenCenterOffset;
-        Vector2 cursorToScreenScaleFactor;
         Tween cursorMoveTween;
 
         GameObject calculator;
@@ -148,8 +145,8 @@ namespace FlameStream
                 adjustedY = Y;
             }
 
-            var inX = Mathf.Clamp(adjustedX, monitor.left, monitor.right);
-            var inY = Mathf.Clamp(adjustedY, monitor.top, monitor.bottom);
+            var inX = Mathf.Clamp(adjustedX, monitor.left - (int)CursorMode.BoundOffsets.x, monitor.right + (int)CursorMode.BoundOffsets.z);
+            var inY = Mathf.Clamp(adjustedY, monitor.top - (int)CursorMode.BoundOffsets.y, monitor.bottom + (int)CursorMode.BoundOffsets.w);
             isOutOfBound = inX != X || inY != Y;
 
 
@@ -192,12 +189,7 @@ namespace FlameStream
                 anchorTransform.Position = NeutralHandPosition.setupAnchor?.Transform.Position ?? NeutralHandPosition.Position;
             } else {
 
-                // Follow pointer
-                var targetPlanarPosition = new Vector3(
-                    -(adjustedX - cursorToScreenCenterOffset.x) * screenAsset.Transform.Scale.x * SCREEN_PIXEL_TO_WORLD_FACTOR,
-                    -(adjustedY - cursorToScreenCenterOffset.y) * screenAsset.Transform.Scale.y * SCREEN_PIXEL_TO_WORLD_FACTOR,
-                    0
-                ) * PointerFactorCorrection;
+                var targetPlanarPosition = screenAsset.GetChildCursorPosition(adjustedX, adjustedY) * PointerFactorCorrection;
 
                 cursorMoveTween?.Kill();
                 if (CursorSmoothness == 0) {
@@ -288,16 +280,6 @@ namespace FlameStream
             // Monitor data check
             monitor = Manager.monitors.FirstOrDefault((Monitor it) => it.name == DisplayName);
             if (monitor == null) return;
-
-            // Set parameters based on display data
-            cursorToScreenCenterOffset = new Vector2(
-                (monitor.left + monitor.right) * 0.5f,
-                (monitor.bottom + monitor.top) * 0.5f
-            );
-            cursorToScreenScaleFactor = new Vector2(
-                monitor.widthMeter,
-                monitor.heightMeter
-            );
         }
 
         void OnDebugSettingChange() {
