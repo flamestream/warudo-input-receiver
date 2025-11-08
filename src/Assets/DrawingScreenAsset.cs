@@ -13,8 +13,7 @@ namespace FlameStream {
         /// </summary>
         const float LEGACY_SCREEN_PIXEL_TO_WORLD_FACTOR = 0.00177f;
 
-        public DrawingScreenAsset()
-        {
+        public DrawingScreenAsset() {
             ContentType = ScreenContentType.Display;
             Bend = false;
         }
