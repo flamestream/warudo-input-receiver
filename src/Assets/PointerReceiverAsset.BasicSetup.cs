@@ -189,19 +189,19 @@ namespace FlameStream
                 anchorTransform.Position = NeutralHandPosition.setupAnchor?.Transform.Position ?? NeutralHandPosition.Position;
             } else {
 
-                var cursorPosition = screenAsset.GetChildCursorPosition(adjustedX, adjustedY) * PointerFactorCorrection;
+                var targetPlanarPosition = screenAsset.GetChildCursorPosition(adjustedX, adjustedY) * PointerFactorCorrection;
 
                 // Follow pointer
                 var targetPlanarPosition = cursorPosition * PointerFactorCorrection;
 
                 cursorMoveTween?.Kill();
                 if (CursorSmoothness == 0) {
-                    cursorScreenPosition = cursorPosition;
+                    cursorScreenPosition = targetPlanarPosition;
                 } else {
                     cursorMoveTween = DOTween.To(
                         () => cursorScreenPosition,
                         delegate(Vector3 it) { cursorScreenPosition = it; },
-                        cursorPosition,
+                        targetPlanarPosition,
                         CursorSmoothness
                     ).SetEase(Ease.Linear);
                 }
