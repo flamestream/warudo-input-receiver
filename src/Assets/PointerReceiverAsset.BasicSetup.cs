@@ -145,8 +145,8 @@ namespace FlameStream
                 adjustedY = Y;
             }
 
-            var inX = Mathf.Clamp(adjustedX, monitor.left - (int)CursorMode.BoundOffsets.x, monitor.right - (int)CursorMode.BoundOffsets.z);
-            var inY = Mathf.Clamp(adjustedY, monitor.top - (int)CursorMode.BoundOffsets.y, monitor.bottom - (int)CursorMode.BoundOffsets.w);
+            var inX = Mathf.Clamp(adjustedX, monitor.left - (int)CursorMode.BoundOffsets.x, monitor.right + (int)CursorMode.BoundOffsets.z);
+            var inY = Mathf.Clamp(adjustedY, monitor.top - (int)CursorMode.BoundOffsets.y, monitor.bottom + (int)CursorMode.BoundOffsets.w);
             isOutOfBound = inX != X || inY != Y;
 
 
