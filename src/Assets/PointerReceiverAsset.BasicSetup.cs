@@ -191,9 +191,6 @@ namespace FlameStream
 
                 var targetPlanarPosition = screenAsset.GetChildCursorPosition(adjustedX, adjustedY) * PointerFactorCorrection;
 
-                // Follow pointer
-                var targetPlanarPosition = cursorPosition * PointerFactorCorrection;
-
                 cursorMoveTween?.Kill();
                 if (CursorSmoothness == 0) {
                     cursorScreenPosition = targetPlanarPosition;
