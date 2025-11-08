@@ -17,7 +17,7 @@ namespace FlameStream
 
         [DataInput]
         [Label("OOB_HANDLING")]
-        public OutOfBoundRawTrackingHandlingValue OutOfBoundRawTrackingHandling = OutOfBoundRawTrackingHandlingValue.Overflow;
+        public OutOfBoundRawTrackingHandlingValue OutOfBoundRawTrackingHandling;
         public enum OutOfBoundRawTrackingHandlingValue {
             [Label("CURSOR_MODE_RAW_OOB_OVERFLOW")]
             Overflow = 0,
