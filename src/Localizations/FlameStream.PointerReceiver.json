@@ -55,7 +55,7 @@
         "CROSS_BUTTON": "Cross",
         "CURSOR_MODE_BOUND_OFFSETS": "Bound Offsets",
         "CURSOR_MODE_BOUND_OFFSETS_DESC": "Adjust the cursor boundary by setting offsets for left, top, right, and bottom edges (in that order, in pixels). This allows fine-tuning of the active area for cursor movement.",
-        "CURSOR_MODE_FIXED_DELTA_DESC": "Cursor moves based on fixed delta from center position. Designed for FPS game. ",
+        "CURSOR_MODE_FIXED_DELTA_DESC": "Cursor moves based on fixed delta from center position. Designed for FPS game.",
         "CURSOR_MODE_FIXED_DELTA": "FPS Mode",
         "CURSOR_MODE_FIXED_OOB_BACK_TO_CENTER_DESC": "Returns the cursor to the center of the screen when it goes out of bounds.",
         "CURSOR_MODE_FIXED_OOB_BACK_TO_CENTER": "Return to Center",
