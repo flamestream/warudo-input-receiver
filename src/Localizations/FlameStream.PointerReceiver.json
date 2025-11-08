@@ -63,7 +63,7 @@
         "CURSOR_MODE_FIXED_OOB_CLAMP": "Clamp to Edge",
         "CURSOR_MODE_RAW_OOB_CLAMP_DESC": "Prevent the cursor from going out of bounds by clamping it to the edge of the screen.",
         "CURSOR_MODE_RAW_OOB_CLAMP": "Clamp to Edge",
-        "CURSOR_MODE_RAW_OOB_DISABLE_HAND_DESC": "Go back to neutral hand position while the cursor goes out of bounds.",
+        "CURSOR_MODE_RAW_OOB_DISABLE_HAND_DESC": "Go back to neutral hand position when the cursor goes out of bounds.",
         "CURSOR_MODE_RAW_OOB_DISABLE_HAND": "Disable Hand Movement",
         "CURSOR_MODE_RAW_OOB_FREEZE_DESC": "Freezes the hand position when the cursor goes out of bounds.",
         "CURSOR_MODE_RAW_OOB_FREEZE": "Freeze at Edge",
