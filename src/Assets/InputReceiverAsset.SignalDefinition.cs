@@ -464,8 +464,8 @@ namespace FlameStream {
         public class SignalDefinitionGenerationFromProp : StructuredData<SignalDefinitionGenerationSection>, ICollapsibleStructuredData {
 
             [Trigger]
-            [Label("IMPORT_SIGNAL_DEFINITIONS_FROM_PROP")]
-            [Description("IMPORT_SIGNAL_DEFINITIONS_FROM_PROP_DESCRIPTION")]
+            [Label("IMPORT_FROM_PROP")]
+            [Description("IMPORT_FROM_PROP_DESCRIPTION")]
             public async void TriggerImportSignalDefinitionsFromProp() {
                 await Parent.Parent.ImportSignalDefinitionsFromProp();
             }
