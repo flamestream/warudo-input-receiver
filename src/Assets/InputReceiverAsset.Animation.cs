@@ -56,11 +56,13 @@ namespace FlameStream
                         }
 
                         case SwitchDefinition switchDefinition: {
+                            // Get the current active switch direction (0=none, 1=up, 2=up-right, 3=right, 4=down-right, 5=down, 6=down-left, 7=left, 8=up-left)
                             var activeSubSwitchIndex = GetSwitchLastChangeSubIndex(switchDefinition.Index, 0);
-                            // There is no base active animation for switch, so defer genetric animation logic to subswitch data
+                            // There is no base active animation for switch, so defer generic animation logic to subswitch data
                             activeAnimationData = switchDefinition.GetCharacterActiveSubAnimationData(activeSubSwitchIndex);
                             activeTransition = switchDefinition.GetCharacterActiveTransition();
 
+                            // Get the previously active switch direction that needs to be deactivated
                             var inactiveSubSwitchIndex = GetSwitchLastChangeSubIndex(switchDefinition.Index, 1);
                             setAnimationtoEnd = inactiveSubSwitchIndex != 0;
 
@@ -86,7 +88,9 @@ namespace FlameStream
                                     ProcessAnimation(inactiveSubHoverAnimationData2, subHoverTransition, 0f);
                                 }
                             }
+                            // Activate prop animation for the new switch direction (weight = 1.0)
                             ProcessPropAnimation(switchDefinition.GetPropSubAnimationData(activeSubSwitchIndex), switchDefinition.GetPropActiveSubTransition(activeSubSwitchIndex), 1f);
+                            // Deactivate prop animation for the previous switch direction (weight = 0.0)
                             ProcessPropAnimation(switchDefinition.GetPropSubAnimationData(inactiveSubSwitchIndex), switchDefinition.GetPropInactiveSubTransition(inactiveSubSwitchIndex), 0f);
                             break;
                         }
@@ -159,14 +163,15 @@ namespace FlameStream
                     // Special additional operations
                     switch (currentSignal) {
                         case SwitchDefinition switchDefinition:
-                            // Special sub-switch sub-index handling
-                            var lastSubSwitchIndex = GetSwitchSubIndex(switchDefinition.Index, 1);
+                            var lastSubSwitchIndex = GetSwitchLastChangeSubIndex(switchDefinition.Index, 1);
                             var activeSubAnimationData = switchDefinition.GetCharacterActiveSubAnimationData(lastSubSwitchIndex);
                             var activeSubTransition = switchDefinition.GetCharacterActiveTransition();
+                            // Reset character animation weight to 0 for the previously active switch direction
                             ProcessAnimation(activeSubAnimationData, activeSubTransition, 0f);
+                            // Reset prop animation weight to 0 for the previously active switch direction
                             ProcessPropAnimation(
                                 switchDefinition.GetPropSubAnimationData(lastSubSwitchIndex),
-                                switchDefinition.GetPropInactiveTransition(),
+                                switchDefinition.GetPropInactiveSubTransition(lastSubSwitchIndex), // Use sub-specific transition method
                                 0f
                             );
                             break;

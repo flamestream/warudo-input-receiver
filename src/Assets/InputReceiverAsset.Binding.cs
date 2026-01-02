@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Runtime.Remoting.Channels;
 using DG.Tweening;
 using UnityEngine;
 using Warudo.Core;
@@ -8,6 +9,7 @@ using Warudo.Core.Data;
 using Warudo.Core.Data.Models;
 using Warudo.Core.Localization;
 using Warudo.Core.Scenes;
+using Warudo.Core.UI;
 using Warudo.Plugins.Core.Assets;
 using Warudo.Plugins.Core.Assets.Utility;
 using static Warudo.Plugins.Core.Assets.Character.CharacterAsset;
@@ -18,6 +20,11 @@ namespace FlameStream
 
         bool IsAssetChangeRequested;
         Tween IkTween;
+
+        // Track previous state to detect enable/disable transitions
+        bool PreviousIsEnabled = false;
+        bool PreviousIsControlEnabled = false;
+        bool HasInitializedState = false;
 
         [DataInput]
         [Hidden]
@@ -69,28 +76,66 @@ namespace FlameStream
         }
 
         void OnUpdateBinding() {
-            if (IsAssetChangeRequested) {
-                IsAssetChangeRequested = false;
-                var enable = IsEnabled && IsControlEnabled && Character != null;
-                if (enable) {
+            // Initialize state tracking on first run (startup)
+            if (!HasInitializedState) {
+                PreviousIsEnabled = IsEnabled;
+                PreviousIsControlEnabled = IsControlEnabled;
+                HasInitializedState = true;
+                return; // Don't process anything on startup
+            }
+
+            // Check for state transitions
+            var currentEnabled = IsEnabled && IsControlEnabled;
+            var previousEnabled = PreviousIsEnabled && PreviousIsControlEnabled;
+
+            // Only trigger changes when there's an actual state transition
+            if (currentEnabled != previousEnabled || IsAssetChangeRequested) {
+                if (IsAssetChangeRequested) {
+                    IsAssetChangeRequested = false;
+                }
+
+                var enable = currentEnabled && Character != null;
+                if (enable && !previousEnabled) {
+                    // Transitioning from disabled to enabled
                     FadeInControl();
-                } else {
+                } else if (!enable && previousEnabled) {
+                    // Transitioning from enabled to disabled
                     FadeOutControl();
                 }
             }
+
+            // Update previous state
+            PreviousIsEnabled = IsEnabled;
+            PreviousIsControlEnabled = IsControlEnabled;
         }
 
-        void SetupLimb(LimbIKData limb, float? weight, AnchorAsset anchor, AnchorAsset bendGoalTarget) {
+        void SetupLimbIkTarget(LimbIKData limb, AnchorAsset anchor, float? weight) {
 
             if (weight != null) {
                 var w = weight.Value;
                 limb.PositionWeight = w;
                 limb.RotationWeight = w;
-                limb.BendGoalWeight = w;
             }
             limb.IkTarget = anchor;
+            limb.Broadcast();
+        }
+
+        void SetupLimbBendGoalTarget(LimbIKData limb, AnchorAsset bendGoalTarget, float? weight) {
+
+            if (weight != null) {
+                var w = weight.Value;
+                limb.BendGoalWeight = w;
+            }
             limb.BendGoalTarget = bendGoalTarget;
             limb.Broadcast();
+        }
+
+        void SetupLeftLimbBendGoalTarget(AnchorAsset bendGoalTarget, float? weight = null) {
+            SetupLimbBendGoalTarget(Character.LeftHandIK, bendGoalTarget, weight);
+        }
+
+        void SetupRightLimbBendGoalTarget(AnchorAsset bendGoalTarget, float? weight = null) {
+            SetupLimbBendGoalTarget(Character.RightHandIK, bendGoalTarget, weight);
         }
 
         void TransitionIkLimbs(bool isEnabledWanted, Transition transition, TweenCallback onComplete = null) {
@@ -219,8 +264,14 @@ namespace FlameStream
             leftHandAnchor.Attachable.Parent = targetAnchor;
             rightHandAnchor.Attachable.Parent = targetAnchor;
 
-            SetupLimb(Character.LeftHandIK, 0f, leftHandAnchor, AdvancedOptions.LeftHandIkBendGoalTarget);
-            SetupLimb(Character.RightHandIK, 0f, rightHandAnchor, AdvancedOptions.RightHandIkBendGoalTarget);
+            SetupLimbIkTarget(Character.LeftHandIK, leftHandAnchor, 0f);
+            SetupLimbIkTarget(Character.RightHandIK, rightHandAnchor, 0f);
+
+            var bendGoalControlOptions = AdvancedOptions.BendGoalControlOptionsInstance;
+            if (bendGoalControlOptions.IsEnabled) {
+                SetupLeftLimbBendGoalTarget(bendGoalControlOptions.LeftHandIkBendGoalTarget, 0f);
+                SetupRightLimbBendGoalTarget(bendGoalControlOptions.RightHandIkBendGoalTarget, 0f);
+            }
 
             moverAnchor.Broadcast();
             targetAnchor.Broadcast();
@@ -279,6 +330,9 @@ namespace FlameStream
 
         void FadeOutControl() {
 
+            // Clear managed character animation layers immediately when disabling
+            RequestCharacterAnimationChange();
+
             // Detach prop
             Helper.UnsetParent(HeldProp);
             var prefix = $"{CHARACTER_ANIM_LAYER_ID_PREFIX}🔒 ";
@@ -296,13 +350,18 @@ namespace FlameStream
                 var leftIk = Character.LeftHandIK;
                 leftIk.Enabled = false;
                 leftIk.IkTarget = null;
-                leftIk.BendGoalTarget = null;
+
+                if (AdvancedOptions.BendGoalControlOptionsInstance.IsEnabled) {
+                    leftIk.BendGoalTarget = null;
+                }
                 leftIk.Broadcast();
 
                 var rightIk = Character.RightHandIK;
                 rightIk.Enabled = false;
                 rightIk.IkTarget = null;
-                rightIk.BendGoalTarget = null;
+                if (AdvancedOptions.BendGoalControlOptionsInstance.IsEnabled) {
+                    rightIk.BendGoalTarget = null;
+                }
                 rightIk.Broadcast();
 
                 ClearAllSceneAssets();
@@ -331,18 +390,20 @@ namespace FlameStream
 
         public class AdvancedBindings : StructuredData<InputReceiverAsset>, ICollapsibleStructuredData {
 
+            protected override void OnCreate() {
+                base.OnCreate();
+                BendGoalControlOptionsInstance.Parent = Parent;
+
+                Watch(nameof(BendGoalControlOptionsInstance), HandleBendGoalControlOptionsChanged);
+            }
+
             [DataInput]
             [Label("HOLD_PROP_IN_RIGHT_HAND")]
             public bool IsPropHeldInRightHandWanted;
 
-
             [DataInput]
-            [Label("LEFT_HAND_BEND_GOAL_TARGET")]
-            public AnchorAsset LeftHandIkBendGoalTarget;
-
-            [DataInput]
-            [Label("RIGHT_HAND_BEND_GOAL_TARGET")]
-            public AnchorAsset RightHandIkBendGoalTarget;
+            [Label("BEND_GOAL_CONTROLS")]
+            public BendGoalControlOptions BendGoalControlOptionsInstance;
 
             [DataInput]
             [Label("ENTER_TRANSITION")]
@@ -362,6 +423,17 @@ namespace FlameStream
 
             public string GetHeader() {
                 return "ADVANCED_OPTIONS";
+            }
+
+            void HandleBendGoalControlOptionsChanged() {
+                // Character control check
+                if (!Parent.IsCharacterControlActive) return;
+
+                // Bend goal controls check
+                if (!BendGoalControlOptionsInstance.IsEnabled) return;
+
+                Parent.SetupLeftLimbBendGoalTarget(BendGoalControlOptionsInstance.LeftHandIkBendGoalTarget);
+                Parent.SetupRightLimbBendGoalTarget(BendGoalControlOptionsInstance.RightHandIkBendGoalTarget);
             }
         }
 
@@ -388,6 +460,22 @@ namespace FlameStream
             public string GetHeader() {
                 return "SAVED_BINDINGS_DATA";
             }
+        }
+
+        public class BendGoalControlOptions : StructuredData<InputReceiverAsset> {
+
+            [DataInput]
+            [Label("ENABLED")]
+            [Description("BEND_GOAL_CONTROLS_OPTIONS_ENABLED_DESCRIPTION")]
+            public bool IsEnabled;
+
+            [DataInput]
+            [Label("LEFT_HAND_IK_BEND_GOAL_TARGET")]
+            public AnchorAsset LeftHandIkBendGoalTarget;
+
+            [DataInput]
+            [Label("RIGHT_HAND_IK_BEND_GOAL_TARGET")]
+            public AnchorAsset RightHandIkBendGoalTarget;
         }
     }
 }

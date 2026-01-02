@@ -13,10 +13,10 @@ namespace FlameStream
 {
     public abstract partial class InputReceiverAsset : ReceiverAsset {
 
-        protected abstract SignalProfileType[] SupportedProfileTypes { get; }
-        protected abstract void GenerateButtonDefinitions(SignalProfileType profile);
+        protected abstract SignalTemplateType[] SupportedProfileTypes { get; }
+        protected abstract void GenerateButtonDefinitions(SignalTemplateType profile);
 
-        public enum SignalProfileType {
+        public enum SignalTemplateType {
             [Label("CONTROLLER_NINTENDO_SWITCH_PRO")]
             SwitchProController,
             [Label("CONTROLLER_XBOX_SERIES_XS")]
@@ -53,7 +53,7 @@ namespace FlameStream
 
         protected override void OnCreate() {
             base.OnCreate();
-            SignalDefinitionGeneration.Parent = this;
+            SignalDefinitionGenerationSectionInstance.Parent = this;
             OnCreateSignalDefinition();
             OnCreateAnimation();
 
@@ -70,6 +70,8 @@ namespace FlameStream
             OnUpdatePropMotion();
         }
 
+        public bool IsCharacterControlActive => IsEnabled && IsStateSaved && IsControlEnabled;
+
         protected override void Log(string msg) {
             Debug.Log($"[FlameStream.Asset.GameInputReceiver] {msg}");
         }
@@ -77,6 +79,74 @@ namespace FlameStream
         [Hidden]
         [DataInput]
         public int AssetVersion = CURRENT_ASSET_VERSION;
+
+        /// <summary>
+        /// BINDING
+        /// </summary>
+        [Section("BINDING")]
+
+        [Markdown]
+        [HiddenIf(nameof(IsStateSaved), Is.True)]
+        public string BindingInstructions = "BINDING_DESC".Localized(new object[] {
+            "CHARACTER".Localized(),
+            "PROP".Localized(),
+            "SAVE_STATE".Localized(),
+            "ENABLE_CONTROL".Localized(),
+        });
+
+        [DataInput]
+        [Label("ENABLE_CONTROL")]
+        [HiddenIf(nameof(IsStateSaved), Is.False)]
+        [Description("ENABLE_CONTROL_DESC")]
+        public bool IsControlEnabled;
+
+        [Trigger]
+        [HiddenIf(nameof(IsStateSaved), Is.False)]
+        [Label("RESET_STATE")]
+        public void TriggerResetState() {
+            FadeInControl();
+        }
+
+        [DataInput]
+        [Label("CHARACTER")]
+        [Description("BINDING_CHARACTER_DESC")]
+        [DisabledIf(nameof(IsStateSaved), Is.True)]
+        public CharacterAsset Character;
+
+        [DataInput]
+        [Label("PROP")]
+        [Description("BINDING_PROP_DESC")]
+        [DisabledIf(nameof(IsStateSaved), Is.True)]
+        public PropAsset HeldProp;
+
+        [Trigger]
+        [DisabledIf(nameof(CheckIsBindingSetupInputMissing))]
+        [HiddenIf(nameof(IsStateSaved), Is.True)]
+        [Label("SAVE_STATE")]
+        public void TriggerSaveState() {
+            RecordState();
+        }
+
+        [DataInput]
+        [Label("EXTRA")]
+        [HiddenIf(nameof(IsStateSaved), Is.False)]
+        public AdvancedBindings AdvancedOptions;
+
+        [DataInput]
+        [Hidden]
+        public bool IsStateSaved;
+
+        [DataInput]
+        [Label("")]
+        [HiddenIf(nameof(IsStateSaved), Is.False)]
+        public BindingDefinitions SavedBindingData;
+
+        [Trigger]
+        [Label("CLEAR_SAVED_STATE")]
+        [HiddenIf(nameof(IsStateSaved), Is.False)]
+        public void TriggerClearSavedState() {
+            ClearSavedState();
+        }
 
         /// <summary>
         /// SIGNAL DEFINITIONS
@@ -88,7 +158,7 @@ namespace FlameStream
 
         [Label("QUICK_SETUP")]
         [DataInput]
-        public SignalDefinitionGenerationSection SignalDefinitionGeneration;
+        public SignalDefinitionGenerationSection SignalDefinitionGenerationSectionInstance;
 
         [DataInput]
         [Label("BUTTON_DEFINITIONS")]
@@ -224,75 +294,6 @@ namespace FlameStream
             if (wantedLargestId != targetLargestId) {
                 Context.Service.PromptMessage("ERROR", $"You may not have more than {MAX_AXIS_COUNT} axes defined.");
             }
-        }
-
-
-        /// <summary>
-        /// BINDING
-        /// </summary>
-        [Section("BINDING")]
-
-        [Markdown]
-        [HiddenIf(nameof(IsStateSaved), Is.True)]
-        public string BindingInstructions = "BINDING_DESC".Localized(new object[] {
-            "CHARACTER".Localized(),
-            "PROP".Localized(),
-            "SAVE_STATE".Localized(),
-            "ENABLE_CONTROL".Localized(),
-        });
-
-        [DataInput]
-        [Label("ENABLE_CONTROL")]
-        [HiddenIf(nameof(IsStateSaved), Is.False)]
-        [Description("ENABLE_CONTROL_DESC")]
-        public bool IsControlEnabled;
-
-        [Trigger]
-        [HiddenIf(nameof(IsStateSaved), Is.False)]
-        [Label("RESET_STATE")]
-        public void TriggerResetState() {
-            FadeInControl();
-        }
-
-        [DataInput]
-        [Label("CHARACTER")]
-        [Description("BINDING_CHARACTER_DESC")]
-        [DisabledIf(nameof(IsStateSaved), Is.True)]
-        public CharacterAsset Character;
-
-        [DataInput]
-        [Label("PROP")]
-        [Description("BINDING_PROP_DESC")]
-        [DisabledIf(nameof(IsStateSaved), Is.True)]
-        public PropAsset HeldProp;
-
-        [Trigger]
-        [DisabledIf(nameof(CheckIsBindingSetupInputMissing))]
-        [HiddenIf(nameof(IsStateSaved), Is.True)]
-        [Label("SAVE_STATE")]
-        public void TriggerSaveState() {
-            RecordState();
-        }
-
-        [DataInput]
-        [Label("EXTRA")]
-        [HiddenIf(nameof(IsStateSaved), Is.False)]
-        public AdvancedBindings AdvancedOptions;
-
-        [DataInput]
-        [Hidden]
-        public bool IsStateSaved;
-
-        [DataInput]
-        [Label("")]
-        [HiddenIf(nameof(IsStateSaved), Is.False)]
-        public BindingDefinitions SavedBindingData;
-
-        [Trigger]
-        [Label("CLEAR_SAVED_STATE")]
-        [HiddenIf(nameof(IsStateSaved), Is.False)]
-        public void TriggerClearSavedState() {
-            ClearSavedState();
         }
 
         /// <summary>

@@ -40,27 +40,27 @@ namespace FlameStream
             }
         }
 
-        protected override SignalProfileType[] SupportedProfileTypes {
+        protected override SignalTemplateType[] SupportedProfileTypes {
             get {
-                return new SignalProfileType[] {
-                    SignalProfileType.SwitchProController,
-                    SignalProfileType.Xbox360Controller,
-                    SignalProfileType.PS5Controller,
-                    SignalProfileType.EightBitDoPro2Controller,
-                    SignalProfileType.EightBitDoModKitGameCubeController,
-                    SignalProfileType.RetroFightersBattlerGcProController,
-                    SignalProfileType.PowerAGameCubeStyleForSwitchController,
+                return new SignalTemplateType[] {
+                    SignalTemplateType.SwitchProController,
+                    SignalTemplateType.Xbox360Controller,
+                    SignalTemplateType.PS5Controller,
+                    SignalTemplateType.EightBitDoPro2Controller,
+                    SignalTemplateType.EightBitDoModKitGameCubeController,
+                    SignalTemplateType.RetroFightersBattlerGcProController,
+                    SignalTemplateType.PowerAGameCubeStyleForSwitchController,
                 };
             }
         }
 
-        protected override void GenerateButtonDefinitions(SignalProfileType profile) {
+        protected override void GenerateButtonDefinitions(SignalTemplateType profile) {
             // Create a list of button definitions based on profile
             switch (profile) {
                 /**
                  * Switch Pro Controller
                  */
-                case SignalProfileType.SwitchProController:
+                case SignalTemplateType.SwitchProController:
                     SetDataInput(
                         nameof(ButtonDefinitions),
                         new ButtonDefinition[] {
@@ -535,71 +535,6 @@ namespace FlameStream
                                 });
                                 d.PropAnimation = StructuredData.Create<SwitchPropAnimationDefinition>(p => {
                                     p.D1 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D8";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D2 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D9";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D6";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D4 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D3";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D2";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D6 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D1";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
@@ -612,7 +547,33 @@ namespace FlameStream
                                             t.DelayTime = 0f;
                                         });
                                     });
-                                    p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                    p.D2 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D2";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D3";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D4 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D4";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
@@ -625,8 +586,47 @@ namespace FlameStream
                                             t.DelayTime = 0f;
                                         });
                                     });
-                                    p.D8 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                    p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D5";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D6 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D6";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D7";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D8 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D8";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
                                             t.Ease = Ease.OutCubic;
@@ -689,8 +689,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 +X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 -X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 X+";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 X-";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -713,8 +713,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -737,8 +737,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 +X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 -X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 X+";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 X-";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -761,8 +761,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -782,7 +782,7 @@ namespace FlameStream
                 /**
                  * Xbox 360 Controller
                  */
-                case SignalProfileType.Xbox360Controller:
+                case SignalTemplateType.Xbox360Controller:
                     SetDataInput(
                         nameof(ButtonDefinitions),
                         new ButtonDefinition[] {
@@ -1139,7 +1139,7 @@ namespace FlameStream
                                 });
                                 d.PropAnimation = StructuredData.Create<SwitchPropAnimationDefinition>(p => {
                                     p.D1 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D8";
+                                        pd.AnimatorLayerName = "D1";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
                                             t.Ease = Ease.OutCubic;
@@ -1152,7 +1152,7 @@ namespace FlameStream
                                         });
                                     });
                                     p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D6";
+                                        pd.AnimatorLayerName = "D3";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
                                             t.Ease = Ease.OutCubic;
@@ -1165,7 +1165,7 @@ namespace FlameStream
                                         });
                                     });
                                     p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D2";
+                                        pd.AnimatorLayerName = "D5";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
                                             t.Ease = Ease.OutCubic;
@@ -1178,7 +1178,7 @@ namespace FlameStream
                                         });
                                     });
                                     p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D4";
+                                        pd.AnimatorLayerName = "D7";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
                                             t.Ease = Ease.OutCubic;
@@ -1225,8 +1225,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 +X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 -X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 X+";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 X-";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -1249,8 +1249,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -1273,8 +1273,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 +X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 -X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 X+";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 X-";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -1297,8 +1297,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -1318,7 +1318,7 @@ namespace FlameStream
                 /**
                  * PS5 Controller
                  */
-                case SignalProfileType.PS5Controller:
+                case SignalTemplateType.PS5Controller:
                     SetDataInput(
                         nameof(ButtonDefinitions),
                         new ButtonDefinition[] {
@@ -1761,7 +1761,7 @@ namespace FlameStream
                                 });
                                 d.PropAnimation = StructuredData.Create<SwitchPropAnimationDefinition>(p => {
                                     p.D1 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D8";
+                                        pd.AnimatorLayerName = "D1";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
                                             t.Ease = Ease.OutCubic;
@@ -1774,7 +1774,7 @@ namespace FlameStream
                                         });
                                     });
                                     p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D6";
+                                        pd.AnimatorLayerName = "D3";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
                                             t.Ease = Ease.OutCubic;
@@ -1787,7 +1787,7 @@ namespace FlameStream
                                         });
                                     });
                                     p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D2";
+                                        pd.AnimatorLayerName = "D5";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
                                             t.Ease = Ease.OutCubic;
@@ -1800,7 +1800,7 @@ namespace FlameStream
                                         });
                                     });
                                     p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D4";
+                                        pd.AnimatorLayerName = "D7";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
                                             t.Ease = Ease.OutCubic;
@@ -1847,8 +1847,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 +X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 -X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 X+";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 X-";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -1871,8 +1871,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -1895,8 +1895,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 +X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 -X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 X+";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 X-";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -1919,8 +1919,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -1969,7 +1969,7 @@ namespace FlameStream
                  * 8BitDo Pro 2 Bluetooth Gamepad
                  * https://www.8bitdo.com/pro2/
                  */
-                case SignalProfileType.EightBitDoPro2Controller:
+                case SignalTemplateType.EightBitDoPro2Controller:
                     SetDataInput(
                         nameof(ButtonDefinitions),
                         new ButtonDefinition[] {
@@ -2358,71 +2358,6 @@ namespace FlameStream
                                 });
                                 d.PropAnimation = StructuredData.Create<SwitchPropAnimationDefinition>(p => {
                                     p.D1 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D8";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D2 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D9";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D6";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D4 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D3";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D2";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D6 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D1";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
@@ -2435,7 +2370,33 @@ namespace FlameStream
                                             t.DelayTime = 0f;
                                         });
                                     });
-                                    p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                    p.D2 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D2";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D3";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D4 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D4";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
@@ -2448,8 +2409,47 @@ namespace FlameStream
                                             t.DelayTime = 0f;
                                         });
                                     });
-                                    p.D8 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                    p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D5";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D6 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D6";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D7";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D8 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D8";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
                                             t.Ease = Ease.OutCubic;
@@ -2512,8 +2512,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 -X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 +X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 X-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 X+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -2536,8 +2536,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -2560,8 +2560,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 -X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 +X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 X-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 X+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -2584,8 +2584,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -2606,7 +2606,7 @@ namespace FlameStream
                  * 8BitDo Mod Kit for Original NGC Controller
                  * https://shop.8bitdo.com/products/mod-kit-for-original-ngc
                  */
-                case SignalProfileType.EightBitDoModKitGameCubeController:
+                case SignalTemplateType.EightBitDoModKitGameCubeController:
                     SetDataInput(
                         nameof(ButtonDefinitions),
                         new ButtonDefinition[] {
@@ -2984,71 +2984,6 @@ namespace FlameStream
                                 });
                                 d.PropAnimation = StructuredData.Create<SwitchPropAnimationDefinition>(p => {
                                     p.D1 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D8";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D2 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D9";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D6";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D4 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D3";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D2";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D6 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D1";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
@@ -3061,7 +2996,33 @@ namespace FlameStream
                                             t.DelayTime = 0f;
                                         });
                                     });
-                                    p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                    p.D2 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D2";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D3";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D4 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D4";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
@@ -3074,8 +3035,47 @@ namespace FlameStream
                                             t.DelayTime = 0f;
                                         });
                                     });
-                                    p.D8 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                    p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D5";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D6 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D6";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D7";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D8 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D8";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
                                             t.Ease = Ease.OutCubic;
@@ -3138,8 +3138,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 +X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 -X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 X+";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 X-";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -3162,8 +3162,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -3186,8 +3186,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 +X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 -X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 X+";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 X-";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -3210,8 +3210,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -3232,7 +3232,7 @@ namespace FlameStream
                  * Retro Fighters BattlerGC Pro
                  * https://retrofighters.com/our-collection/battlergc-pro/
                  */
-                case SignalProfileType.RetroFightersBattlerGcProController:
+                case SignalTemplateType.RetroFightersBattlerGcProController:
                     SetDataInput(
                         nameof(ButtonDefinitions),
                         new ButtonDefinition[] {
@@ -3621,71 +3621,6 @@ namespace FlameStream
                                 });
                                 d.PropAnimation = StructuredData.Create<SwitchPropAnimationDefinition>(p => {
                                     p.D1 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D8";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D2 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D9";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D6";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D4 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D3";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D2";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D6 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D1";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
@@ -3698,7 +3633,33 @@ namespace FlameStream
                                             t.DelayTime = 0f;
                                         });
                                     });
-                                    p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                    p.D2 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D2";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D3";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D4 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D4";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
@@ -3711,8 +3672,47 @@ namespace FlameStream
                                             t.DelayTime = 0f;
                                         });
                                     });
-                                    p.D8 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                    p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D5";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D6 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D6";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D7";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D8 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D8";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
                                             t.Ease = Ease.OutCubic;
@@ -3775,8 +3775,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 +X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 -X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 X+";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 X-";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -3799,8 +3799,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -3823,8 +3823,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 +X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 -X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 X+";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 X-";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -3847,8 +3847,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -3869,7 +3869,7 @@ namespace FlameStream
                  * PowerA GameCube Style Wired Controller for Nintendo Switch
                  * https://www.powera.com/p/nintendo/nintendo-switch/controllers/wired/wired-controller-for-nintendo-switch-gamecube/
                  */
-                case SignalProfileType.PowerAGameCubeStyleForSwitchController:
+                case SignalTemplateType.PowerAGameCubeStyleForSwitchController:
                     SetDataInput(
                         nameof(ButtonDefinitions),
                         new ButtonDefinition[] {
@@ -4344,71 +4344,6 @@ namespace FlameStream
                                 });
                                 d.PropAnimation = StructuredData.Create<SwitchPropAnimationDefinition>(p => {
                                     p.D1 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D8";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D2 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D9";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D6";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D4 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D3";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                        pd.AnimatorLayerName = "D2";
-                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                            t.Time = 0.05f;
-                                            t.Ease = Ease.OutCubic;
-                                            t.DelayTime = 0f;
-                                        });
-                                    });
-                                    p.D6 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D1";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
@@ -4421,7 +4356,33 @@ namespace FlameStream
                                             t.DelayTime = 0f;
                                         });
                                     });
-                                    p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                    p.D2 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D2";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D3";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D4 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D4";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
@@ -4434,8 +4395,47 @@ namespace FlameStream
                                             t.DelayTime = 0f;
                                         });
                                     });
-                                    p.D8 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                    p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D5";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D6 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D6";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                         pd.AnimatorLayerName = "D7";
+                                        pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                        pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                            t.Time = 0.05f;
+                                            t.Ease = Ease.OutCubic;
+                                            t.DelayTime = 0f;
+                                        });
+                                    });
+                                    p.D8 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                        pd.AnimatorLayerName = "D8";
                                         pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                             t.Time = 0.05f;
                                             t.Ease = Ease.OutCubic;
@@ -4498,8 +4498,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 +X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 -X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 X+";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 X-";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -4522,8 +4522,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick1 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick1 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group1;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -4546,8 +4546,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 +X";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 -X";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 X+";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 X-";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -4570,8 +4570,8 @@ namespace FlameStream
                                 d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
                                 });
                                 d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 -Y";
-                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 +Y";
+                                d.PropAnimation.Max.AnimatorLayerName = "Stick2 Y-";
+                                d.PropAnimation.Min.AnimatorLayerName = "Stick2 Y+";
                                 d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                                 d.AssignedGroup = AxisGroup.Group2;
                                 d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
