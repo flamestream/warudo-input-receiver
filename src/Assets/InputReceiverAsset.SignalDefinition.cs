@@ -1817,16 +1817,16 @@ namespace FlameStream {
                             return;
                         }
 
-                        // Check assetClass compatibility
-                        if (animationSettingsData["assetClass"] != null) {
-                            var exportedAssetClass = animationSettingsData["assetClass"].ToString();
-                            var currentAssetClass = GetType().Name;
+                        // Check protocol compatibility
+                        if (animationSettingsData["protocol"] != null) {
+                            var exportedProtocol = animationSettingsData["protocol"].ToString();
+                            var currentProtocol = PROTOCOL_ID;
 
-                            if (exportedAssetClass != currentAssetClass) {
-                                var warningMessage = $"⚠️ **Asset Class Mismatch Detected**\n\n" +
-                                    $"The prop was configured for a different asset:\n" +
-                                    $"   • Prop asset class: **{exportedAssetClass}**\n" +
-                                    $"   • Current asset class: **{currentAssetClass}**\n\n" +
+                            if (exportedProtocol != currentProtocol) {
+                                var warningMessage = $"⚠️ **Protocol Mismatch Detected**\n\n" +
+                                    $"The prop was configured for a different protocol:\n" +
+                                    $"   • Prop protocol: **{exportedProtocol}**\n" +
+                                    $"   • Current protocol: **{currentProtocol}**\n\n" +
                                     $"This may cause compatibility issues. The signal definitions may not match your current setup.\n\n" +
                                     $"**Recommended action:**\n" +
                                     $"1. First, generate signal definitions from a template that matches your controller\n" +
@@ -1977,7 +1977,7 @@ namespace FlameStream {
             // Create versioned export structure
             var exportData = new Dictionary<string, object> {
                 ["version"] = 1,
-                ["assetClass"] = GetType().Name,
+                ["protocol"] = PROTOCOL_ID,
                 ["data"] = signalData
             };
 
