@@ -491,7 +491,7 @@ namespace FlameStream {
             public SignalTemplateType Template;
 
             [Trigger]
-            [Label("SIGNAL_DEFINITION_FROM_TEMPLATE_GENERATOR")]
+            [Label("GENERATE_DEFINITIONS")]
             public async void TriggerGenerateFromTemplate() {
 
                 // Validate supported profiles

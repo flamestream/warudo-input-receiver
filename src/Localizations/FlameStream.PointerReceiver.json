@@ -157,7 +157,7 @@
         "GENERAL_CONFIGURATION": "General Configuration",
         "GENERATE_ANIMATION_BLUEPRINT": "Generate Animation Blueprint",
         "GENERATE_BUTTON_ANIMATION_DATA_TEMPLATE": "Generate Button Animation Data Template",
-        "GENERATE_FROM_PROFILE": "🔰 Generate Definitions",
+        "GENERATE_DEFINITIONS": "🔰 Generate Definitions",
         "HAND_MOVEMENT": "Hand Movement",
         "HAND_PROP_CONTROL": "Hand Prop Control",
         "HAND_STATE": "Hand State",
