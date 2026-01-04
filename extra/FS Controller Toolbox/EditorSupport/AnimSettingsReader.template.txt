@@ -1,0 +1,14 @@
+using UnityEngine;
+
+namespace Flamestream
+{
+    public class AnimSettingsReader : MonoBehaviour
+    {
+        public TextAsset jsonFile;
+
+        public string getRawJson()
+        {
+            return jsonFile != null ? jsonFile.text : string.Empty;
+        }
+    }
+}

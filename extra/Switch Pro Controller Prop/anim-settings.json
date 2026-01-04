@@ -1,0 +1,1323 @@
+{
+  "version": 1,
+  "protocol": "D",
+  "data": {
+    "B": {
+      "index": 0,
+      "label": "B",
+      "assignedCharacterLayer": "RightThumb",
+      "propAnimation": {
+        "animatorLayerName": "B",
+        "transitionDown": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.05
+        },
+        "transitionUp": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": 0.0,
+          "y": -1.0,
+          "z": 0.0
+        },
+        "rotationFactor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Btn B Hover.warudo",
+            "isReturnToBaseWanted": false,
+            "transition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          },
+          "downAnimationData": {
+            "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Btn B Press.warudo",
+            "transition": {
+              "time": 0.0,
+              "ease": "OutCubic"
+            },
+            "upTransition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "RightFingers"
+        ]
+      }
+    },
+    "A": {
+      "index": 1,
+      "label": "A",
+      "assignedCharacterLayer": "RightThumb",
+      "propAnimation": {
+        "animatorLayerName": "A",
+        "transitionDown": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.05
+        },
+        "transitionUp": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": 0.0,
+          "y": -0.5,
+          "z": 0.0
+        },
+        "rotationFactor": {
+          "x": 0.25,
+          "y": 0.0,
+          "z": -0.5
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Btn A Hover.warudo",
+            "isReturnToBaseWanted": false,
+            "transition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          },
+          "downAnimationData": {
+            "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Btn A Press.warudo",
+            "transition": {
+              "time": 0.0,
+              "ease": "OutCubic"
+            },
+            "upTransition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "RightFingers"
+        ]
+      }
+    },
+    "Y": {
+      "index": 2,
+      "label": "Y",
+      "assignedCharacterLayer": "RightThumb",
+      "propAnimation": {
+        "animatorLayerName": "Y",
+        "transitionDown": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.05
+        },
+        "transitionUp": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": 0.0,
+          "y": -1.0,
+          "z": 0.0
+        },
+        "rotationFactor": {
+          "x": 1.0,
+          "y": 0.0,
+          "z": 0.0
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Btn Y Hover.warudo",
+            "isReturnToBaseWanted": false,
+            "transition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          },
+          "downAnimationData": {
+            "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Btn Y Press.warudo",
+            "transition": {
+              "time": 0.0,
+              "ease": "OutCubic"
+            },
+            "upTransition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "RightFingers"
+        ]
+      }
+    },
+    "X": {
+      "index": 3,
+      "label": "X",
+      "assignedCharacterLayer": "RightThumb",
+      "propAnimation": {
+        "animatorLayerName": "X",
+        "transitionDown": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.05
+        },
+        "transitionUp": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": 0.0,
+          "y": -0.5,
+          "z": 0.0
+        },
+        "rotationFactor": {
+          "x": 0.5,
+          "y": 0.0,
+          "z": 0.0
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Btn X Hover.warudo",
+            "isReturnToBaseWanted": false,
+            "transition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          },
+          "downAnimationData": {
+            "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Btn X Press.warudo",
+            "transition": {
+              "time": 0.0,
+              "ease": "OutCubic"
+            },
+            "upTransition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "RightFingers"
+        ]
+      }
+    },
+    "L": {
+      "index": 4,
+      "label": "L",
+      "assignedCharacterLayer": "LeftIndex",
+      "propAnimation": {
+        "animatorLayerName": "L",
+        "transitionDown": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.05
+        },
+        "transitionUp": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": 0.25,
+          "y": 0.0,
+          "z": -0.25
+        },
+        "rotationFactor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "",
+            "isReturnToBaseWanted": false,
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          },
+          "downAnimationData": {
+            "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Shoulders Press.warudo",
+            "transition": {
+              "time": 0.0,
+              "ease": "OutCubic"
+            },
+            "upTransition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "LeftFingers"
+        ]
+      }
+    },
+    "R": {
+      "index": 5,
+      "label": "R",
+      "assignedCharacterLayer": "RightIndex",
+      "propAnimation": {
+        "animatorLayerName": "R",
+        "transitionDown": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.05
+        },
+        "transitionUp": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": -0.25,
+          "y": 0.0,
+          "z": -0.25
+        },
+        "rotationFactor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "",
+            "isReturnToBaseWanted": false,
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          },
+          "downAnimationData": {
+            "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Shoulders Press.warudo",
+            "transition": {
+              "time": 0.0,
+              "ease": "OutCubic"
+            },
+            "upTransition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "RightFingers"
+        ]
+      }
+    },
+    "ZL": {
+      "index": 6,
+      "label": "ZL",
+      "assignedCharacterLayer": "LeftMiddle",
+      "propAnimation": {
+        "animatorLayerName": "ZL",
+        "transitionDown": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.0
+        },
+        "transitionUp": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": -0.25,
+          "y": -0.5,
+          "z": -0.25
+        },
+        "rotationFactor": {
+          "x": 0.25,
+          "y": 0.0,
+          "z": 0.0
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "",
+            "isReturnToBaseWanted": false,
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          },
+          "downAnimationData": {
+            "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Triggers Press.warudo",
+            "transition": {
+              "time": 0.0,
+              "ease": "OutCubic"
+            },
+            "upTransition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "LeftFingers"
+        ]
+      }
+    },
+    "ZR": {
+      "index": 7,
+      "label": "ZR",
+      "assignedCharacterLayer": "RightMiddle",
+      "propAnimation": {
+        "animatorLayerName": "ZR",
+        "transitionDown": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.0
+        },
+        "transitionUp": {
+          "time": 0.05,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": 0.25,
+          "y": -0.5,
+          "z": -0.25
+        },
+        "rotationFactor": {
+          "x": 0.25,
+          "y": 0.0,
+          "z": 0.0
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "",
+            "isReturnToBaseWanted": false,
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          },
+          "downAnimationData": {
+            "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Triggers Press.warudo",
+            "transition": {
+              "time": 0.0,
+              "ease": "OutCubic"
+            },
+            "upTransition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "RightFingers"
+        ]
+      }
+    },
+    "Minus": {
+      "index": 8,
+      "label": "Minus",
+      "assignedCharacterLayer": "RightThumb",
+      "propAnimation": {
+        "animatorLayerName": "",
+        "transitionDown": {
+          "time": 0.5,
+          "ease": "Linear",
+          "delay": 0.0
+        },
+        "transitionUp": {
+          "time": 0.5,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotationFactor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "",
+            "isReturnToBaseWanted": false,
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          },
+          "downAnimationData": {
+            "source": "",
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            },
+            "upTransition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "RightFingers"
+        ]
+      }
+    },
+    "Plus": {
+      "index": 9,
+      "label": "Plus",
+      "assignedCharacterLayer": "LeftThumb",
+      "propAnimation": {
+        "animatorLayerName": "",
+        "transitionDown": {
+          "time": 0.5,
+          "ease": "Linear",
+          "delay": 0.0
+        },
+        "transitionUp": {
+          "time": 0.5,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotationFactor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "",
+            "isReturnToBaseWanted": false,
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          },
+          "downAnimationData": {
+            "source": "",
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            },
+            "upTransition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "LeftFingers"
+        ]
+      }
+    },
+    "LS": {
+      "index": 10,
+      "label": "LS",
+      "assignedCharacterLayer": "LeftThumb",
+      "propAnimation": {
+        "animatorLayerName": "",
+        "transitionDown": {
+          "time": 0.5,
+          "ease": "Linear",
+          "delay": 0.0
+        },
+        "transitionUp": {
+          "time": 0.5,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": 0.0,
+          "y": -1.0,
+          "z": 0.0
+        },
+        "rotationFactor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "",
+            "isReturnToBaseWanted": true,
+            "transition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          },
+          "downAnimationData": {
+            "source": "",
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            },
+            "upTransition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "LeftFingers"
+        ]
+      }
+    },
+    "RS": {
+      "index": 11,
+      "label": "RS",
+      "assignedCharacterLayer": "RightThumb",
+      "propAnimation": {
+        "animatorLayerName": "",
+        "transitionDown": {
+          "time": 0.5,
+          "ease": "Linear",
+          "delay": 0.0
+        },
+        "transitionUp": {
+          "time": 0.5,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": 0.0,
+          "y": -1.0,
+          "z": 0.0
+        },
+        "rotationFactor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "",
+            "isReturnToBaseWanted": true,
+            "transition": {
+              "time": 0.1,
+              "ease": "OutCubic"
+            }
+          },
+          "downAnimationData": {
+            "source": "",
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            },
+            "upTransition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "RightFingers"
+        ]
+      }
+    },
+    "Home": {
+      "index": 12,
+      "label": "Home",
+      "assignedCharacterLayer": "RightThumb",
+      "propAnimation": {
+        "animatorLayerName": "",
+        "transitionDown": {
+          "time": 0.5,
+          "ease": "Linear",
+          "delay": 0.0
+        },
+        "transitionUp": {
+          "time": 0.5,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotationFactor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "",
+            "isReturnToBaseWanted": false,
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          },
+          "downAnimationData": {
+            "source": "",
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            },
+            "upTransition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "RightFingers"
+        ]
+      }
+    },
+    "Capture": {
+      "index": 13,
+      "label": "Capture",
+      "assignedCharacterLayer": "LeftThumb",
+      "propAnimation": {
+        "animatorLayerName": "",
+        "transitionDown": {
+          "time": 0.5,
+          "ease": "Linear",
+          "delay": 0.0
+        },
+        "transitionUp": {
+          "time": 0.5,
+          "ease": "Linear",
+          "delay": 0.0
+        }
+      },
+      "propMotion": {
+        "translationFactor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotationFactor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        }
+      },
+      "characterAnimation": {
+        "animationData": {
+          "hoverAnimationData": {
+            "source": "",
+            "isReturnToBaseWanted": false,
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          },
+          "downAnimationData": {
+            "source": "",
+            "transition": {
+              "time": 0.5,
+              "ease": "Linear"
+            },
+            "upTransition": {
+              "time": 0.5,
+              "ease": "Linear"
+            }
+          }
+        },
+        "maskedBodyParts": [
+          "LeftFingers"
+        ]
+      }
+    },
+    "D-Pad": {
+      "index": 0,
+      "label": "D-Pad",
+      "assignedCharacterLayer": "LeftThumb",
+      "propAnimations": {
+        "d1": {
+          "animatorLayerName": "D1",
+          "transitionDown": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          },
+          "transitionUp": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          }
+        },
+        "d2": {
+          "animatorLayerName": "D2",
+          "transitionDown": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          },
+          "transitionUp": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          }
+        },
+        "d3": {
+          "animatorLayerName": "D3",
+          "transitionDown": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          },
+          "transitionUp": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          }
+        },
+        "d4": {
+          "animatorLayerName": "D4",
+          "transitionDown": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          },
+          "transitionUp": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          }
+        },
+        "d5": {
+          "animatorLayerName": "D5",
+          "transitionDown": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          },
+          "transitionUp": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          }
+        },
+        "d6": {
+          "animatorLayerName": "D6",
+          "transitionDown": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          },
+          "transitionUp": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          }
+        },
+        "d7": {
+          "animatorLayerName": "D7",
+          "transitionDown": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          },
+          "transitionUp": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          }
+        },
+        "d8": {
+          "animatorLayerName": "D8",
+          "transitionDown": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          },
+          "transitionUp": {
+            "time": 0.05,
+            "ease": "OutCubic",
+            "delay": 0.0
+          }
+        }
+      },
+      "propMotions": {
+        "d1": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": -1.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        "d2": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": -1.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        "d3": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": -1.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        "d4": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": -0.5,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": -0.5,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        "d5": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": -1.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        "d6": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": -0.5,
+            "y": 0.0,
+            "z": 0.5
+          }
+        },
+        "d7": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1.0
+          }
+        },
+        "d8": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": -0.5,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.5
+          }
+        }
+      },
+      "characterAnimation": {
+        "directions": {
+          "d1": {
+            "hoverAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D1 Hover.warudo"
+            },
+            "downAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D1 Press.warudo"
+            }
+          },
+          "d2": {
+            "hoverAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D2 Hover.warudo"
+            },
+            "downAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D2 Press.warudo"
+            }
+          },
+          "d3": {
+            "hoverAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D3 Hover.warudo"
+            },
+            "downAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D3 Press.warudo"
+            }
+          },
+          "d4": {
+            "hoverAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D4 Hover.warudo"
+            },
+            "downAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D4 Press.warudo"
+            }
+          },
+          "d5": {
+            "hoverAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D5 Hover.warudo"
+            },
+            "downAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D5 Press.warudo"
+            }
+          },
+          "d6": {
+            "hoverAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D6 Hover.warudo"
+            },
+            "downAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D6 Press.warudo"
+            }
+          },
+          "d7": {
+            "hoverAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D7 Hover.warudo"
+            },
+            "downAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D7 Press.warudo"
+            }
+          },
+          "d8": {
+            "hoverAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D8 Hover.warudo"
+            },
+            "downAnimation": {
+              "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D8 Press.warudo"
+            }
+          }
+        },
+        "base": {
+          "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro D Base.warudo",
+          "isReturnToBaseWanted": false
+        },
+        "transitions": {
+          "hover": {
+            "time": 0.1,
+            "ease": "OutCubic"
+          },
+          "down": {
+            "time": 0.05,
+            "ease": "OutCubic"
+          },
+          "up": {
+            "time": 0.05,
+            "ease": "OutCubic"
+          }
+        },
+        "maskedBodyParts": [
+          "LeftFingers"
+        ]
+      },
+      "virtualDefinition": {
+        "enabled": false,
+        "upId": 0,
+        "downId": 1,
+        "leftId": 2,
+        "rightId": 3
+      }
+    },
+    "Stick1 X": {
+      "index": 0,
+      "label": "Stick1 X",
+      "assignedCharacterLayer": "LeftThumb",
+      "assignedGroup": "Group1",
+      "deadzoneThreshold": 0.05,
+      "neutralState": "Midpoint",
+      "propAnimations": {
+        "max": {
+          "animatorLayerName": "Stick1 X+"
+        },
+        "min": {
+          "animatorLayerName": "Stick1 X-"
+        }
+      },
+      "propMotions": {
+        "max": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": -2.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": -1.0
+          }
+        },
+        "min": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": -2.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1.0
+          }
+        }
+      },
+      "characterAnimation": {
+        "base": {
+          "source": "",
+          "isReturnToBaseWanted": true
+        },
+        "max": {
+          "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Stick1 X+.warudo"
+        },
+        "min": {
+          "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Stick1 X-.warudo"
+        },
+        "maskedBodyParts": [
+          "LeftFingers"
+        ]
+      }
+    },
+    "Stick1 Y": {
+      "index": 1,
+      "label": "Stick1 Y",
+      "assignedCharacterLayer": "LeftThumb",
+      "assignedGroup": "Group1",
+      "deadzoneThreshold": 0.05,
+      "neutralState": "Midpoint",
+      "propAnimations": {
+        "max": {
+          "animatorLayerName": "Stick1 Y+"
+        },
+        "min": {
+          "animatorLayerName": "Stick1 Y-"
+        }
+      },
+      "propMotions": {
+        "max": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": -2.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": 1.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        "min": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": 2.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": -1.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        }
+      },
+      "characterAnimation": {
+        "base": {
+          "source": "",
+          "isReturnToBaseWanted": true
+        },
+        "max": {
+          "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Stick1 Y+.warudo"
+        },
+        "min": {
+          "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Stick1 Y-.warudo"
+        },
+        "maskedBodyParts": [
+          "LeftFingers"
+        ]
+      }
+    },
+    "Stick2 X": {
+      "index": 3,
+      "label": "Stick2 X",
+      "assignedCharacterLayer": "RightThumb",
+      "assignedGroup": "Group2",
+      "deadzoneThreshold": 0.05,
+      "neutralState": "Midpoint",
+      "propAnimations": {
+        "max": {
+          "animatorLayerName": "Stick2 X+"
+        },
+        "min": {
+          "animatorLayerName": "Stick2 X-"
+        }
+      },
+      "propMotions": {
+        "max": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": -2.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": -1.0
+          }
+        },
+        "min": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": -2.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1.0
+          }
+        }
+      },
+      "characterAnimation": {
+        "base": {
+          "source": "",
+          "isReturnToBaseWanted": true
+        },
+        "max": {
+          "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Stick2 X+.warudo"
+        },
+        "min": {
+          "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Stick2 X-.warudo"
+        },
+        "maskedBodyParts": [
+          "RightFingers"
+        ]
+      }
+    },
+    "Stick2 Y": {
+      "index": 4,
+      "label": "Stick2 Y",
+      "assignedCharacterLayer": "RightThumb",
+      "assignedGroup": "Group2",
+      "deadzoneThreshold": 0.05,
+      "neutralState": "Midpoint",
+      "propAnimations": {
+        "max": {
+          "animatorLayerName": "Stick2 Y+"
+        },
+        "min": {
+          "animatorLayerName": "Stick2 Y-"
+        }
+      },
+      "propMotions": {
+        "max": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": -2.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": 1.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        "min": {
+          "translationFactor": {
+            "x": 0.0,
+            "y": 2.0,
+            "z": 0.0
+          },
+          "rotationFactor": {
+            "x": -1.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        }
+      },
+      "characterAnimation": {
+        "base": {
+          "source": "",
+          "isReturnToBaseWanted": true
+        },
+        "max": {
+          "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Stick2 Y+.warudo"
+        },
+        "min": {
+          "source": "character-animation://data/CharacterAnimations/🔥🎮 SWPro Stick2 Y-.warudo"
+        },
+        "maskedBodyParts": [
+          "RightFingers"
+        ]
+      }
+    }
+  }
+}

@@ -40,16 +40,16 @@ namespace FlameStream
             }
         }
 
-        protected override SignalProfileType[] SupportedProfileTypes {
+        protected override SignalTemplateType[] SupportedProfileTypes {
             get {
-                return new SignalProfileType[] {
-                    SignalProfileType.SwitchProController,
-                    SignalProfileType.Xbox360Controller,
+                return new SignalTemplateType[] {
+                    SignalTemplateType.SwitchProController,
+                    SignalTemplateType.Xbox360Controller,
                 };
             }
         }
 
-        protected override void GenerateButtonDefinitions(SignalProfileType profile) {
+        protected override void GenerateButtonDefinitions(SignalTemplateType profile) {
 
             // All profiles are assumed to be the same for XInput
             SetDataInput(
@@ -93,7 +93,7 @@ namespace FlameStream
                             });
                         });
                         d.PropMotion = StructuredData.Create<PropMotionDefinition>(pmd => {
-                            if (profile == SignalProfileType.SwitchProController) {
+                            if (profile == SignalTemplateType.SwitchProController) {
                                 pmd.TranslationFactor = TranslationDownLight;
                                 pmd.RotationFactor = new Vector3(0.25f, 0f, -0.5f);
                             } else {
@@ -140,7 +140,7 @@ namespace FlameStream
                             });
                         });
                         d.PropMotion = StructuredData.Create<PropMotionDefinition>(pmd => {
-                            if (profile == SignalProfileType.SwitchProController) {
+                            if (profile == SignalTemplateType.SwitchProController) {
                                 pmd.TranslationFactor = TranslationDownStrong;
                                 pmd.RotationFactor = Vector3.zero;
                             } else {
@@ -189,7 +189,7 @@ namespace FlameStream
                         d.PropMotion = StructuredData.Create<PropMotionDefinition>(pmd => {
                             pmd.TranslationFactor = TranslationDownLight;
                             pmd.RotationFactor = RotationForwardLight;
-                            if (profile == SignalProfileType.Xbox360Controller) {
+                            if (profile == SignalTemplateType.Xbox360Controller) {
                                 pmd.TranslationFactor = TranslationDownStrong;
                                 pmd.RotationFactor = RotationForwardStrong;
                             } else {
@@ -236,7 +236,7 @@ namespace FlameStream
                             });
                         });
                         d.PropMotion = StructuredData.Create<PropMotionDefinition>(pmd => {
-                            if (profile == SignalProfileType.Xbox360Controller) {
+                            if (profile == SignalTemplateType.Xbox360Controller) {
                                 pmd.TranslationFactor = TranslationDownLight;
                                 pmd.RotationFactor = RotationForwardLight;
                             } else {
@@ -248,7 +248,7 @@ namespace FlameStream
                     StructuredData.Create<ButtonDefinition>(d => {
                         d.IsValid = true;
                         d.Index = 8;
-                        if (profile == SignalProfileType.SwitchProController) {
+                        if (profile == SignalTemplateType.SwitchProController) {
                             d.Label = "L";
                         } else {
                             d.Label = "LB";
@@ -268,7 +268,7 @@ namespace FlameStream
                             });
                         });
                         d.PropAnimation = StructuredData.Create<TransitionablePropAnimationDefinition>(p => {
-                            if (profile == SignalProfileType.SwitchProController) {
+                            if (profile == SignalTemplateType.SwitchProController) {
                                 p.AnimatorLayerName = "L";
                             } else {
                                 p.AnimatorLayerName = "LB";
@@ -292,7 +292,7 @@ namespace FlameStream
                     StructuredData.Create<ButtonDefinition>(d => {
                         d.IsValid = true;
                         d.Index = 9;
-                        if (profile == SignalProfileType.SwitchProController) {
+                        if (profile == SignalTemplateType.SwitchProController) {
                             d.Label = "R";
                         } else {
                             d.Label = "RB";
@@ -312,7 +312,7 @@ namespace FlameStream
                             });
                         });
                         d.PropAnimation = StructuredData.Create<TransitionablePropAnimationDefinition>(p => {
-                            if (profile == SignalProfileType.SwitchProController) {
+                            if (profile == SignalTemplateType.SwitchProController) {
                                 p.AnimatorLayerName = "R";
                             } else {
                                 p.AnimatorLayerName = "RB";
@@ -336,7 +336,7 @@ namespace FlameStream
                     StructuredData.Create<ButtonDefinition>(d => {
                         d.IsValid = true;
                         d.Index = 4;
-                        if (profile == SignalProfileType.SwitchProController) {
+                        if (profile == SignalTemplateType.SwitchProController) {
                             d.Label = "Plus";
                         } else {
                             d.Label = "Start";
@@ -347,7 +347,7 @@ namespace FlameStream
                     StructuredData.Create<ButtonDefinition>(d => {
                         d.IsValid = true;
                         d.Index = 5;
-                        if (profile == SignalProfileType.SwitchProController) {
+                        if (profile == SignalTemplateType.SwitchProController) {
                             d.Label = "Minus";
                         } else {
                             d.Label = "Back";
@@ -408,68 +408,36 @@ namespace FlameStream
                         d.AssignedCharacterLayer = Layer.LeftThumb;
                         d.CharacterAnimation.MaskedBodyParts = new AnimationMaskedBodyPart[] { AnimationMaskedBodyPart.LeftFingers };
                         d.CharacterAnimation.AnimationDataD1 = StructuredData.Create<SwitchStateAnimationData>(ad => {
-                            ad.Parent = d.CharacterAnimation; // Particularly important because layer name will be generated soon
+                            ad.Parent = d.CharacterAnimation;
                             ad.Index = 1;
-                            ad.HoverAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
-                            ad.DownAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
                         });
                         d.CharacterAnimation.AnimationDataD2 = StructuredData.Create<SwitchStateAnimationData>(ad => {
-                            ad.Parent = d.CharacterAnimation; // Particularly important because layer name will be generated soon
+                            ad.Parent = d.CharacterAnimation;
                             ad.Index = 2;
-                            ad.HoverAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
-                            ad.DownAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
                         });
                         d.CharacterAnimation.AnimationDataD3 = StructuredData.Create<SwitchStateAnimationData>(ad => {
-                            ad.Parent = d.CharacterAnimation; // Particularly important because layer name will be generated soon
+                            ad.Parent = d.CharacterAnimation;
                             ad.Index = 3;
-                            ad.HoverAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
-                            ad.DownAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
                         });
                         d.CharacterAnimation.AnimationDataD4 = StructuredData.Create<SwitchStateAnimationData>(ad => {
-                            ad.Parent = d.CharacterAnimation; // Particularly important because layer name will be generated soon
+                            ad.Parent = d.CharacterAnimation;
                             ad.Index = 4;
-                            ad.HoverAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
-                            ad.DownAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
                         });
                         d.CharacterAnimation.AnimationDataD5 = StructuredData.Create<SwitchStateAnimationData>(ad => {
-                            ad.Parent = d.CharacterAnimation; // Particularly important because layer name will be generated soon
+                            ad.Parent = d.CharacterAnimation;
                             ad.Index = 5;
-                            ad.HoverAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
-                            ad.DownAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
                         });
                         d.CharacterAnimation.AnimationDataD6 = StructuredData.Create<SwitchStateAnimationData>(ad => {
-                            ad.Parent = d.CharacterAnimation; // Particularly important because layer name will be generated soon
+                            ad.Parent = d.CharacterAnimation;
                             ad.Index = 6;
-                            ad.HoverAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
-                            ad.DownAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
                         });
                         d.CharacterAnimation.AnimationDataD7 = StructuredData.Create<SwitchStateAnimationData>(ad => {
-                            ad.Parent = d.CharacterAnimation; // Particularly important because layer name will be generated soon
+                            ad.Parent = d.CharacterAnimation;
                             ad.Index = 7;
-                            ad.HoverAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
-                            ad.DownAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
                         });
                         d.CharacterAnimation.AnimationDataD8 = StructuredData.Create<SwitchStateAnimationData>(ad => {
-                            ad.Parent = d.CharacterAnimation; // Particularly important because layer name will be generated soon
+                            ad.Parent = d.CharacterAnimation;
                             ad.Index = 8;
-                            ad.HoverAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
-                            ad.DownAnimation = StructuredData.Create<AnimationData>(tad => {
-                            });
                         });
                         d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
                         d.CharacterAnimation.TransitionHover = StructuredData.Create<Transition>(t => {
@@ -486,71 +454,6 @@ namespace FlameStream
                         });
                         d.PropAnimation = StructuredData.Create<SwitchPropAnimationDefinition>(p => {
                             p.D1 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                pd.AnimatorLayerName = "D8";
-                                pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                    t.Time = 0.05f;
-                                    t.Ease = Ease.OutCubic;
-                                    t.DelayTime = 0f;
-                                });
-                                pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                    t.Time = 0.05f;
-                                    t.Ease = Ease.OutCubic;
-                                    t.DelayTime = 0f;
-                                });
-                            });
-                            p.D2 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                pd.AnimatorLayerName = "D9";
-                                pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                    t.Time = 0.05f;
-                                    t.Ease = Ease.OutCubic;
-                                    t.DelayTime = 0f;
-                                });
-                                pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                    t.Time = 0.05f;
-                                    t.Ease = Ease.OutCubic;
-                                    t.DelayTime = 0f;
-                                });
-                            });
-                            p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                pd.AnimatorLayerName = "D6";
-                                pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                    t.Time = 0.05f;
-                                    t.Ease = Ease.OutCubic;
-                                    t.DelayTime = 0f;
-                                });
-                                pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                    t.Time = 0.05f;
-                                    t.Ease = Ease.OutCubic;
-                                    t.DelayTime = 0f;
-                                });
-                            });
-                            p.D4 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                pd.AnimatorLayerName = "D3";
-                                pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                    t.Time = 0.05f;
-                                    t.Ease = Ease.OutCubic;
-                                    t.DelayTime = 0f;
-                                });
-                                pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                    t.Time = 0.05f;
-                                    t.Ease = Ease.OutCubic;
-                                    t.DelayTime = 0f;
-                                });
-                            });
-                            p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
-                                pd.AnimatorLayerName = "D2";
-                                pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
-                                    t.Time = 0.05f;
-                                    t.Ease = Ease.OutCubic;
-                                    t.DelayTime = 0f;
-                                });
-                                pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
-                                    t.Time = 0.05f;
-                                    t.Ease = Ease.OutCubic;
-                                    t.DelayTime = 0f;
-                                });
-                            });
-                            p.D6 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                 pd.AnimatorLayerName = "D1";
                                 pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                     t.Time = 0.05f;
@@ -563,7 +466,33 @@ namespace FlameStream
                                     t.DelayTime = 0f;
                                 });
                             });
-                            p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                            p.D2 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                pd.AnimatorLayerName = "D2";
+                                pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                    t.Time = 0.05f;
+                                    t.Ease = Ease.OutCubic;
+                                    t.DelayTime = 0f;
+                                });
+                                pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                    t.Time = 0.05f;
+                                    t.Ease = Ease.OutCubic;
+                                    t.DelayTime = 0f;
+                                });
+                            });
+                            p.D3 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                pd.AnimatorLayerName = "D3";
+                                pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                    t.Time = 0.05f;
+                                    t.Ease = Ease.OutCubic;
+                                    t.DelayTime = 0f;
+                                });
+                                pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                    t.Time = 0.05f;
+                                    t.Ease = Ease.OutCubic;
+                                    t.DelayTime = 0f;
+                                });
+                            });
+                            p.D4 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                 pd.AnimatorLayerName = "D4";
                                 pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                     t.Time = 0.05f;
@@ -576,8 +505,47 @@ namespace FlameStream
                                     t.DelayTime = 0f;
                                 });
                             });
-                            p.D8 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                            p.D5 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                pd.AnimatorLayerName = "D5";
+                                pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                    t.Time = 0.05f;
+                                    t.Ease = Ease.OutCubic;
+                                    t.DelayTime = 0f;
+                                });
+                                pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                    t.Time = 0.05f;
+                                    t.Ease = Ease.OutCubic;
+                                    t.DelayTime = 0f;
+                                });
+                            });
+                            p.D6 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                pd.AnimatorLayerName = "D6";
+                                pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                    t.Time = 0.05f;
+                                    t.Ease = Ease.OutCubic;
+                                    t.DelayTime = 0f;
+                                });
+                                pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                    t.Time = 0.05f;
+                                    t.Ease = Ease.OutCubic;
+                                    t.DelayTime = 0f;
+                                });
+                            });
+                            p.D7 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
                                 pd.AnimatorLayerName = "D7";
+                                pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
+                                    t.Time = 0.05f;
+                                    t.Ease = Ease.OutCubic;
+                                    t.DelayTime = 0f;
+                                });
+                                pd.TransitionUp = StructuredData.Create<DelayableTransition>(t => {
+                                    t.Time = 0.05f;
+                                    t.Ease = Ease.OutCubic;
+                                    t.DelayTime = 0f;
+                                });
+                            });
+                            p.D8 = StructuredData.Create<TransitionablePropAnimationDefinition>(pd => {
+                                pd.AnimatorLayerName = "D8";
                                 pd.TransitionDown = StructuredData.Create<DelayableTransition>(t => {
                                     t.Time = 0.05f;
                                     t.Ease = Ease.OutCubic;
@@ -640,13 +608,9 @@ namespace FlameStream
                         d.Label = "Stick1 X";
                         d.AssignedCharacterLayer = Layer.LeftThumb;
                         d.CharacterAnimation.MaskedBodyParts = new AnimationMaskedBodyPart[] { AnimationMaskedBodyPart.LeftFingers };
-                        d.CharacterAnimation.Max = StructuredData.Create<AnimationData>(ad => {
-                        });
-                        d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
-                        });
                         d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                        d.PropAnimation.Max.AnimatorLayerName = "Stick1 +X";
-                        d.PropAnimation.Min.AnimatorLayerName = "Stick1 -X";
+                        d.PropAnimation.Max.AnimatorLayerName = "Stick1 X+";
+                        d.PropAnimation.Min.AnimatorLayerName = "Stick1 X-";
                         d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                         d.AssignedGroup = AxisGroup.Group1;
                         d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -664,13 +628,9 @@ namespace FlameStream
                         d.Label = "Stick1 Y";
                         d.AssignedCharacterLayer = Layer.LeftThumb;
                         d.CharacterAnimation.MaskedBodyParts = new AnimationMaskedBodyPart[] { AnimationMaskedBodyPart.LeftFingers };
-                        d.CharacterAnimation.Max = StructuredData.Create<AnimationData>(ad => {
-                        });
-                        d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
-                        });
                         d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                        d.PropAnimation.Max.AnimatorLayerName = "Stick1 +Y";
-                        d.PropAnimation.Min.AnimatorLayerName = "Stick1 -Y";
+                        d.PropAnimation.Max.AnimatorLayerName = "Stick1 Y+";
+                        d.PropAnimation.Min.AnimatorLayerName = "Stick1 Y-";
                         d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                         d.AssignedGroup = AxisGroup.Group1;
                         d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -688,13 +648,9 @@ namespace FlameStream
                         d.Label = "Stick2 X";
                         d.AssignedCharacterLayer = Layer.RightThumb;
                         d.CharacterAnimation.MaskedBodyParts = new AnimationMaskedBodyPart[] { AnimationMaskedBodyPart.RightFingers };
-                        d.CharacterAnimation.Max = StructuredData.Create<AnimationData>(ad => {
-                        });
-                        d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
-                        });
                         d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                        d.PropAnimation.Max.AnimatorLayerName = "Stick2 +X";
-                        d.PropAnimation.Min.AnimatorLayerName = "Stick2 -X";
+                        d.PropAnimation.Max.AnimatorLayerName = "Stick2 X+";
+                        d.PropAnimation.Min.AnimatorLayerName = "Stick2 X-";
                         d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                         d.AssignedGroup = AxisGroup.Group2;
                         d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -712,13 +668,9 @@ namespace FlameStream
                         d.Label = "Stick2 Y";
                         d.AssignedCharacterLayer = Layer.RightThumb;
                         d.CharacterAnimation.MaskedBodyParts = new AnimationMaskedBodyPart[] { AnimationMaskedBodyPart.RightFingers };
-                        d.CharacterAnimation.Max = StructuredData.Create<AnimationData>(ad => {
-                        });
-                        d.CharacterAnimation.Min = StructuredData.Create<AnimationData>(ad => {
-                        });
                         d.CharacterAnimation.Base.SetDataInput(nameof(d.CharacterAnimation.Base.IsReturnToBaseWanted), true, true);
-                        d.PropAnimation.Max.AnimatorLayerName = "Stick2 +Y";
-                        d.PropAnimation.Min.AnimatorLayerName = "Stick2 -Y";
+                        d.PropAnimation.Max.AnimatorLayerName = "Stick2 Y+";
+                        d.PropAnimation.Min.AnimatorLayerName = "Stick2 Y-";
                         d.SetDataInput(nameof(d.NeutralState), AxisNeutralState.Midpoint, true);
                         d.AssignedGroup = AxisGroup.Group2;
                         d.PropMotionSet.Max = StructuredData.Create<PropMotionDefinition>(pmd => {
@@ -733,7 +685,7 @@ namespace FlameStream
                     StructuredData.Create<AxisDefinition>(d => {
                         d.IsValid = true;
                         d.Index = 4;
-                        if (profile == SignalProfileType.SwitchProController) {
+                        if (profile == SignalTemplateType.SwitchProController) {
                             d.Label = "ZL";
                         } else {
                             d.Label = "LT";
@@ -742,7 +694,7 @@ namespace FlameStream
                         d.CharacterAnimation.MaskedBodyParts = new AnimationMaskedBodyPart[] { AnimationMaskedBodyPart.LeftFingers };
                         d.CharacterAnimation.Max = StructuredData.Create<AnimationData>(ad => {
                         });
-                        if (profile == SignalProfileType.SwitchProController) {
+                        if (profile == SignalTemplateType.SwitchProController) {
                             d.PropAnimation.Max.AnimatorLayerName = "ZL";
                         } else {
                             d.PropAnimation.Max.AnimatorLayerName = "LT";
@@ -755,7 +707,7 @@ namespace FlameStream
                     StructuredData.Create<AxisDefinition>(d => {
                         d.IsValid = true;
                         d.Index = 5;
-                        if (profile == SignalProfileType.SwitchProController) {
+                        if (profile == SignalTemplateType.SwitchProController) {
                             d.Label = "ZR";
                         } else {
                             d.Label = "RT";
@@ -764,7 +716,7 @@ namespace FlameStream
                         d.CharacterAnimation.MaskedBodyParts = new AnimationMaskedBodyPart[] { AnimationMaskedBodyPart.RightFingers };
                         d.CharacterAnimation.Max = StructuredData.Create<AnimationData>(ad => {
                         });
-                        if (profile == SignalProfileType.SwitchProController) {
+                        if (profile == SignalTemplateType.SwitchProController) {
                             d.PropAnimation.Max.AnimatorLayerName = "ZR";
                         } else {
                             d.PropAnimation.Max.AnimatorLayerName = "RT";
