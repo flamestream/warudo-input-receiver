@@ -145,7 +145,7 @@
         "FS_ASSET_TITLE_LEGACY_DIRECTINPUT": "🔥 FS Legacy DirectInput Receiver",
         "FS_ASSET_TITLE_POINTER": "🔥 FS Pointer Receiver",
         "FS_ASSET_TITLE_XINPUT": "🔥 FS XInput Receiver",
-        "FS_INPUT_RECEIVER_VERSION_UPDATE": "🔰 Get started at https://github.com/flamestream/warudo-input-receiver/wiki\n\n### Version 5.2.0 (2025-11-08)\n\n* Pointer: Updated Drawing screen to be compatible with both default and beta branch\n* Pointer: Labelled cursor modes and out-of-bound handlers selections\n* Pointer: Added description about cursor modes and out-of-bound handlers\n* Pointer: Introduced customizable bound offsets\n\nFull release notes at https://github.com/flamestream/warudo-input-receiver/releases/latest",
+        "FS_INPUT_RECEIVER_VERSION_UPDATE": "**Version 5.3.0** (2026-01-03)\n\n✨ **New:** Signal definition import/export • Enhanced IK and bend goal controls  \n⚠️ **Breaking Changes:** Template D-Pad naming now uses clockwise order • Axis naming changed to X+/X- format  \n🔧 **Fixed:** Directional switch state handling • Layer cleanup issues\n\n🔗 Full changelog: https://github.com/flamestream/warudo-input-receiver/releases/latest  \n📚 Documentation: https://github.com/flamestream/warudo-input-receiver/wiki",
         "FS_NODE_CATEGORY_GAMEPAD": "🔥🎮 Legacy DirectInput",
         "FS_NODE_CATEGORY_INPUT_RECEIVER": "🔥🎮 Input Receiver",
         "FS_NODE_CATEGORY_KEYBOARD": "🔥 Keyboard Receiver",
