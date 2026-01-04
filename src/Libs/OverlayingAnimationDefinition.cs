@@ -46,7 +46,7 @@ namespace FlameStream {
         [DataInput]
         [Disabled]
         [Label("CUSTOM_LAYER_ID")]
-        public string CustomLayerID = "🔥🎮 Base Layer";
+        public string CustomLayerID = "⚠️ Base Layer";
 
         public bool IsSetUp {
             get {

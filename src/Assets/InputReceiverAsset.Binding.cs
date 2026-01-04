@@ -184,6 +184,7 @@ namespace FlameStream
                 oad.MaskedBodyParts = new AnimationMaskedBodyPart[] { AnimationMaskedBodyPart.LeftFingers, AnimationMaskedBodyPart.RightFingers };
                 oad.Additive = false;
                 oad.Looping = false;
+                oad.CustomLayerID = $"{CHARACTER_ANIM_LAYER_ID_PREFIX} Base Layer";
             }), true);
 
             // Imitate the prop transforms
