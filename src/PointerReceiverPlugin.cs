@@ -7,7 +7,7 @@ namespace FlameStream {
         Name = "PLUGIN_NAME",
         Description = "PLUGIN_DESCRIPTION",
         Author = "FlameStream",
-        Version = "5.3.0",
+        Version = "5.4.1",
         AssetTypes = new[] {
             typeof(DrawingScreenAsset),
             typeof(DirectInputReceiverAsset),

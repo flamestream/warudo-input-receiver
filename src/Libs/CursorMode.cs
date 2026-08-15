@@ -4,40 +4,43 @@ using UnityEngine;
 
 namespace FlameStream
 {
+    public enum CursorModeValue {
+        [Label("CURSOR_MODE_RAW_TRACKING")]
+        RawTracking = 0,
+        [Label("CURSOR_MODE_FIXED_DELTA")]
+        FixedDelta = 1,
+    }
+
+    public enum OutOfBoundRawTrackingHandlingValue {
+        [Label("CURSOR_MODE_RAW_OOB_OVERFLOW")]
+        Overflow = 0,
+        [Label("CURSOR_MODE_RAW_OOB_CLAMP")]
+        Clamp = 1,
+        [Label("CURSOR_MODE_RAW_OOB_FREEZE")]
+        Freeze = 2,
+        [Label("CURSOR_MODE_RAW_OOB_DISABLE_HAND")]
+        DisableHand = 3,
+    }
+
+    public enum OutOfBoundFixedDeltaHandlingValue {
+        [Label("CURSOR_MODE_FIXED_OOB_CLAMP")]
+        Clamped = 0,
+        [Label("CURSOR_MODE_FIXED_OOB_BACK_TO_CENTER")]
+        BackToCenter = 1,
+    }
+
     public class CursorMode : StructuredData {
         [DataInput]
         [Label("MODE")]
         public CursorModeValue Mode;
-        public enum CursorModeValue {
-            [Label("CURSOR_MODE_RAW_TRACKING")]
-            RawTracking = 0,
-            [Label("CURSOR_MODE_FIXED_DELTA")]
-            FixedDelta = 1,
-        }
 
         [DataInput]
         [Label("OOB_HANDLING")]
         public OutOfBoundRawTrackingHandlingValue OutOfBoundRawTrackingHandling;
-        public enum OutOfBoundRawTrackingHandlingValue {
-            [Label("CURSOR_MODE_RAW_OOB_OVERFLOW")]
-            Overflow = 0,
-            [Label("CURSOR_MODE_RAW_OOB_CLAMP")]
-            Clamp = 1,
-            [Label("CURSOR_MODE_RAW_OOB_FREEZE")]
-            Freeze = 2,
-            [Label("CURSOR_MODE_RAW_OOB_DISABLE_HAND")]
-            DisableHand = 3,
-        }
 
         [DataInput]
         [Label("OOB_HANDLING")]
         public OutOfBoundFixedDeltaHandlingValue OutOfBoundFixedDeltaHandling;
-        public enum OutOfBoundFixedDeltaHandlingValue {
-            [Label("CURSOR_MODE_FIXED_OOB_CLAMP")]
-            Clamped = 0,
-            [Label("CURSOR_MODE_FIXED_OOB_BACK_TO_CENTER")]
-            BackToCenter = 1,
-        }
 
         [DataInput]
         [Label("DISPLACEMENT_INFLUENCE_FACTOR")]

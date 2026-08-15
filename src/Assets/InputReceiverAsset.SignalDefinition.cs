@@ -466,6 +466,7 @@ namespace FlameStream {
             [Trigger]
             [Label("IMPORT_FROM_PROP")]
             [Description("IMPORT_FROM_PROP_DESCRIPTION")]
+            [Disabled]
             public async void TriggerImportSignalDefinitionsFromProp() {
                 await Parent.Parent.ImportSignalDefinitionsFromProp();
             }
@@ -1747,159 +1748,159 @@ namespace FlameStream {
         ///
 
         private async System.Threading.Tasks.Task ImportSignalDefinitionsFromProp() {
-            try {
-                // Get AnimSettingsReader component from prop gameObject
-                if (HeldProp == null) {
-                    Context.Service.PromptMessage("Import Error", "❌ No prop is currently bound. Please bind a prop first.");
-                    return;
-                }
+            // try {
+            //     // Get AnimSettingsReader component from prop gameObject
+            //     if (HeldProp == null) {
+            //         Context.Service.PromptMessage("Import Error", "❌ No prop is currently bound. Please bind a prop first.");
+            //         return;
+            //     }
 
-                var gameObject = HeldProp.GameObject;
-                if (gameObject == null) {
-                    Context.Service.PromptMessage("Import Error", "❌ Prop gameObject not available. Please check prop binding.");
-                    return;
-                }
+            //     var gameObject = HeldProp.GameObject;
+            //     if (gameObject == null) {
+            //         Context.Service.PromptMessage("Import Error", "❌ Prop gameObject not available. Please check prop binding.");
+            //         return;
+            //     }
 
-                Newtonsoft.Json.Linq.JObject animationSettingsData = null;
+            //     Newtonsoft.Json.Linq.JObject animationSettingsData = null;
 
-                // Attempt to get animation settings JSON
-                try {
-                    Component animSettingsReader = null;
+            //     // Attempt to get animation settings JSON
+            //     try {
+            //         Component animSettingsReader = null;
 
-                    // Look for any component with "AnimSettingsReader" in its name
-                    var allComponents = gameObject.GetComponents<Component>();
-                    foreach (var component in allComponents) {
-                        if (component.GetType().Name.Contains("AnimSettingsReader")) {
-                            animSettingsReader = component;
-                            break;
-                        }
-                    }
+            //         // Look for any component with "AnimSettingsReader" in its name
+            //         var allComponents = gameObject.GetComponents<Component>();
+            //         foreach (var component in allComponents) {
+            //             if (component.GetType().Name.Contains("AnimSettingsReader")) {
+            //                 animSettingsReader = component;
+            //                 break;
+            //             }
+            //         }
 
-                    if (animSettingsReader == null) {
-                        Context.Service.PromptMessage("Import Error", "❌ Prop does not have an AnimSettingsReader component.");
-                        return;
-                    }
+            //         if (animSettingsReader == null) {
+            //             Context.Service.PromptMessage("Import Error", "❌ Prop does not have an AnimSettingsReader component.");
+            //             return;
+            //         }
 
-                    // Get animation settings
-                    var getRawJsonMethod = animSettingsReader.GetType().GetMethod("getRawJson");
-                    if (getRawJsonMethod != null) {
-                        var jsonString = getRawJsonMethod.Invoke(animSettingsReader, null) as string;
-                        if (string.IsNullOrEmpty(jsonString)) {
-                            Context.Service.PromptMessage("Import Error", "❌ AnimSettingsReader returned empty JSON string.");
-                            return;
-                        }
-                        // Parse JSON string to JObject
-                        animationSettingsData = Newtonsoft.Json.Linq.JObject.Parse(jsonString);
-                    } else {
-                        Context.Service.PromptMessage("Import Error", "❌ AnimSettingsReader component does not have a 'getRawJson' method.");
-                        return;
-                    }
-                } catch (Newtonsoft.Json.JsonException jsonEx) {
-                    Context.Service.PromptMessage("Import Error", $"❌ Failed to parse JSON from AnimSettingsReader: {jsonEx.Message}");
-                    return;
-                } catch (System.Exception reflectionEx) {
-                    Context.Service.PromptMessage("Import Error", $"❌ Reflection approach failed: {reflectionEx.Message}");
-                    return;
-                }
+            //         // Get animation settings
+            //         var getRawJsonMethod = animSettingsReader.GetType().GetMethod("getRawJson");
+            //         if (getRawJsonMethod != null) {
+            //             var jsonString = getRawJsonMethod.Invoke(animSettingsReader, null) as string;
+            //             if (string.IsNullOrEmpty(jsonString)) {
+            //                 Context.Service.PromptMessage("Import Error", "❌ AnimSettingsReader returned empty JSON string.");
+            //                 return;
+            //             }
+            //             // Parse JSON string to JObject
+            //             animationSettingsData = Newtonsoft.Json.Linq.JObject.Parse(jsonString);
+            //         } else {
+            //             Context.Service.PromptMessage("Import Error", "❌ AnimSettingsReader component does not have a 'getRawJson' method.");
+            //             return;
+            //         }
+            //     } catch (Newtonsoft.Json.JsonException jsonEx) {
+            //         Context.Service.PromptMessage("Import Error", $"❌ Failed to parse JSON from AnimSettingsReader: {jsonEx.Message}");
+            //         return;
+            //     } catch (System.Exception reflectionEx) {
+            //         Context.Service.PromptMessage("Import Error", $"❌ Reflection approach failed: {reflectionEx.Message}");
+            //         return;
+            //     }
 
-                // Validation
-                if (animationSettingsData == null) {
-                    Context.Service.PromptMessage("Import Error", "❌ AnimSettingsReader returned null data.");
-                    return;
-                }
-                Newtonsoft.Json.Linq.JObject importData;
-                try {
-                    if (animationSettingsData["version"] != null && animationSettingsData["data"] != null) {
-                        importData = animationSettingsData["data"] as Newtonsoft.Json.Linq.JObject;
+            //     // Validation
+            //     if (animationSettingsData == null) {
+            //         Context.Service.PromptMessage("Import Error", "❌ AnimSettingsReader returned null data.");
+            //         return;
+            //     }
+            //     Newtonsoft.Json.Linq.JObject importData;
+            //     try {
+            //         if (animationSettingsData["version"] != null && animationSettingsData["data"] != null) {
+            //             importData = animationSettingsData["data"] as Newtonsoft.Json.Linq.JObject;
 
-                        if (importData == null) {
-                            Context.Service.PromptMessage("Import Error", "❌ Failed to parse 'data' field as JObject.");
-                            return;
-                        }
+            //             if (importData == null) {
+            //                 Context.Service.PromptMessage("Import Error", "❌ Failed to parse 'data' field as JObject.");
+            //                 return;
+            //             }
 
-                        // Check protocol compatibility
-                        if (animationSettingsData["protocol"] != null) {
-                            var exportedProtocol = animationSettingsData["protocol"].ToString();
-                            var currentProtocol = PROTOCOL_ID;
+            //             // Check protocol compatibility
+            //             if (animationSettingsData["protocol"] != null) {
+            //                 var exportedProtocol = animationSettingsData["protocol"].ToString();
+            //                 var currentProtocol = PROTOCOL_ID;
 
-                            if (exportedProtocol != currentProtocol) {
-                                var warningMessage = $"⚠️ **Protocol Mismatch Detected**\n\n" +
-                                    $"The prop was configured for a different protocol:\n" +
-                                    $"   • Prop protocol: **{exportedProtocol}**\n" +
-                                    $"   • Current protocol: **{currentProtocol}**\n\n" +
-                                    $"This may cause compatibility issues. The signal definitions may not match your current setup.\n\n" +
-                                    $"**Recommended action:**\n" +
-                                    $"1. First, generate signal definitions from a template that matches your controller\n" +
-                                    $"2. Then, rerun the prop import function to apply settings based on existing definitions, matching by label\n\n" +
-                                    $"⚠️ **Note:** Even if you follow the recommended steps, further manual adjustments may be needed to ensure full compatibility.";
+            //                 if (exportedProtocol != currentProtocol) {
+            //                     var warningMessage = $"⚠️ **Protocol Mismatch Detected**\n\n" +
+            //                         $"The prop was configured for a different protocol:\n" +
+            //                         $"   • Prop protocol: **{exportedProtocol}**\n" +
+            //                         $"   • Current protocol: **{currentProtocol}**\n\n" +
+            //                         $"This may cause compatibility issues. The signal definitions may not match your current setup.\n\n" +
+            //                         $"**Recommended action:**\n" +
+            //                         $"1. First, generate signal definitions from a template that matches your controller\n" +
+            //                         $"2. Then, rerun the prop import function to apply settings based on existing definitions, matching by label\n\n" +
+            //                         $"⚠️ **Note:** Even if you follow the recommended steps, further manual adjustments may be needed to ensure full compatibility.";
 
-                                Context.Service.PromptMessage("Asset Class Mismatch", warningMessage);
-                            }
-                        }
-                    } else {
-                        // Legacy format - treat entire root as data
-                        importData = animationSettingsData;
-                    }
-                } catch (Exception ex) {
-                    Context.Service.PromptMessage("Import Error", $"❌ Failed to process animation settings data:\n{ex.Message}");
-                    return;
-                }
+            //                     Context.Service.PromptMessage("Asset Class Mismatch", warningMessage);
+            //                 }
+            //             }
+            //         } else {
+            //             // Legacy format - treat entire root as data
+            //             importData = animationSettingsData;
+            //         }
+            //     } catch (Exception ex) {
+            //         Context.Service.PromptMessage("Import Error", $"❌ Failed to process animation settings data:\n{ex.Message}");
+            //         return;
+            //     }
 
-                // // Scan signal definition labels and validate
-                // var importLabels = importData.Properties().Select(p => p.Name).ToList();
-                // var existingLabels = new HashSet<string>();
+            //     // // Scan signal definition labels and validate
+            //     // var importLabels = importData.Properties().Select(p => p.Name).ToList();
+            //     // var existingLabels = new HashSet<string>();
 
-                // // Collect all existing signal definition labels
-                // if (ButtonDefinitions != null) {
-                //     foreach (var def in ButtonDefinitions) {
-                //         if (def.IsValid && !string.IsNullOrEmpty(def.Label)) {
-                //             existingLabels.Add(def.Label);
-                //         }
-                //     }
-                // }
+            //     // // Collect all existing signal definition labels
+            //     // if (ButtonDefinitions != null) {
+            //     //     foreach (var def in ButtonDefinitions) {
+            //     //         if (def.IsValid && !string.IsNullOrEmpty(def.Label)) {
+            //     //             existingLabels.Add(def.Label);
+            //     //         }
+            //     //     }
+            //     // }
 
-                // if (SwitchDefinitions != null) {
-                //     foreach (var def in SwitchDefinitions) {
-                //         if (def.IsValid && !string.IsNullOrEmpty(def.Label)) {
-                //             existingLabels.Add(def.Label);
-                //         }
-                //     }
-                // }
+            //     // if (SwitchDefinitions != null) {
+            //     //     foreach (var def in SwitchDefinitions) {
+            //     //         if (def.IsValid && !string.IsNullOrEmpty(def.Label)) {
+            //     //             existingLabels.Add(def.Label);
+            //     //         }
+            //     //     }
+            //     // }
 
-                // if (AxisDefinitions != null) {
-                //     foreach (var def in AxisDefinitions) {
-                //         if (def.IsValid && !string.IsNullOrEmpty(def.Label)) {
-                //             existingLabels.Add(def.Label);
-                //         }
-                //     }
-                // }
+            //     // if (AxisDefinitions != null) {
+            //     //     foreach (var def in AxisDefinitions) {
+            //     //         if (def.IsValid && !string.IsNullOrEmpty(def.Label)) {
+            //     //             existingLabels.Add(def.Label);
+            //     //         }
+            //     //     }
+            //     // }
 
-                // // Find missing labels
-                // var missingLabels = importLabels.Where(label => !existingLabels.Contains(label)).ToList();
+            //     // // Find missing labels
+            //     // var missingLabels = importLabels.Where(label => !existingLabels.Contains(label)).ToList();
 
-                // // Handle validation results
-                // if (missingLabels.Count > 0) {
-                //     var errorMessage = "❌ **Missing Signal Definitions**\n\n" +
-                //                      "The following labels from the prop animation settings do not have corresponding signal definitions:\n\n" +
-                //                      string.Join("\n", missingLabels.Select(l => $"   • '{l}'")) + "\n\n" +
-                //                      "Please create signal definitions with these labels first, or ensure the labels match exactly.";
-                //     Context.Service.PromptMessage("Import Validation Failed", errorMessage);
-                //     return;
-                // }
-                // var matchedCount = importLabels.Count;
+            //     // // Handle validation results
+            //     // if (missingLabels.Count > 0) {
+            //     //     var errorMessage = "❌ **Missing Signal Definitions**\n\n" +
+            //     //                      "The following labels from the prop animation settings do not have corresponding signal definitions:\n\n" +
+            //     //                      string.Join("\n", missingLabels.Select(l => $"   • '{l}'")) + "\n\n" +
+            //     //                      "Please create signal definitions with these labels first, or ensure the labels match exactly.";
+            //     //     Context.Service.PromptMessage("Import Validation Failed", errorMessage);
+            //     //     return;
+            //     // }
+            //     // var matchedCount = importLabels.Count;
 
-                // Show confirmation dialog
-                var confirmMessage = $"Signal definitions found on prop. This will overwrite existing animation settings for all matched signal definitions. Do you want to continue?";
+            //     // Show confirmation dialog
+            //     var confirmMessage = $"Signal definitions found on prop. This will overwrite existing animation settings for all matched signal definitions. Do you want to continue?";
 
-                bool confirmed = await Context.Service.PromptConfirmation("Import Signal Definition from Prop", confirmMessage);
-                if (!confirmed) return;
+            //     bool confirmed = await Context.Service.PromptConfirmation("Import Signal Definition from Prop", confirmMessage);
+            //     if (!confirmed) return;
 
-                // Use existing ImportSignalDefinitions method
-                ImportSignalDefinitions(importData);
+            //     // Use existing ImportSignalDefinitions method
+            //     ImportSignalDefinitions(importData);
 
-            } catch (Exception ex) {
-                Context.Service.PromptMessage("Import Error", $"❌ An unexpected error occurred during import:\n{ex.Message}");
-            }
+            // } catch (Exception ex) {
+            //     Context.Service.PromptMessage("Import Error", $"❌ An unexpected error occurred during import:\n{ex.Message}");
+            // }
         }
 
         private void ExportSignalDefinitions() {

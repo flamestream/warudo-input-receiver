@@ -123,7 +123,7 @@ namespace FlameStream
             if (monitor == null) return;
             if (cursorAnchorAsset == null) return;
 
-            if (CursorMode.Mode == CursorMode.CursorModeValue.FixedDelta) {
+            if (CursorMode.Mode == CursorModeValue.FixedDelta) {
                 adjustedX = 0;
                 adjustedY = 0;
                 if (X != lastX) {
@@ -150,28 +150,28 @@ namespace FlameStream
             isOutOfBound = inX != X || inY != Y;
 
 
-            if (CursorMode.Mode == CursorMode.CursorModeValue.FixedDelta) {
+            if (CursorMode.Mode == CursorModeValue.FixedDelta) {
                 switch (CursorMode.OutOfBoundFixedDeltaHandling) {
-                    case CursorMode.OutOfBoundFixedDeltaHandlingValue.BackToCenter:
+                    case OutOfBoundFixedDeltaHandlingValue.BackToCenter:
                         if (adjustedX != inX) adjustedX = (monitor.left + monitor.right) / 2;
                         if (adjustedY != inY) adjustedY = (monitor.top + monitor.bottom) / 2;
                         break;
-                    case CursorMode.OutOfBoundFixedDeltaHandlingValue.Clamped:
+                    case OutOfBoundFixedDeltaHandlingValue.Clamped:
                     default:
                         adjustedX = inX;
                         adjustedY = inY;
                         break;
                 }
             } else {
-                if (CursorMode.OutOfBoundRawTrackingHandling != CursorMode.OutOfBoundRawTrackingHandlingValue.Overflow) {
+                if (CursorMode.OutOfBoundRawTrackingHandling != OutOfBoundRawTrackingHandlingValue.Overflow) {
                     adjustedX = inX;
                     adjustedY = inY;
-                    if (CursorMode.OutOfBoundRawTrackingHandling == CursorMode.OutOfBoundRawTrackingHandlingValue.DisableHand) {
+                    if (CursorMode.OutOfBoundRawTrackingHandling == OutOfBoundRawTrackingHandlingValue.DisableHand) {
                         if (isOutOfBound != lastIsOutOfBound) {
                             isHandDisabledByOutOfBound = isOutOfBound;
                             OnInputAffectingHandSetupChange();
                         }
-                    } else if (CursorMode.OutOfBoundRawTrackingHandling == CursorMode.OutOfBoundRawTrackingHandlingValue.Freeze) {
+                    } else if (CursorMode.OutOfBoundRawTrackingHandling == OutOfBoundRawTrackingHandlingValue.Freeze) {
                         if (isOutOfBound) {
                             adjustedX = lastAdjustedX;
                             adjustedY = lastAdjustedY;

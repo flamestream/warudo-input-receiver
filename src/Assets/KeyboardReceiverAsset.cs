@@ -61,13 +61,23 @@ namespace FlameStream
             BroadcastTriggerProperties(nameof(TriggerCancelIdentifyButton));
         }
 
-        /// <summary>
-        /// BASIC SETUP
-        /// </summary>
-        [Section("BASIC_SETUP")]
+        protected override void OnCreate() {
+            base.OnCreate();
+            OnCreateBasicSetup();
+            OnCreateFingerMovement();
+        }
 
-        [Markdown]
-        public string ComingSoonInstructions = @"### Key Press Animator Framework Coming Soon
-In the meantime, the nodes should provide enough basic functionality to do anything";
+        protected override void OnDestroy() {
+            base.OnDestroy();
+            OnDestroyBasicSetup();
+            OnDestroyFingerMovement();
+        }
+
+        public override void OnUpdate() {
+            base.OnUpdate();
+            OnUpdateState();
+            OnUpdateBasicSetup();
+            OnUpdateFingerMovement();
+        }
     }
 }

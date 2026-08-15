@@ -113,3 +113,22 @@ All input receivers inherit from `ReceiverAsset`:
 
 ### 4.6 Retaining Compatibility
 - Do not rename existing node IDs or data port names as this breaks existing user scenes and graphs in Warudo.
+
+### 4.7 Enum Declarations for DataInput Ports & StructuredData
+- **CRITICAL**: Any `enum` used as a `[DataInput]` port or inside a `StructuredData` class **MUST** be defined directly at the `namespace` level (top-level type).
+- Do **NOT** declare enums nested inside a class (e.g. `class MyData { public enum MyEnum ... }`), because the CLR type reflection name becomes `Namespace.MyData+MyEnum`, which Warudo's type resolver cannot find, causing runtime log errors such as `Enum type ... does not exist`.
+
+### 4.8 Limb IK Hand Orientation Standards
+- In Warudo, humanoid avatar wrist/hand IK targets use the following rotation standards when facing straight forward in front of the avatar (relative to the Character or a forward-facing Root anchor):
+  - **Left Hand (Straight Forward)**: `Vector3(0f, 90f, 0f)` (rotates left palm/fingers forward toward a keyboard, desk, or prop).
+  - **Right Hand (Straight Forward)**: `Vector3(0f, -90f, 0f)` (rotates right palm/fingers forward toward a keyboard, desk, or prop).
+  - *Note*: An IK rotation of `(0, 0, 0)` causes humanoid hands to point sideways (T-pose/A-pose resting angle) rather than forward.
+
+---
+
+## 5. Troubleshooting & Runtime Logs
+
+- **Warudo Runtime Log**: `C:\Users\flame\AppData\LocalLow\HakuyaLabs\Warudo\Player.log`
+  - Inspect `Player.log` when debugging hot-reload compilation errors, missing types, deserialization issues, or scene loading exceptions.
+
+

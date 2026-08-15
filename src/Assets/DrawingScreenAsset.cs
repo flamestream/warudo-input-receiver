@@ -18,20 +18,6 @@ namespace FlameStream {
             Bend = false;
         }
 
-        /// <summary>
-        /// Attempts to get the ScreenSize property from the base class using dynamic typing.
-        /// Returns null if the property doesn't exist (Stable environment) or if an exception occurs.
-        /// </summary>
-        public Vector2? TryGetScreenSize() {
-            try {
-                // Try to access ScreenSize property from base class (available in Beta)
-                return ((dynamic)this).ScreenSize;
-            } catch {
-                // ScreenSize property doesn't exist (Stable environment) or threw an exception
-                return null;
-            }
-        }
-
         protected override void OnCreate() {
             base.OnCreate();
             GetDataInputPort(nameof(ContentType)).Properties.alwaysDisabled = true;
@@ -59,7 +45,7 @@ namespace FlameStream {
         public Vector3 GetChildCursorPosition(int x, int y) {
             if (cachedMonitor == null) return Vector3.zero;
 
-            Vector2? screenSize = TryGetScreenSize();
+            Vector2? screenSize = this.ScreenSize;
             float xDisplacement;
             float yDisplacement;
             if (screenSize == null) {

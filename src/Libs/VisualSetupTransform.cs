@@ -90,6 +90,7 @@ namespace FlameStream {
             try {
                 Scene.RemoveAsset(setupAnchor.Id);
             } catch {}
+            setupAnchor = null;
         }
 
         public void EnterVisualSetup(bool isNavigationWanted) {
