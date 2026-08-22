@@ -100,13 +100,17 @@ namespace FlameStream
 
             float[] targetFingerWeights = new float[10];
 
-            // 1. Process Left Hand (Up to 1 finger active)
-            bool isLeftInVisualSetup = LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode;
+            // 1. Process Left Hand (Position & rotation driven by newest active key)
+            bool isLeftInVisualSetup = (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode) || (LeftHandDynamicRotation != null && LeftHandDynamicRotation.InVisualSetupMode);
+            if (LeftHandDynamicRotation != null && LeftHandDynamicRotation.InVisualSetupMode) {
+                LeftHandDynamicRotation.UpdateDebugVisuals();
+            }
+
             var activeLeftKey = isLeftInVisualSetup ? null : GetActiveKeyForHand(true, KeyBindings);
-            Vector3 restLeftPos = (isLeftInVisualSetup && LeftHandRestTransform.setupAnchor != null)
+            Vector3 restLeftPos = (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode && LeftHandRestTransform.setupAnchor != null)
                 ? LeftHandRestTransform.setupAnchor.Transform.Position
                 : LeftHandRestPosition;
-            Vector3 restLeftRot = (isLeftInVisualSetup && LeftHandRestTransform.setupAnchor != null)
+            Vector3 restLeftRot = (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode && LeftHandRestTransform.setupAnchor != null)
                 ? LeftHandRestTransform.setupAnchor.Transform.Rotation
                 : LeftHandRestRotation;
 
@@ -161,12 +165,16 @@ namespace FlameStream
             }
 
             // 2. Process Right Hand (Position & rotation driven by newest active key)
-            bool isRightInVisualSetup = RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode;
+            bool isRightInVisualSetup = (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode) || (RightHandDynamicRotation != null && RightHandDynamicRotation.InVisualSetupMode);
+            if (RightHandDynamicRotation != null && RightHandDynamicRotation.InVisualSetupMode) {
+                RightHandDynamicRotation.UpdateDebugVisuals();
+            }
+
             var activeRightKey = isRightInVisualSetup ? null : GetActiveKeyForHand(false, KeyBindings);
-            Vector3 restRightPos = (isRightInVisualSetup && RightHandRestTransform.setupAnchor != null)
+            Vector3 restRightPos = (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode && RightHandRestTransform.setupAnchor != null)
                 ? RightHandRestTransform.setupAnchor.Transform.Position
                 : RightHandRestPosition;
-            Vector3 restRightRot = (isRightInVisualSetup && RightHandRestTransform.setupAnchor != null)
+            Vector3 restRightRot = (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode && RightHandRestTransform.setupAnchor != null)
                 ? RightHandRestTransform.setupAnchor.Transform.Rotation
                 : RightHandRestRotation;
 

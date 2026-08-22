@@ -10,6 +10,8 @@ namespace FlameStream {
     )]
     public class VisualSetupAnchorAsset : AnchorAsset {
         public VisualSetupTransform Parent;
+        public Action ApplyTriggerAction;
+        public Action CancelTriggerAction;
 
         [Markdown(0)]
         public string Instructions;
@@ -17,13 +19,21 @@ namespace FlameStream {
         [Trigger(0)]
         [Label("CANCEL_TRANSFORM")]
         public void CancelTrigger() {
-            Parent.ExitVisualSetup(false);
+            if (CancelTriggerAction != null) {
+                CancelTriggerAction.Invoke();
+            } else {
+                Parent?.ExitVisualSetup(false);
+            }
         }
 
         [Trigger(0)]
         [Label("APPLY_TRANSFORM")]
         public void ApplyTrigger() {
-            Parent.Apply(this);
+            if (ApplyTriggerAction != null) {
+                ApplyTriggerAction.Invoke();
+            } else {
+                Parent?.Apply(this);
+            }
         }
 
         [DataInput(11)]

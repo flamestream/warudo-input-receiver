@@ -295,12 +295,42 @@ namespace FlameStream
             SetupRootTransform();
             SetupLeftHandRestTransform();
             SetupRightHandRestTransform();
+            SetupLeftHandDynamicRotation();
+            SetupRightHandDynamicRotation();
+        }
+
+        void SetupLeftHandDynamicRotation() {
             if (LeftHandDynamicRotation == null) {
                 LeftHandDynamicRotation = StructuredData.Create<DynamicVector3>();
             }
+            LeftHandDynamicRotation.LocalizationKey = "KEYBOARD_LEFT_HAND_DYNAMIC_ROTATION";
+            LeftHandDynamicRotation.GetRestPosition = () => LeftHandRestPosition;
+            LeftHandDynamicRotation.GetParentAnchor = () => GetRootAnchor(false);
+            LeftHandDynamicRotation.OnEnterVisualSetup = (dv) => {
+                EnsureAnchors();
+            };
+            LeftHandDynamicRotation.OnExitVisualSetup = (isApplied) => {
+                ResetActiveKeyValues();
+                Context.Service.NavigateToAsset(Id);
+                Context.Service.BroadcastOpenedScene();
+            };
+        }
+
+        void SetupRightHandDynamicRotation() {
             if (RightHandDynamicRotation == null) {
                 RightHandDynamicRotation = StructuredData.Create<DynamicVector3>();
             }
+            RightHandDynamicRotation.LocalizationKey = "KEYBOARD_RIGHT_HAND_DYNAMIC_ROTATION";
+            RightHandDynamicRotation.GetRestPosition = () => RightHandRestPosition;
+            RightHandDynamicRotation.GetParentAnchor = () => GetRootAnchor(false);
+            RightHandDynamicRotation.OnEnterVisualSetup = (dv) => {
+                EnsureAnchors();
+            };
+            RightHandDynamicRotation.OnExitVisualSetup = (isApplied) => {
+                ResetActiveKeyValues();
+                Context.Service.NavigateToAsset(Id);
+                Context.Service.BroadcastOpenedScene();
+            };
         }
 
         void SetupRootTransform() {
@@ -415,6 +445,8 @@ namespace FlameStream
             Watch(nameof(RootTransform), delegate { SetupRootTransform(); });
             Watch(nameof(LeftHandRestTransform), delegate { SetupLeftHandRestTransform(); });
             Watch(nameof(RightHandRestTransform), delegate { SetupRightHandRestTransform(); });
+            Watch(nameof(LeftHandDynamicRotation), delegate { SetupLeftHandDynamicRotation(); });
+            Watch(nameof(RightHandDynamicRotation), delegate { SetupRightHandDynamicRotation(); });
 
             Watch(nameof(IsEnabled), delegate { UpdateHandTrackingState(); });
             Watch(nameof(IsHandEnabled), delegate { UpdateHandTrackingState(); });
@@ -437,6 +469,10 @@ namespace FlameStream
             RootTransform?.DestroyAnchor();
             LeftHandRestTransform?.DestroyAnchor();
             RightHandRestTransform?.DestroyAnchor();
+            LeftHandDynamicRotation?.DestroyAnchor();
+            LeftHandDynamicRotation?.DestroyDebugVisuals();
+            RightHandDynamicRotation?.DestroyAnchor();
+            RightHandDynamicRotation?.DestroyDebugVisuals();
 
             if (Character != null && Character.OverlappingAnimations != null) {
                 var userLayers = Character.OverlappingAnimations.Where(d => !(d.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false)).ToArray();

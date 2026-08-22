@@ -52,6 +52,9 @@
     <Reference Include="UnityEngine.XRModule">
       <HintPath>$(WarudoManagedDir)/UnityEngine.XRModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(WarudoManagedDir)/UnityEngine.PhysicsModule.dll</HintPath>
+    </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(WarudoManagedDir)/Newtonsoft.Json.dll</HintPath>
     </Reference>
