@@ -21,9 +21,9 @@ namespace FlameStream {
         public Vector3 Evaluate(Vector3 v) {
             var result = Enabled
                 ? new Vector3(
-                    X.Evaluate(v),
-                    Y.Evaluate(v),
-                    Z.Evaluate(v)
+                    X != null ? X.Evaluate(v) : 0f,
+                    Y != null ? Y.Evaluate(v) : 0f,
+                    Z != null ? Z.Evaluate(v) : 0f
                 )
                 : Vector3.zero;
             if (debugMode) {
@@ -58,7 +58,11 @@ result: {result}
 
         protected override void OnCreate() {
             base.OnCreate();
+            if (X == null) X = StructuredData.Create<DistanceInputMathExpression>();
+            if (Y == null) Y = StructuredData.Create<DistanceInputMathExpression>();
+            if (Z == null) Z = StructuredData.Create<DistanceInputMathExpression>();
             Watch(nameof(Enabled), delegate { OnEnabledChanged(); });
+            OnEnabledChanged();
         }
 
         void OnEnabledChanged() {

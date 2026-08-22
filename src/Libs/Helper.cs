@@ -104,5 +104,60 @@ namespace FlameStream {
             if (angle <= -180.0f) return angle + 360.0f;
             return angle;
         }
+
+        /// <summary>
+        /// Determines if the code is currently executing inside Warudo's live Roslyn-compiled Playground environment
+        /// or as a packaged .warudo mod loaded via uMod.
+        /// </summary>
+        public static bool IsPlaygroundMode {
+            get {
+                var asm = typeof(Helper).Assembly;
+                // 1. If assembly location contains Playground path, it is Playground mode
+                if (!string.IsNullOrEmpty(asm.Location) && asm.Location.IndexOf("Playground", System.StringComparison.OrdinalIgnoreCase) >= 0) {
+                    return true;
+                }
+                // 2. If assembly name contains "umod-", it is packaged Plugin (uMod) mode
+                var name = asm.GetName().Name ?? "";
+                if (name.IndexOf("umod-", System.StringComparison.OrdinalIgnoreCase) >= 0) {
+                    return false;
+                }
+                // 3. Fallback: Check if OwnerPlugin is CorePlugin (Playground assigns CorePlugin as OwnerPlugin)
+                var meta = Warudo.Core.Context.AssetTypeRegistry?.GetTypeMeta(typeof(PointerReceiverAsset));
+                if (meta != null && meta.OwnerPlugin != null && meta.OwnerPlugin.GetType().Name == "CorePlugin") {
+                    return true;
+                }
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Updates the character's OverlappingAnimations array, applying the appropriate technique
+        /// depending on whether the plugin is executing in Playground mode or packaged Plugin (uMod) mode.
+        /// </summary>
+        public static void SetCharacterOverlappingAnimations(CharacterAsset character, CharacterAsset.OverlappingAnimationData[] layers) {
+            if (character == null) return;
+
+            if (IsPlaygroundMode) {
+                character.OverlappingAnimations = layers;
+                character.BroadcastDataInput(nameof(character.OverlappingAnimations));
+            } else {
+                character.DataInputPortCollection.SetValueAtPath(nameof(character.OverlappingAnimations), layers, true);
+            }
+        }
+
+        /// <summary>
+        /// Updates a single animation layer on the character, using the appropriate technique
+        /// for Playground mode vs packaged Plugin mode.
+        /// </summary>
+        public static void SetCharacterOverlappingAnimationAt(CharacterAsset character, int index, string animationClipUri) {
+            if (character == null || character.OverlappingAnimations == null || index < 0 || index >= character.OverlappingAnimations.Length) return;
+
+            if (IsPlaygroundMode) {
+                character.OverlappingAnimations[index].Animation = animationClipUri;
+                character.BroadcastDataInput(nameof(character.OverlappingAnimations));
+            } else {
+                character.DataInputPortCollection.SetValueAtPath($"{nameof(character.OverlappingAnimations)}.{index}.Animation", animationClipUri, true);
+            }
+        }
     }
 }

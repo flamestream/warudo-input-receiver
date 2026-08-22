@@ -185,20 +185,13 @@ namespace FlameStream
                 } else {
                     list.Add(idleLayer);
                 }
-                // Plugin Mode
-                Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}", list.ToArray(), true);
-                // Playground Mode
-                // Character.OverlappingAnimations =  list.ToArray();
-                // Character.BroadcastDataInput(nameof(Character.OverlappingAnimations));
+
+                Helper.SetCharacterOverlappingAnimations(Character, list.ToArray());
 
             } else {
 
                 var idx = Array.IndexOf(Character.OverlappingAnimations, idleLayer);
-                // Plugin Mode
-                Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}.{idx}.Animation", IdleFingerAnimation, true);
-                // Playground Mode
-                // Character.OverlappingAnimations[idx].Animation = IdleFingerAnimation;
-                // Character.BroadcastDataInput(nameof(Character.OverlappingAnimations));
+                Helper.SetCharacterOverlappingAnimationAt(Character, idx, IdleFingerAnimation);
             }
         }
 

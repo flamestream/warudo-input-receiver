@@ -79,7 +79,7 @@ namespace FlameStream {
             Scene.UpdateNewAssetName(setupAnchor);
 
             setupAnchor.OnAnimationChange = (a) => {
-                OnAnimationChange.Invoke(a);
+                OnAnimationChange?.Invoke(a);
             };
 
             return setupAnchor;

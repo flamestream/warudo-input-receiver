@@ -7,6 +7,7 @@ using Warudo.Core;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
 using Warudo.Core.Localization;
+using Warudo.Plugins.Core.Assets.Character;
 
 namespace FlameStream
 {
@@ -123,8 +124,10 @@ namespace FlameStream
                 leftKeyReleaseTime = -1f;
             } else if (activeLeftKey != null) {
                 if (activeLeftKey.EnableHandMovement) {
-                    targetLeftPos = restLeftPos + Vector3.Scale(activeLeftKey.DeltaPosition, MovementFactor);
-                    targetLeftRot = restLeftRot + activeLeftKey.DeltaRotation;
+                    Vector3 deltaPos = Vector3.Scale(activeLeftKey.DeltaPosition, MovementFactor);
+                    targetLeftPos = restLeftPos + deltaPos;
+                    Vector3 dynamicRot = LeftHandDynamicRotation != null ? LeftHandDynamicRotation.Evaluate(deltaPos) : Vector3.zero;
+                    targetLeftRot = restLeftRot + dynamicRot + activeLeftKey.DeltaRotation;
                 } else {
                     targetLeftPos = hasLeftKeyBeenPressed ? lastLeftKeyPos : restLeftPos;
                     targetLeftRot = hasLeftKeyBeenPressed ? lastLeftKeyRot : restLeftRot;
@@ -134,10 +137,6 @@ namespace FlameStream
                 lastLeftKeyRot = targetLeftRot;
                 hasLeftKeyBeenPressed = true;
                 leftKeyReleaseTime = -1f;
-
-                if (activeLeftKey.EnableHandMovement || PlayAnimationOnDisabledKey) {
-                    targetFingerWeights[(int)activeLeftKey.Finger] = 1.0f;
-                }
             } else {
                 if (leftKeyReleaseTime < 0f) {
                     leftKeyReleaseTime = Time.time;
@@ -161,7 +160,7 @@ namespace FlameStream
                 }
             }
 
-            // 2. Process Right Hand (Up to 1 finger active)
+            // 2. Process Right Hand (Position & rotation driven by newest active key)
             bool isRightInVisualSetup = RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode;
             var activeRightKey = isRightInVisualSetup ? null : GetActiveKeyForHand(false, KeyBindings);
             Vector3 restRightPos = (isRightInVisualSetup && RightHandRestTransform.setupAnchor != null)
@@ -185,8 +184,10 @@ namespace FlameStream
                 rightKeyReleaseTime = -1f;
             } else if (activeRightKey != null) {
                 if (activeRightKey.EnableHandMovement) {
-                    targetRightPos = restRightPos + Vector3.Scale(activeRightKey.DeltaPosition, MovementFactor);
-                    targetRightRot = restRightRot + activeRightKey.DeltaRotation;
+                    Vector3 deltaPos = Vector3.Scale(activeRightKey.DeltaPosition, MovementFactor);
+                    targetRightPos = restRightPos + deltaPos;
+                    Vector3 dynamicRot = RightHandDynamicRotation != null ? RightHandDynamicRotation.Evaluate(deltaPos) : Vector3.zero;
+                    targetRightRot = restRightRot + dynamicRot + activeRightKey.DeltaRotation;
                 } else {
                     targetRightPos = hasRightKeyBeenPressed ? lastRightKeyPos : restRightPos;
                     targetRightRot = hasRightKeyBeenPressed ? lastRightKeyRot : restRightRot;
@@ -196,10 +197,6 @@ namespace FlameStream
                 lastRightKeyRot = targetRightRot;
                 hasRightKeyBeenPressed = true;
                 rightKeyReleaseTime = -1f;
-
-                if (activeRightKey.EnableHandMovement || PlayAnimationOnDisabledKey) {
-                    targetFingerWeights[(int)activeRightKey.Finger] = 1.0f;
-                }
             } else {
                 if (rightKeyReleaseTime < 0f) {
                     rightKeyReleaseTime = Time.time;
@@ -223,7 +220,25 @@ namespace FlameStream
                 }
             }
 
-            // 3. Drive Left Hand Anchor
+            // 3. Populate targetFingerWeights for ALL currently pressed keys across all bindings
+            if (KeyBindings != null) {
+                for (int i = 0; i < KeyBindings.Length; i++) {
+                    var binding = KeyBindings[i];
+                    if (binding == null) continue;
+
+                    bool isLeft = binding.Finger.IsLeftHand();
+                    if (isLeft && isLeftInVisualSetup) continue;
+                    if (!isLeft && isRightInVisualSetup) continue;
+
+                    if (Down((int)binding.Key)) {
+                        if (binding.EnableHandMovement || PlayAnimationOnDisabledKey) {
+                            targetFingerWeights[(int)binding.Finger] = 1.0f;
+                        }
+                    }
+                }
+            }
+
+            // 4. Drive Left Hand Anchor
             var leftAnchor = LeftHandAnchor;
             if (leftAnchor != null) {
                 var isPress = activeLeftKey != null;
@@ -242,7 +257,7 @@ namespace FlameStream
                 leftAnchor.Transform.Broadcast();
             }
 
-            // 4. Drive Right Hand Anchor
+            // 5. Drive Right Hand Anchor
             var rightAnchor = RightHandAnchor;
             if (rightAnchor != null) {
                 var isPress = activeRightKey != null;
@@ -261,7 +276,7 @@ namespace FlameStream
                 rightAnchor.Transform.Broadcast();
             }
 
-            // 5. Drive 10 Finger Overlay Animations
+            // 6. Drive 10 Finger Overlay Animations
             if (Character.OverlappingAnimations != null) {
                 for (int f = 0; f < 10; f++) {
                     KeyboardFinger finger = (KeyboardFinger)f;
@@ -270,21 +285,39 @@ namespace FlameStream
             }
         }
 
+        int GetAnimancerLayerIndex(CharacterAsset.OverlappingAnimationData layerData) {
+            if (Character == null || Character.OverlappingAnimations == null || layerData == null) return -1;
+            // In Warudo, CharacterAsset.SetupOverlappingAnimations filters by enabled layers with valid clips
+            var activeLayers = Character.OverlappingAnimations.Where(a => a.Enabled && a.GetAnimationClip() != null).ToList();
+            var indexInActive = activeLayers.IndexOf(layerData);
+            if (indexInActive < 0) return -1;
+            return 1 + indexInActive;
+        }
+
+        void SetAnimancerLayerWeight(int animancerLayerIdx, float weight) {
+            SetAnimancerComponentLayerWeight(Character?.Animancer, animancerLayerIdx, weight);
+            SetAnimancerComponentLayerWeight(Character?.CloneAnimancer, animancerLayerIdx, weight);
+        }
+
+        void SetAnimancerComponentLayerWeight(Animancer.AnimancerComponent animancer, int animancerLayerIdx, float weight) {
+            if (animancer == null || animancer.Layers == null || animancerLayerIdx < 0 || animancerLayerIdx >= animancer.Layers.Count) return;
+            var layer = animancer.Layers[animancerLayerIdx];
+            if (layer == null) return;
+            layer.SetWeight(weight);
+        }
+
         void ApplyFingerLayerWeight(KeyboardFinger finger, int fingerIndex, float targetWeight) {
-            var animancer = Character?.Animancer;
-            if (animancer == null || animancer.Layers == null) return;
-            if (Character.OverlappingAnimations == null) return;
+            if (Character == null || Character.OverlappingAnimations == null) return;
 
             var layerId = GetFingerLayerId(finger);
             var layerData = Array.Find(Character.OverlappingAnimations, a => a.CustomLayerID == layerId);
             if (layerData == null) return;
 
-            var idx = Array.IndexOf(Character.OverlappingAnimations, layerData);
-            if (idx < 0) return;
+            int animancerLayerIdx = GetAnimancerLayerIndex(layerData);
+            if (animancerLayerIdx < 0) return;
 
-            // In Warudo, Animancer Layer 0 is the Base Animation Layer. Overlapping animations start at Layer 1.
-            int animancerLayerIdx = 1 + idx;
-            if (animancerLayerIdx >= animancer.Layers.Count) return;
+            var animancer = Character.Animancer;
+            if (animancer == null || animancer.Layers == null || animancerLayerIdx >= animancer.Layers.Count) return;
 
             var layer = animancer.Layers[animancerLayerIdx];
             if (layer == null) return;
@@ -304,15 +337,13 @@ namespace FlameStream
                         return 0f;
                     },
                     v => {
-                        if (animancer != null && animancer.Layers != null && animancerLayerIdx < animancer.Layers.Count) {
-                            animancer.Layers[animancerLayerIdx].SetWeight(v);
-                        }
+                        SetAnimancerLayerWeight(animancerLayerIdx, v);
                     },
                     targetWeight,
                     trans.Time
                 ).SetEase(trans.Ease);
             } else {
-                layer.SetWeight(targetWeight);
+                SetAnimancerLayerWeight(animancerLayerIdx, targetWeight);
             }
         }
 
@@ -323,15 +354,15 @@ namespace FlameStream
 
             ResetActiveKeyValues();
 
-            var animancer = Character?.Animancer;
-            if (animancer == null || animancer.Layers == null || Character?.OverlappingAnimations == null) return;
+            if (Character == null || Character.OverlappingAnimations == null) return;
 
-            for (int i = 0; i < Character.OverlappingAnimations.Length; i++) {
-                var d = Character.OverlappingAnimations[i];
-                if (d != null && d.CustomLayerID != null && d.CustomLayerID.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX)) {
-                    int layerIdx = 1 + i;
-                    if (layerIdx < animancer.Layers.Count && animancer.Layers[layerIdx] != null) {
-                        animancer.Layers[layerIdx].SetWeight(0f);
+            for (int f = 0; f < 10; f++) {
+                var layerId = GetFingerLayerId((KeyboardFinger)f);
+                var layerData = Array.Find(Character.OverlappingAnimations, a => a.CustomLayerID == layerId);
+                if (layerData != null) {
+                    int animancerLayerIdx = GetAnimancerLayerIndex(layerData);
+                    if (animancerLayerIdx >= 0) {
+                        SetAnimancerLayerWeight(animancerLayerIdx, 0f);
                     }
                 }
             }

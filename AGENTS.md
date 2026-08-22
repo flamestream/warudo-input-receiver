@@ -124,6 +124,15 @@ All input receivers inherit from `ReceiverAsset`:
   - **Right Hand (Straight Forward)**: `Vector3(0f, -90f, 0f)` (rotates right palm/fingers forward toward a keyboard, desk, or prop).
   - *Note*: An IK rotation of `(0, 0, 0)` causes humanoid hands to point sideways (T-pose/A-pose resting angle) rather than forward.
 
+### 4.9 Overlapping Animations: Playground Mode vs Plugin (uMod) Mode
+- **Playground Mode vs. Plugin Mode**:
+  - **Playground Mode**: Dynamically compiled live by Warudo's Roslyn monitor (`HotReloadScriptMonitor`). Modifying `Character.OverlappingAnimations` directly (`Character.OverlappingAnimations = list.ToArray(); Character.BroadcastDataInput(nameof(Character.OverlappingAnimations));`) is required.
+  - **Plugin Mode**: Packaged as a `.warudo` mod loaded in a separate uMod script domain. Nested reflection paths (`Character.DataInputPortCollection.SetValueAtPath`) interact differently with Warudo's WebSocket message queue serializer.
+- **Runtime Mode Detection & Helper**:
+  Always use [`Helper.SetCharacterOverlappingAnimations(character, layers)`](file:///d:/Code/FS%20Input%20Receiver/src/Libs/Helper.cs) and [`Helper.SetCharacterOverlappingAnimationAt(character, index, clipUri)`](file:///d:/Code/FS%20Input%20Receiver/src/Libs/Helper.cs). These utilities inspect [`Helper.IsPlaygroundMode`](file:///d:/Code/FS%20Input%20Receiver/src/Libs/Helper.cs) at runtime and execute the correct pattern automatically.
+- **CRITICAL Avatar Masking Rule**:
+  Any `OverlappingAnimationData` layer created with `Masked = true` **MUST** have `MaskedBodyParts` populated with a non-null array (e.g. `new[] { AnimationMaskedBodyPart.LeftFingers }`). In Warudo's internal `CharacterAsset.SetupOverlappingAnimations()`, `CreateAvatarMask()` iterates `layer.GetMaskedBodyParts()` without a null check; leaving `MaskedBodyParts = null` throws an unhandled `NullReferenceException` that crashes Warudo immediately when an animation clip is loaded.
+
 ---
 
 ## 5. Troubleshooting & Runtime Logs

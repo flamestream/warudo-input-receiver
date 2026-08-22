@@ -51,9 +51,17 @@ namespace FlameStream
         [Label("LEFT_HAND_REST_TRANSFORM")]
         public VisualSetupTransform LeftHandRestTransform;
 
+        [DataInput(52)]
+        [Label("LEFT_HAND_DYNAMIC_ROTATION")]
+        public DynamicVector3 LeftHandDynamicRotation;
+
         [DataInput(60)]
         [Label("RIGHT_HAND_REST_TRANSFORM")]
         public VisualSetupTransform RightHandRestTransform;
+
+        [DataInput(62)]
+        [Label("RIGHT_HAND_DYNAMIC_ROTATION")]
+        public DynamicVector3 RightHandDynamicRotation;
 
         public Vector3 KeyboardRootPosition {
             get => RootTransform?.Position ?? new Vector3(0f, 0.6218f, 0.1484f);
@@ -287,6 +295,12 @@ namespace FlameStream
             SetupRootTransform();
             SetupLeftHandRestTransform();
             SetupRightHandRestTransform();
+            if (LeftHandDynamicRotation == null) {
+                LeftHandDynamicRotation = StructuredData.Create<DynamicVector3>();
+            }
+            if (RightHandDynamicRotation == null) {
+                RightHandDynamicRotation = StructuredData.Create<DynamicVector3>();
+            }
         }
 
         void SetupRootTransform() {
@@ -423,6 +437,11 @@ namespace FlameStream
             RootTransform?.DestroyAnchor();
             LeftHandRestTransform?.DestroyAnchor();
             RightHandRestTransform?.DestroyAnchor();
+
+            if (Character != null && Character.OverlappingAnimations != null) {
+                var userLayers = Character.OverlappingAnimations.Where(d => !(d.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false)).ToArray();
+                Helper.SetCharacterOverlappingAnimations(Character, userLayers);
+            }
         }
 
         void OnUpdateBasicSetup() {
@@ -631,87 +650,55 @@ namespace FlameStream
             limb.Broadcast();
         }
 
+        public void SynchronizeFingerAnimation(KeyboardFinger finger) {
+            SynchronizeAllFingerAnimations();
+        }
+
         public void SynchronizeAllFingerAnimations() {
             if (Character == null) return;
 
-            var userLayers = Character.OverlappingAnimations?.Where(d => !d.CustomLayerID.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
-            var pluginLayers = Character.OverlappingAnimations?.Where(d => d.CustomLayerID.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
+            var userLayers = Character.OverlappingAnimations?.Where(d => !(d.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false)).ToList() ?? new List<OverlappingAnimationData>();
+            var pluginLayers = Character.OverlappingAnimations?.Where(d => d.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false).ToList() ?? new List<OverlappingAnimationData>();
 
-            bool changed = false;
+            // Always maintain strict canonical order of all fingers (LeftPinky -> RightPinky)
+            var newPluginLayers = new List<OverlappingAnimationData>();
+            foreach (KeyboardFinger f in Enum.GetValues(typeof(KeyboardFinger))) {
+                var layerId = GetFingerLayerId(f);
+                var animClip = GetFingerAnimation(f);
+                if (string.IsNullOrEmpty(animClip)) continue;
 
-            foreach (KeyboardFinger finger in Enum.GetValues(typeof(KeyboardFinger))) {
-                var layerId = GetFingerLayerId(finger);
-                var animClip = GetFingerAnimation(finger);
                 var existingLayer = pluginLayers.FirstOrDefault(d => d.CustomLayerID == layerId);
+                bool isLeft = (int)f <= (int)KeyboardFinger.LeftThumb;
+                var maskedParts = isLeft
+                    ? new[] { AnimationMaskedBodyPart.LeftFingers }
+                    : new[] { AnimationMaskedBodyPart.RightFingers };
 
-                if (string.IsNullOrEmpty(animClip)) {
-                    if (existingLayer != null) {
-                        pluginLayers.Remove(existingLayer);
-                        changed = true;
-                    }
+                if (existingLayer == null) {
+                    existingLayer = StructuredData.Create<OverlappingAnimationData>();
+                    existingLayer.CustomLayerID = layerId;
+                    existingLayer.Enabled = true;
+                    existingLayer.Animation = animClip;
+                    existingLayer.Weight = 0f;
+                    existingLayer.Speed = 1f;
+                    existingLayer.Additive = true;
+                    existingLayer.Looping = false;
+                    existingLayer.Masked = true;
+                    existingLayer.MaskedBodyParts = maskedParts;
                 } else {
-                    if (existingLayer == null) {
-                        existingLayer = StructuredData.Create<OverlappingAnimationData>();
-                        existingLayer.CustomLayerID = layerId;
-                        existingLayer.Animation = animClip;
-                        existingLayer.Weight = 0f;
-                        existingLayer.Additive = true;
-                        existingLayer.Speed = 1f;
-                        existingLayer.Looping = false;
-                        pluginLayers.Add(existingLayer);
-                        changed = true;
-                    } else {
-                        if (existingLayer.Animation != animClip || !existingLayer.Additive) {
-                            existingLayer.Animation = animClip;
-                            existingLayer.Additive = true;
-                            changed = true;
-                        }
-                    }
+                    existingLayer.Enabled = true;
+                    existingLayer.Animation = animClip;
+                    existingLayer.Additive = true;
+                    existingLayer.Looping = false;
+                    existingLayer.Speed = 1f;
+                    existingLayer.Masked = true;
+                    existingLayer.MaskedBodyParts = maskedParts;
                 }
+                newPluginLayers.Add(existingLayer);
             }
 
-            if (changed) {
-                userLayers.AddRange(pluginLayers);
-                Character.SetDataInput(nameof(Character.OverlappingAnimations), userLayers.ToArray(), true);
-            }
-        }
-
-        public void SynchronizeFingerAnimation(KeyboardFinger finger) {
-            if (Character == null) return;
-
-            var layerId = GetFingerLayerId(finger);
-            var animClip = GetFingerAnimation(finger);
-
-            var userLayers = Character.OverlappingAnimations?.Where(d => !d.CustomLayerID.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
-            var pluginLayers = Character.OverlappingAnimations?.Where(d => d.CustomLayerID.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
-
-            var existingLayer = pluginLayers.FirstOrDefault(d => d.CustomLayerID == layerId);
-
-            if (string.IsNullOrEmpty(animClip)) {
-                if (existingLayer != null) {
-                    pluginLayers.Remove(existingLayer);
-                    userLayers.AddRange(pluginLayers);
-                    Character.SetDataInput(nameof(Character.OverlappingAnimations), userLayers.ToArray(), true);
-                }
-                return;
-            }
-
-            if (existingLayer == null) {
-                existingLayer = StructuredData.Create<OverlappingAnimationData>();
-                existingLayer.CustomLayerID = layerId;
-                existingLayer.Animation = animClip;
-                existingLayer.Weight = 0f;
-                existingLayer.Additive = true;
-                existingLayer.Speed = 1f;
-                existingLayer.Looping = false;
-                pluginLayers.Add(existingLayer);
-            } else {
-                existingLayer.Animation = animClip;
-                existingLayer.Additive = true;
-            }
-
-            userLayers.AddRange(pluginLayers);
-            Character.SetDataInput(nameof(Character.OverlappingAnimations), userLayers.ToArray(), true);
+            userLayers.AddRange(newPluginLayers);
+            Helper.SetCharacterOverlappingAnimations(Character, userLayers.ToArray());
+            ResetFingerWeights();
         }
     }
 }
