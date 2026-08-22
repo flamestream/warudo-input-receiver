@@ -249,7 +249,7 @@ result: {result}
             debugRestSphereMat.SetColor("_EmissionColor", new Color(0.8f, 0f, 0f));
             debugRestSphere.GetComponent<Renderer>().material = debugRestSphereMat;
 
-            // 2. 50% opacity red circle centered at anchorPos
+            // 2. 80% opacity red circle centered at anchorPos
             debugOrbitCircle = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             debugOrbitCircle.name = "DynamicRotation_DebugOrbitCircle";
             var col2 = debugOrbitCircle.GetComponent("Collider");
@@ -268,7 +268,7 @@ result: {result}
             debugOrbitCircleMat.EnableKeyword("_ALPHABLEND_ON");
             debugOrbitCircleMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
             debugOrbitCircleMat.renderQueue = 3000;
-            debugOrbitCircleMat.color = new Color(1f, 0f, 0f, 0.5f);
+            debugOrbitCircleMat.color = new Color(1f, 0f, 0f, 0.8f);
             debugOrbitCircle.GetComponent<Renderer>().material = debugOrbitCircleMat;
 
             UpdateDebugVisuals();
