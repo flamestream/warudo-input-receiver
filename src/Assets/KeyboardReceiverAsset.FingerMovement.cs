@@ -70,6 +70,18 @@ namespace FlameStream
             if (KeyBindings == null || KeyBindings.Length == 0) {
                 ApplyPreset(KeyboardLayoutPreset.StandardQWERTY, false);
             }
+            Watch(nameof(KeyBindings), delegate { RefreshKeyBindingsParent(); });
+            RefreshKeyBindingsParent();
+        }
+
+        public void RefreshKeyBindingsParent() {
+            if (KeyBindings == null) return;
+            for (int i = 0; i < KeyBindings.Length; i++) {
+                if (KeyBindings[i] != null) {
+                    KeyBindings[i].Parent = this;
+                    KeyBindings[i].SetupTransformCallbacks();
+                }
+            }
         }
 
         void OnDestroyFingerMovement() {
@@ -98,12 +110,23 @@ namespace FlameStream
         void OnUpdateFingerMovement() {
             if (!IsEnabled || !IsHandEnabled || Character == null) return;
 
+            if (KeyBindings != null && KeyBindings.Length > 0 && KeyBindings[0] != null && KeyBindings[0].Parent == null) {
+                RefreshKeyBindingsParent();
+            }
+
             float[] targetFingerWeights = new float[10];
 
-            // 1. Process Left Hand (Position & rotation driven by newest active key)
-            bool isLeftInVisualSetup = (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode) || (LeftHandDynamicRotation != null && LeftHandDynamicRotation.InVisualSetupMode);
+            var activeKeySetup = ActiveKeyBindingInVisualSetup;
+            bool isLeftKeySetup = activeKeySetup != null && activeKeySetup.Finger.IsLeftHand() && activeKeySetup.Transform != null && activeKeySetup.Transform.InVisualSetupMode;
+            bool isRightKeySetup = activeKeySetup != null && !activeKeySetup.Finger.IsLeftHand() && activeKeySetup.Transform != null && activeKeySetup.Transform.InVisualSetupMode;
+
+            // 1. Process Left Hand (Position & rotation driven by newest active key or visual setup)
+            bool isLeftInVisualSetup = isLeftKeySetup || (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode) || (LeftHandDynamicRotation != null && LeftHandDynamicRotation.InVisualSetupMode);
             if (LeftHandDynamicRotation != null && LeftHandDynamicRotation.InVisualSetupMode) {
                 LeftHandDynamicRotation.UpdateDebugVisuals();
+            }
+            if (isLeftKeySetup) {
+                activeKeySetup.UpdateDebugVisuals();
             }
 
             var activeLeftKey = isLeftInVisualSetup ? null : GetActiveKeyForHand(true, KeyBindings);
@@ -117,7 +140,20 @@ namespace FlameStream
             Vector3 targetLeftPos;
             Vector3 targetLeftRot;
 
-            if (isLeftInVisualSetup) {
+            if (isLeftKeySetup && activeKeySetup.Transform.setupAnchor != null) {
+                targetLeftPos = activeKeySetup.Transform.setupAnchor.Transform.Position;
+                Vector3 deltaHand = targetLeftPos - restLeftPos;
+                Vector3 dynamicRot = (LeftHandDynamicRotation != null && LeftHandDynamicRotation.Enabled)
+                    ? LeftHandDynamicRotation.Evaluate(deltaHand)
+                    : Vector3.zero;
+                targetLeftRot = activeKeySetup.Transform.setupAnchor.Transform.Rotation + dynamicRot;
+                currentLeftHandPos = targetLeftPos;
+                currentLeftHandRot = targetLeftRot;
+                lastLeftKeyPos = targetLeftPos;
+                lastLeftKeyRot = targetLeftRot;
+                hasLeftKeyBeenPressed = false;
+                leftKeyReleaseTime = -1f;
+            } else if (isLeftInVisualSetup) {
                 targetLeftPos = restLeftPos;
                 targetLeftRot = restLeftRot;
                 currentLeftHandPos = restLeftPos;
@@ -164,10 +200,13 @@ namespace FlameStream
                 }
             }
 
-            // 2. Process Right Hand (Position & rotation driven by newest active key)
-            bool isRightInVisualSetup = (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode) || (RightHandDynamicRotation != null && RightHandDynamicRotation.InVisualSetupMode);
+            // 2. Process Right Hand (Position & rotation driven by newest active key or visual setup)
+            bool isRightInVisualSetup = isRightKeySetup || (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode) || (RightHandDynamicRotation != null && RightHandDynamicRotation.InVisualSetupMode);
             if (RightHandDynamicRotation != null && RightHandDynamicRotation.InVisualSetupMode) {
                 RightHandDynamicRotation.UpdateDebugVisuals();
+            }
+            if (isRightKeySetup) {
+                activeKeySetup.UpdateDebugVisuals();
             }
 
             var activeRightKey = isRightInVisualSetup ? null : GetActiveKeyForHand(false, KeyBindings);
@@ -181,7 +220,20 @@ namespace FlameStream
             Vector3 targetRightPos;
             Vector3 targetRightRot;
 
-            if (isRightInVisualSetup) {
+            if (isRightKeySetup && activeKeySetup.Transform.setupAnchor != null) {
+                targetRightPos = activeKeySetup.Transform.setupAnchor.Transform.Position;
+                Vector3 deltaHand = targetRightPos - restRightPos;
+                Vector3 dynamicRot = (RightHandDynamicRotation != null && RightHandDynamicRotation.Enabled)
+                    ? RightHandDynamicRotation.Evaluate(deltaHand)
+                    : Vector3.zero;
+                targetRightRot = activeKeySetup.Transform.setupAnchor.Transform.Rotation + dynamicRot;
+                currentRightHandPos = targetRightPos;
+                currentRightHandRot = targetRightRot;
+                lastRightKeyPos = targetRightPos;
+                lastRightKeyRot = targetRightRot;
+                hasRightKeyBeenPressed = false;
+                rightKeyReleaseTime = -1f;
+            } else if (isRightInVisualSetup) {
                 targetRightPos = restRightPos;
                 targetRightRot = restRightRot;
                 currentRightHandPos = restRightPos;
@@ -244,6 +296,13 @@ namespace FlameStream
                         }
                     }
                 }
+            }
+
+            if (isLeftKeySetup) {
+                targetFingerWeights[(int)activeKeySetup.Finger] = 1.0f;
+            }
+            if (isRightKeySetup) {
+                targetFingerWeights[(int)activeKeySetup.Finger] = 1.0f;
             }
 
             // 4. Drive Left Hand Anchor
@@ -382,11 +441,13 @@ namespace FlameStream
             // Helper to add key definition
             void AddKey(VKCode key, KeyboardFinger finger, float deltaX, float deltaZ, float rotY = 0f, bool enableHandMove = true) {
                 var binding = StructuredData.Create<KeyboardKeyBinding>(b => {
+                    b.Parent = this;
                     b.Key = key;
                     b.Finger = finger;
                     b.DeltaPosition = new Vector3(deltaX, 0f, deltaZ);
                     b.DeltaRotation = new Vector3(0f, rotY, 0f);
                     b.EnableHandMovement = enableHandMove;
+                    b.SetupTransformCallbacks();
                 });
                 list.Add(binding);
             }

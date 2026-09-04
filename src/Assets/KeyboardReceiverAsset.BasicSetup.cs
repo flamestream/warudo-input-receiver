@@ -464,6 +464,8 @@ namespace FlameStream
             Watch(nameof(RightPinkyAnimation), delegate { SynchronizeFingerAnimation(KeyboardFinger.RightPinky); });
         }
 
+        public KeyboardKeyBinding ActiveKeyBindingInVisualSetup;
+
         void OnDestroyBasicSetup() {
             ClearAnchors();
             RootTransform?.DestroyAnchor();
@@ -473,6 +475,9 @@ namespace FlameStream
             LeftHandDynamicRotation?.DestroyDebugVisuals();
             RightHandDynamicRotation?.DestroyAnchor();
             RightHandDynamicRotation?.DestroyDebugVisuals();
+            ActiveKeyBindingInVisualSetup?.Transform?.DestroyAnchor();
+            ActiveKeyBindingInVisualSetup?.DestroyDebugVisuals();
+            ActiveKeyBindingInVisualSetup = null;
 
             if (Character != null && Character.OverlappingAnimations != null) {
                 var userLayers = Character.OverlappingAnimations.Where(d => !(d.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false)).ToArray();

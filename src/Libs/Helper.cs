@@ -111,22 +111,16 @@ namespace FlameStream {
         /// </summary>
         public static bool IsPlaygroundMode {
             get {
-                var asm = typeof(Helper).Assembly;
-                // 1. If assembly location contains Playground path, it is Playground mode
-                if (!string.IsNullOrEmpty(asm.Location) && asm.Location.IndexOf("Playground", System.StringComparison.OrdinalIgnoreCase) >= 0) {
-                    return true;
+                // When running as a packaged mod in Warudo, Plugin.ModHost is populated by UMod.
+                // In Playground mode, plugins are compiled by Roslyn into the host domain and ModHost is null.
+                if (PointerReceiverPlugin.Instance != null) {
+                    return PointerReceiverPlugin.Instance.ModHost == null;
                 }
-                // 2. If assembly name contains "umod-", it is packaged Plugin (uMod) mode
-                var name = asm.GetName().Name ?? "";
-                if (name.IndexOf("umod-", System.StringComparison.OrdinalIgnoreCase) >= 0) {
-                    return false;
+                var plugin = Warudo.Core.Context.PluginManager?.GetPlugin("FlameStream.PointerReceiver");
+                if (plugin != null) {
+                    return plugin.ModHost == null;
                 }
-                // 3. Fallback: Check if OwnerPlugin is CorePlugin (Playground assigns CorePlugin as OwnerPlugin)
-                var meta = Warudo.Core.Context.AssetTypeRegistry?.GetTypeMeta(typeof(PointerReceiverAsset));
-                if (meta != null && meta.OwnerPlugin != null && meta.OwnerPlugin.GetType().Name == "CorePlugin") {
-                    return true;
-                }
-                return true;
+                return false;
             }
         }
 

@@ -52,5 +52,17 @@ namespace FlameStream {
             typeof(KeyboardReceiverOnKeyDownNode),
             typeof(KeyboardReceiverOnKeyUpNode),
         })]
-    public class PointerReceiverPlugin : Plugin {}
+    public class PointerReceiverPlugin : Plugin {
+        public static PointerReceiverPlugin Instance { get; private set; }
+
+        protected override void OnCreate() {
+            base.OnCreate();
+            Instance = this;
+        }
+
+        protected override void OnDestroy() {
+            Instance = null;
+            base.OnDestroy();
+        }
+    }
 }
