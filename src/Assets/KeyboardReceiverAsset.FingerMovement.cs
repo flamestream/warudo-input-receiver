@@ -295,6 +295,12 @@ namespace FlameStream
                             targetFingerWeights[(int)binding.Finger] = 1.0f;
                         }
                     }
+
+                    if (Activated((int)binding.Key)) {
+                        if (binding.EnableHandMovement || PlayAnimationOnDisabledKey) {
+                            PlayFingerAnimation(binding.Finger);
+                        }
+                    }
                 }
             }
 
@@ -371,6 +377,42 @@ namespace FlameStream
             var layer = animancer.Layers[animancerLayerIdx];
             if (layer == null) return;
             layer.SetWeight(weight);
+            if (weight > 0.001f) {
+                var state = layer.CurrentState;
+                if (state != null && !state.IsPlaying) {
+                    state.IsPlaying = true;
+                }
+            }
+        }
+
+        public void PlayFingerAnimation(KeyboardFinger finger) {
+            if (Character == null || Character.OverlappingAnimations == null) return;
+            var layerId = GetFingerLayerId(finger);
+            var layerData = Array.Find(Character.OverlappingAnimations, a => a.CustomLayerID == layerId);
+            if (layerData == null) return;
+
+            int animancerLayerIdx = GetAnimancerLayerIndex(layerData);
+            if (animancerLayerIdx < 0) return;
+
+            RewindAnimancerLayer(Character.Animancer, animancerLayerIdx);
+            RewindAnimancerLayer(Character.CloneAnimancer, animancerLayerIdx);
+        }
+
+        void RewindAnimancerLayer(Animancer.AnimancerComponent animancer, int animancerLayerIdx) {
+            if (animancer == null || animancer.Layers == null || animancerLayerIdx < 0 || animancerLayerIdx >= animancer.Layers.Count) return;
+            var layer = animancer.Layers[animancerLayerIdx];
+            if (layer == null) return;
+            var state = layer.CurrentState;
+            if (state == null) {
+                foreach (Animancer.AnimancerState s in layer) {
+                    state = s;
+                    break;
+                }
+            }
+            if (state != null) {
+                var playingState = layer.Play(state);
+                playingState.Time = 0f;
+            }
         }
 
         void ApplyFingerLayerWeight(KeyboardFinger finger, int fingerIndex, float targetWeight) {
@@ -410,6 +452,7 @@ namespace FlameStream
                     trans.Time
                 ).SetEase(trans.Ease);
             } else {
+                fingerTweens[fingerIndex]?.Kill(false);
                 SetAnimancerLayerWeight(animancerLayerIdx, targetWeight);
             }
         }

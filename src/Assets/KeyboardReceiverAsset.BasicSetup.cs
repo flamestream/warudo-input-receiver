@@ -467,22 +467,14 @@ namespace FlameStream
         public KeyboardKeyBinding ActiveKeyBindingInVisualSetup;
 
         void OnDestroyBasicSetup() {
-            ClearAnchors();
-            RootTransform?.DestroyAnchor();
-            LeftHandRestTransform?.DestroyAnchor();
-            RightHandRestTransform?.DestroyAnchor();
-            LeftHandDynamicRotation?.DestroyAnchor();
-            LeftHandDynamicRotation?.DestroyDebugVisuals();
-            RightHandDynamicRotation?.DestroyAnchor();
-            RightHandDynamicRotation?.DestroyDebugVisuals();
-            ActiveKeyBindingInVisualSetup?.Transform?.DestroyAnchor();
-            ActiveKeyBindingInVisualSetup?.DestroyDebugVisuals();
             ActiveKeyBindingInVisualSetup = null;
 
-            if (Character != null && Character.OverlappingAnimations != null) {
-                var userLayers = Character.OverlappingAnimations.Where(d => !(d.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false)).ToArray();
-                Helper.SetCharacterOverlappingAnimations(Character, userLayers);
-            }
+            try {
+                if (Character != null && Character.Active && Character.OverlappingAnimations != null) {
+                    var userLayers = Character.OverlappingAnimations.Where(d => !(d.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false)).ToArray();
+                    Helper.SetCharacterOverlappingAnimations(Character, userLayers);
+                }
+            } catch {}
         }
 
         void OnUpdateBasicSetup() {
@@ -547,7 +539,14 @@ namespace FlameStream
             } else {
                 ClearAnchors();
                 ResetFingerWeights();
+                ClearFingerAnimations();
             }
+        }
+
+        public void ClearFingerAnimations() {
+            if (Character == null || Character.OverlappingAnimations == null) return;
+            var userLayers = Character.OverlappingAnimations.Where(d => !(d.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false)).ToArray();
+            Helper.SetCharacterOverlappingAnimations(Character, userLayers);
         }
 
         void UpdateRootTransform() {
@@ -722,14 +721,14 @@ namespace FlameStream
                     existingLayer.Weight = 0f;
                     existingLayer.Speed = 1f;
                     existingLayer.Additive = true;
-                    existingLayer.Looping = false;
+                    existingLayer.Looping = true;
                     existingLayer.Masked = true;
                     existingLayer.MaskedBodyParts = maskedParts;
                 } else {
                     existingLayer.Enabled = true;
                     existingLayer.Animation = animClip;
                     existingLayer.Additive = true;
-                    existingLayer.Looping = false;
+                    existingLayer.Looping = true;
                     existingLayer.Speed = 1f;
                     existingLayer.Masked = true;
                     existingLayer.MaskedBodyParts = maskedParts;

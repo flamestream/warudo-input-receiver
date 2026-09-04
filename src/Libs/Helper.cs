@@ -124,19 +124,10 @@ namespace FlameStream {
             }
         }
 
-        /// <summary>
-        /// Updates the character's OverlappingAnimations array, applying the appropriate technique
-        /// depending on whether the plugin is executing in Playground mode or packaged Plugin (uMod) mode.
-        /// </summary>
         public static void SetCharacterOverlappingAnimations(CharacterAsset character, CharacterAsset.OverlappingAnimationData[] layers) {
             if (character == null) return;
 
-            if (IsPlaygroundMode) {
-                character.OverlappingAnimations = layers;
-                character.BroadcastDataInput(nameof(character.OverlappingAnimations));
-            } else {
-                character.DataInputPortCollection.SetValueAtPath(nameof(character.OverlappingAnimations), layers, true);
-            }
+            character.SetDataInput(nameof(character.OverlappingAnimations), layers, true);
         }
 
         /// <summary>
