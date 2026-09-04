@@ -125,13 +125,19 @@ All input receivers inherit from `ReceiverAsset`:
   - *Note*: An IK rotation of `(0, 0, 0)` causes humanoid hands to point sideways (T-pose/A-pose resting angle) rather than forward.
 
 ### 4.9 Overlapping Animations: Playground Mode vs Plugin (uMod) Mode
-- **Playground Mode vs. Plugin Mode**:
-  - **Playground Mode**: Dynamically compiled live by Warudo's Roslyn monitor (`HotReloadScriptMonitor`). Modifying `Character.OverlappingAnimations` directly (`Character.OverlappingAnimations = list.ToArray(); Character.BroadcastDataInput(nameof(Character.OverlappingAnimations));`) is required.
-  - **Plugin Mode**: Packaged as a `.warudo` mod loaded in a separate uMod script domain. Nested reflection paths (`Character.DataInputPortCollection.SetValueAtPath`) interact differently with Warudo's WebSocket message queue serializer.
-- **Runtime Mode Detection & Helper**:
-  Always use [`Helper.SetCharacterOverlappingAnimations(character, layers)`](file:///d:/Code/FS%20Input%20Receiver/src/Libs/Helper.cs) and [`Helper.SetCharacterOverlappingAnimationAt(character, index, clipUri)`](file:///d:/Code/FS%20Input%20Receiver/src/Libs/Helper.cs). These utilities inspect [`Helper.IsPlaygroundMode`](file:///d:/Code/FS%20Input%20Receiver/src/Libs/Helper.cs) at runtime and execute the correct pattern automatically.
+- **Updating Character Overlapping Animations**:
+  Always use [`Helper.SetCharacterOverlappingAnimations(character, layers)`](file:///d:/Code/FS%20Input%20Receiver/src/Libs/Helper.cs). This internally calls `character.SetDataInput(nameof(character.OverlappingAnimations), layers, true)`.
+  - **CRITICAL**: Never modify `character.OverlappingAnimations` directly via C# property assignment without `SetDataInput`. Direct assignment completely bypasses `DataInputPortCollection.SetPortValue()`, so `CharacterAsset`'s `WatchAll` never fires, and Warudo will never create Animancer layers on `Character.Animancer` for the new animations.
+- **Action Playback & Looping**:
+  Overlapping animation layers dynamically driven by weight blending or key inputs must have `Looping = true`. If `Looping = false`, Warudo's `Events.OnEnd` handler sets `state.IsPlaying = false` once the clip reaches the end, freezing the state even if weight is subsequently increased. When activating an action animation on button press, explicitly rewind and play: `var state = layer.Play(layer.CurrentState); state.Time = 0f;`.
 - **CRITICAL Avatar Masking Rule**:
   Any `OverlappingAnimationData` layer created with `Masked = true` **MUST** have `MaskedBodyParts` populated with a non-null array (e.g. `new[] { AnimationMaskedBodyPart.LeftFingers }`). In Warudo's internal `CharacterAsset.SetupOverlappingAnimations()`, `CreateAvatarMask()` iterates `layer.GetMaskedBodyParts()` without a null check; leaving `MaskedBodyParts = null` throws an unhandled `NullReferenceException` that crashes Warudo immediately when an animation clip is loaded.
+
+### 4.10 Scene Destruction: Never Call `Scene.RemoveAsset()` Inside `OnDestroy()`
+- **CRITICAL**: Never call `Scene.RemoveAsset()` inside an asset's `OnDestroy()` method.
+- When Warudo restarts a scene or loads a new scene, `Scene.Destroy()` enumerates its internal `List<Asset> assetList` using `List<T>.Enumerator`.
+- Calling `Scene.RemoveAsset()` inside `OnDestroy()` calls `this.assetList.Remove(asset)`, modifying the collection during enumeration and throwing `InvalidOperationException: Collection was modified`.
+- During scene teardown, Warudo already calls `Destroy()` on every asset in the scene automatically. Reserve `Scene.RemoveAsset()` strictly for explicit user-triggered cleanup actions while the scene remains active.
 
 ---
 

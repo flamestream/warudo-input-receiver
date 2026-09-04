@@ -65,12 +65,14 @@ namespace FlameStream
             base.OnCreate();
             OnCreateBasicSetup();
             OnCreateFingerMovement();
+            OnCreateVirtualKeys();
         }
 
         protected override void OnDestroy() {
             base.OnDestroy();
             OnDestroyBasicSetup();
             OnDestroyFingerMovement();
+            OnDestroyVirtualKeys();
         }
 
         public override void OnUpdate() {
@@ -78,6 +80,7 @@ namespace FlameStream
             OnUpdateState();
             OnUpdateBasicSetup();
             OnUpdateFingerMovement();
+            OnUpdateVirtualKeys();
         }
     }
 }
