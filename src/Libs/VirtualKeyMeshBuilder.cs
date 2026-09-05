@@ -33,12 +33,17 @@ namespace FlameStream
                 normals[i + 1] = Vector3.up;
             }
 
-            var triangles = new int[count * 3];
+            var triangles = new int[count * 3 * 2];
             for (int i = 0; i < count; i++) {
                 int next = (i + 1) % count;
-                triangles[i * 3 + 0] = 0;
-                triangles[i * 3 + 1] = i + 1;
-                triangles[i * 3 + 2] = next + 1;
+                // Front face
+                triangles[i * 6 + 0] = 0;
+                triangles[i * 6 + 1] = i + 1;
+                triangles[i * 6 + 2] = next + 1;
+                // Back face (visible from underneath)
+                triangles[i * 6 + 3] = 0;
+                triangles[i * 6 + 4] = next + 1;
+                triangles[i * 6 + 5] = i + 1;
             }
 
             mesh.vertices = vertices;
@@ -84,7 +89,7 @@ namespace FlameStream
                 normals[count + i] = Vector3.up;
             }
 
-            var triangles = new int[count * 6];
+            var triangles = new int[count * 6 * 2];
             for (int i = 0; i < count; i++) {
                 int next = (i + 1) % count;
 
@@ -93,15 +98,25 @@ namespace FlameStream
                 int iCurrent = count + i;
                 int iNext = count + next;
 
-                // Triangle 1
-                triangles[i * 6 + 0] = oCurrent;
-                triangles[i * 6 + 1] = oNext;
-                triangles[i * 6 + 2] = iNext;
+                // Triangle 1: Front face
+                triangles[i * 12 + 0] = oCurrent;
+                triangles[i * 12 + 1] = oNext;
+                triangles[i * 12 + 2] = iNext;
 
-                // Triangle 2
-                triangles[i * 6 + 3] = oCurrent;
-                triangles[i * 6 + 4] = iNext;
-                triangles[i * 6 + 5] = iCurrent;
+                // Triangle 2: Front face
+                triangles[i * 12 + 3] = oCurrent;
+                triangles[i * 12 + 4] = iNext;
+                triangles[i * 12 + 5] = iCurrent;
+
+                // Triangle 1: Back face (visible from underneath)
+                triangles[i * 12 + 6] = oCurrent;
+                triangles[i * 12 + 7] = iNext;
+                triangles[i * 12 + 8] = oNext;
+
+                // Triangle 2: Back face (visible from underneath)
+                triangles[i * 12 + 9] = oCurrent;
+                triangles[i * 12 + 10] = iCurrent;
+                triangles[i * 12 + 11] = iNext;
             }
 
             mesh.vertices = vertices;
