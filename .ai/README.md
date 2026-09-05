@@ -45,3 +45,5 @@ This directory contains key architecture notes, integration patterns, build pipe
    - Constant-topology procedural arc generation for zero-allocation dynamic morphing.
    - `StructuredData` port assignment: C# field assignment vs. `SetDataInput`.
    - Ergonomic neutral home-row keys vs. reach displacement in keyboard tracking.
+   - Scene deserialization interception & two-phase asset version auto-migration (`OnPreMigrateAsset` / `OnPostMigrateAsset`).
+

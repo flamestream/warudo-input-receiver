@@ -829,3 +829,66 @@ In ergonomic keyboard tracking models, the hand rest position (`LeftHandRestPosi
    targetLeftPos = restLeftPos + deltaPos;
    ```
    Avoid redundant global multipliers (such as an asset-level `MovementFactor`) that conflict with per-hand rest transform scales.
+
+---
+
+## 26. Scene Deserialization Interception & Asset Version Auto-Migration
+
+### The Phenomenon
+As plugins evolve across releases, data port names change, obsolete fields are removed, and data structures are restructured. When users load scenes created in older versions of the plugin, missing ports throw deserialization warnings, renamed ports lose their saved user settings (resetting to defaults), or obsolete port data persists silently in scene files forever.
+
+### Root Cause Analysis
+Warudo deserializes scenes by instantiating the asset class, invoking `OnCreate()`, and then passing a [`SerializedAsset`](file:///d:/Code/FS%20Input%20Receiver/src/Assets/ReceiverAsset.cs) to the virtual method `Asset.Deserialize(SerializedAsset serialized)`.
+- `SerializedAsset` contains a dictionary `public Dictionary<string, SerializedDataInputPort> dataInputs` containing raw JSON string values keyed by port name.
+- Standard deserialization blindly maps dictionary keys to existing `[DataInput]` ports on the C# class. Any renamed key is skipped (leaving the new port uninitialized), and deleted keys are discarded or left unhandled.
+
+### Architectural Pattern & Framework
+All input receivers inherit from [`ReceiverAsset`](file:///d:/Code/FS%20Input%20Receiver/src/Assets/ReceiverAsset.cs), which implements a two-phase auto-migration pipeline by overriding `Deserialize(SerializedAsset serialized)`:
+
+```csharp
+public abstract class ReceiverAsset : Asset {
+    protected virtual int CURRENT_ASSET_VERSION => 1;
+
+    [Hidden]
+    [DataInput]
+    public int AssetVersion = 1;
+
+    public override void Deserialize(SerializedAsset serialized) {
+        int savedVersion = 0;
+        if (serialized?.dataInputs != null && serialized.dataInputs.TryGetValue(nameof(AssetVersion), out var versionPort)) {
+            if (!string.IsNullOrEmpty(versionPort?.value) && int.TryParse(versionPort.value, out int parsed)) {
+                savedVersion = parsed;
+            }
+        }
+
+        // Phase 1: Pre-deserialization migration on raw serialized dictionaries
+        if (savedVersion < CURRENT_ASSET_VERSION) {
+            OnPreMigrateAsset(savedVersion, CURRENT_ASSET_VERSION, serialized);
+        }
+
+        // Standard Warudo port deserialization
+        base.Deserialize(serialized);
+
+        // Phase 2: Post-deserialization migration on typed C# objects
+        if (savedVersion < CURRENT_ASSET_VERSION) {
+            OnPostMigrateAsset(savedVersion, CURRENT_ASSET_VERSION);
+            AssetVersion = CURRENT_ASSET_VERSION;
+            BroadcastDataInput(nameof(AssetVersion));
+            Log($"Auto-migrated asset '{Name}' from v{savedVersion} to v{CURRENT_ASSET_VERSION}.");
+        }
+    }
+}
+```
+
+### Migration Guidelines
+1. **Pre-Deserialization (`OnPreMigrateAsset`)**:
+   - Use for **port renaming** (`MigrateRenamePort(rawSerialized, "OldName", "NewName")`).
+   - Use for **stripping deleted/obsolete ports** (`MigrateRemovePort(rawSerialized, "ObsoletePort")`).
+   - Use for JSON payload transformations before Warudo parses types into memory.
+2. **Post-Deserialization (`OnPostMigrateAsset`)**:
+   - Runs after all ports, arrays, and `StructuredData` objects are deserialized into memory.
+   - Use typed C# methods and properties to recalculate defaults, transform coordinate spaces, or heal zero values using `SetDataInput(..., true)`.
+3. **Automatic Persistence**:
+   - Once migrated, `AssetVersion` is updated to `CURRENT_ASSET_VERSION`.
+   - When the user saves the scene (`Ctrl+S`), Warudo serializes the clean, upgraded state, permanently retiring the old schema with zero legacy crutches in code.
+

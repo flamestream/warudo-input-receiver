@@ -34,6 +34,31 @@ namespace FlameStream
             }
         }
 
+        protected override int CURRENT_ASSET_VERSION => 1;
+
+        protected override void OnPreMigrateAsset(int fromVersion, int toVersion, Warudo.Core.Serializations.SerializedAsset rawSerialized) {
+            base.OnPreMigrateAsset(fromVersion, toVersion, rawSerialized);
+            if (fromVersion < 1) {
+                // Cleanly strip unreleased experimental ports from early development scenes
+                MigrateRemovePort(rawSerialized, "MovementFactor");
+                MigrateRemovePort(rawSerialized, "DefaultCornerRadius");
+                MigrateRemovePort(rawSerialized, "DefaultBorderWidth");
+            }
+        }
+
+        protected override void OnPostMigrateAsset(int fromVersion, int toVersion) {
+            base.OnPostMigrateAsset(fromVersion, toVersion);
+            if (fromVersion < 1) {
+                // Auto-heal any 0 scales from early prototype scenes
+                if (LeftHandRestTransform != null && LeftHandRestTransform.Scale == UnityEngine.Vector3.zero) {
+                    LeftHandRestTransform.SetDataInput(nameof(LeftHandRestTransform.Scale), UnityEngine.Vector3.one, true);
+                }
+                if (RightHandRestTransform != null && RightHandRestTransform.Scale == UnityEngine.Vector3.zero) {
+                    RightHandRestTransform.SetDataInput(nameof(RightHandRestTransform.Scale), UnityEngine.Vector3.one, true);
+                }
+            }
+        }
+
         protected override void Log(string msg) {
             UnityEngine.Debug.Log($"[FlameStream.Asset.KeyboardReceiver] {msg}");
         }

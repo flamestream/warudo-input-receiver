@@ -8,9 +8,16 @@ using System.Threading.Tasks;
 using Warudo.Core.Attributes;
 using Warudo.Core.Localization;
 using Warudo.Core.Scenes;
+using Warudo.Core.Serializations;
 
 namespace FlameStream {
     public abstract class ReceiverAsset : Asset {
+
+        protected virtual int CURRENT_ASSET_VERSION => 1;
+
+        [Hidden]
+        [DataInput]
+        public int AssetVersion = 1;
 
         protected abstract ushort PROTOCOL_VERSION { get; }
         protected abstract string PROTOCOL_ID { get; }
@@ -238,6 +245,56 @@ namespace FlameStream {
         }
 
         abstract protected void Log(string msg);
+
+        public override void Deserialize(SerializedAsset serialized) {
+            int savedVersion = 0;
+            if (serialized?.dataInputs != null && serialized.dataInputs.TryGetValue(nameof(AssetVersion), out var versionPort)) {
+                if (!string.IsNullOrEmpty(versionPort?.value) && int.TryParse(versionPort.value, out int parsed)) {
+                    savedVersion = parsed;
+                }
+            }
+
+            if (savedVersion < CURRENT_ASSET_VERSION) {
+                try {
+                    OnPreMigrateAsset(savedVersion, CURRENT_ASSET_VERSION, serialized);
+                } catch (Exception ex) {
+                    Log($"Pre-migration exception from v{savedVersion} to v{CURRENT_ASSET_VERSION}: {ex}");
+                }
+            }
+
+            base.Deserialize(serialized);
+
+            if (savedVersion < CURRENT_ASSET_VERSION) {
+                try {
+                    OnPostMigrateAsset(savedVersion, CURRENT_ASSET_VERSION);
+                } catch (Exception ex) {
+                    Log($"Post-migration exception from v{savedVersion} to v{CURRENT_ASSET_VERSION}: {ex}");
+                }
+                AssetVersion = CURRENT_ASSET_VERSION;
+                BroadcastDataInput(nameof(AssetVersion));
+                Log($"Auto-migrated asset '{Name}' from v{savedVersion} to v{CURRENT_ASSET_VERSION}.");
+            }
+        }
+
+        protected virtual void OnPreMigrateAsset(int fromVersion, int toVersion, SerializedAsset rawSerialized) { }
+
+        protected virtual void OnPostMigrateAsset(int fromVersion, int toVersion) { }
+
+        protected bool MigrateRenamePort(SerializedAsset rawSerialized, string oldPortName, string newPortName) {
+            if (rawSerialized?.dataInputs == null) return false;
+            if (rawSerialized.dataInputs.TryGetValue(oldPortName, out var port)) {
+                rawSerialized.dataInputs.Remove(oldPortName);
+                port.key = newPortName;
+                rawSerialized.dataInputs[newPortName] = port;
+                return true;
+            }
+            return false;
+        }
+
+        protected bool MigrateRemovePort(SerializedAsset rawSerialized, string portName) {
+            if (rawSerialized?.dataInputs == null) return false;
+            return rawSerialized.dataInputs.Remove(portName);
+        }
 
     }
 }

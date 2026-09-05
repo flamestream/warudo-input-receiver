@@ -49,7 +49,7 @@ namespace FlameStream
         protected Vector3 TranslationDownVeryStrong = new Vector3(0f, -2f, 0f);
         protected Vector3 TranslationUpVeryStrong = new Vector3(0f, 2f, 0f);
 
-        const int CURRENT_ASSET_VERSION = 1;
+        protected override int CURRENT_ASSET_VERSION => 1;
 
         protected override void OnCreate() {
             base.OnCreate();
@@ -75,10 +75,6 @@ namespace FlameStream
         protected override void Log(string msg) {
             Debug.Log($"[FlameStream.Asset.GameInputReceiver] {msg}");
         }
-
-        [Hidden]
-        [DataInput]
-        public int AssetVersion = CURRENT_ASSET_VERSION;
 
         /// <summary>
         /// BINDING

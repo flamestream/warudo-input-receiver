@@ -146,6 +146,15 @@ All input receivers inherit from `ReceiverAsset`:
 ### 4.12 Ergonomic Neutral Keys vs Reach Displacement
 - In ergonomic keyboard tracking models, resting home row keys (`A`, `S`, `D`, `F` and `J`, `K`, `L`, `;`) have $\Delta\text{Pos} = (0, 0, 0)$ because the resting hand pose is already anchored directly over them. Only finger curling animations trigger. Hand reach displacement only activates for non-neutral reach keys (`Q`, `W`, `E`, `R`, `T`, `Space`, etc.) where $\Delta\text{Pos} \neq 0$. Always test hand movement with reach keys.
 
+### 4.13 Asset Versioning & Auto-Migration Framework
+- **Two-Phase Migration Pipeline**: All input receivers inherit from [`ReceiverAsset`](file:///d:/Code/FS%20Input%20Receiver/src/Assets/ReceiverAsset.cs), which defines `CURRENT_ASSET_VERSION` and `AssetVersion` (`[Hidden] [DataInput]`).
+- **Scene Deserialization Interception**: `ReceiverAsset` overrides `public override void Deserialize(SerializedAsset serialized)`:
+  - **`OnPreMigrateAsset(fromVersion, toVersion, serialized)`**: Intercepts the raw serialized port dictionary before Warudo loads ports into memory. Use `MigrateRenamePort` or `MigrateRemovePort` to clean up obsolete ports or translate port keys.
+  - **`base.Deserialize(serialized)`**: Standard Warudo port deserialization.
+  - **`OnPostMigrateAsset(fromVersion, toVersion)`**: Runs on typed C# objects after deserialization. Use to heal uninitialized fields or migrate data structures via `SetDataInput(..., true)`.
+- **Automatic Clean Persistence**: Once auto-migrated, `AssetVersion` updates to `CURRENT_ASSET_VERSION` and broadcasts. Saving the scene (`Ctrl+S`) writes the clean modern schema to disk, permanently retiring legacy data.
+
+
 ---
 
 ## 5. Troubleshooting & Runtime Logs

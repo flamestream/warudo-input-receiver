@@ -47,16 +47,6 @@ namespace FlameStream
         [Label("DEFAULT_KEY_SIZE")]
         public Vector2 DefaultKeySize = new Vector2(0.032f, 0.032f);
 
-        [DataInput(565)]
-        [FloatSlider(0f, 0.5f, 0.01f)]
-        [Label("DEFAULT_CORNER_ROUNDNESS")]
-        public float DefaultCornerRadius = 0.28f;
-
-        [DataInput(568)]
-        [FloatSlider(0.0005f, 0.01f, 0.0005f)]
-        [Label("DEFAULT_BORDER_WIDTH")]
-        public float DefaultBorderWidth = 0.0025f;
-
         [DataInput(570)]
         [Label("DEFAULT_KEY_APPEARANCE")]
         public VirtualKeyAppearance DefaultAppearance;
@@ -97,11 +87,6 @@ namespace FlameStream
             Watch(nameof(LeftKeysetTransform), delegate { SetupLeftKeysetTransform(); });
             Watch(nameof(RightKeysetTransform), delegate { SetupRightKeysetTransform(); });
             Watch(nameof(RootKeysetTransform), delegate { SetupRootKeysetTransform(); });
-
-            var crPort = GetDataInputPort(nameof(DefaultCornerRadius));
-            if (crPort != null) crPort.Properties.hidden = true;
-            var bwPort = GetDataInputPort(nameof(DefaultBorderWidth));
-            if (bwPort != null) bwPort.Properties.hidden = true;
 
             Watch(nameof(DefaultKeySize), delegate { RebuildAllVirtualKeyMeshes(); });
             Watch(nameof(DefaultAppearance), delegate {

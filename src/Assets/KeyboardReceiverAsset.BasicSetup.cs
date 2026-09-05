@@ -30,11 +30,6 @@ namespace FlameStream
         [Label("ROOT_INITIAL_TRANSFORM")]
         public VisualSetupTransform RootTransform;
 
-        [DataInput(40)]
-        [Label("MOVEMENT_FACTOR")]
-        [Hidden]
-        public Vector3 MovementFactor = Vector3.one;
-
         public Vector3 GetLeftHandMovementScale() {
             return (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode && LeftHandRestTransform.setupAnchor != null)
                 ? LeftHandRestTransform.setupAnchor.Transform.Scale
