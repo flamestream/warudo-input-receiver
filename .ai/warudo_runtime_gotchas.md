@@ -572,5 +572,134 @@ If an overlapping animation has `Looping = false`:
    }
    ```
 
+---
+
+## 18. Unity Built-in `Standard` Shader Ignores `_Cull = Off` (Two-Sided Geometry Requirement)
+
+### The Phenomenon
+Procedural flat 2D meshes (such as floating keyboard keys, HUD panels, or hologram pads) are created and configured with transparent materials using Unity's built-in `Standard` PBR shader:
+```csharp
+mat.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+```
+When looking at the meshes from the front, they appear properly. However, when the camera is positioned behind or underneath them, the meshes disappear completely.
+
+### Root Cause Analysis
+Unity's built-in `Standard.shader` does not expose a `[Cull]` material property keyword or dynamic uniform pass in its ForwardBase / ForwardAdd passes; it hardcodes `Cull Back` (or defaults to it) in the shader source. Calling `mat.SetInt("_Cull", 0)` only sets an unused shader property in the material's property table, which the compiled GPU rasterizer stage completely ignores.
+
+### Architectural Rule
+Any procedural 2D mesh generated for use with the `Standard` shader that needs to be visible from both sides **must generate explicit reverse-wound back-face triangles** in the mesh index buffer:
+```csharp
+// Front face (clockwise when viewed from +Y)
+triangles[i * 6 + 0] = 0;
+triangles[i * 6 + 1] = i + 1;
+triangles[i * 6 + 2] = next + 1;
+
+// Back face (clockwise when viewed from -Y)
+triangles[i * 6 + 3] = 0;
+triangles[i * 6 + 4] = next + 1;
+triangles[i * 6 + 5] = i + 1;
+```
+Because front-face and back-face triangles share the same vertex positions and UVs, zero extra vertex buffer storage is required, and both sides render cleanly without depending on shader culling state.
+
+---
+
+## 19. Hot-Reload Invalidation & High-Frequency Mesh Rebuild Loop (Input Strobing)
+
+### The Phenomenon
+When holding down an input key or button, the corresponding virtual visual element violently flickers/strobes between unpressed (idle color) and pressed (bright/active color) at 60–120 FPS. Severe frame drops, micro-stutter, and heavy garbage collection allocations occur simultaneously.
+
+### Root Cause Analysis
+To ensure procedural visuals regenerate after Playground hot-reloading, an auto-restoration check was added to `OnUpdate()`:
+```csharp
+if (leftKeysGroupGo == null) {
+    UpdateFloatingKeysState(); // Rebuilds all meshes!
+}
+```
+However, if the user had all visual elements assigned to `RightHand` or `KeyboardRoot`, `leftKeysGroupGo` was never instantiated. As a result:
+1. `leftKeysGroupGo == null` evaluated to `true` on **every single frame**.
+2. Every frame, `UpdateFloatingKeysState()` destroyed and rebuilt all 28+ GameObjects, MeshFilters, and Materials.
+3. Upon recreation in `RebuildVirtualKeyMesh()`, the key defaulted to `false` (unpressed).
+4. One line later in the frame, input processing detected the held key and set it to `true` (pressed).
+5. On the next frame, the cycle repeated: destroy -> recreate (false) -> set pressed (true), producing a 60 FPS strobing flicker and allocating thousands of objects per second.
+
+### Architectural Rule
+1. **Never check a container/group GameObject for auto-restoration**; keys or props can be anchored to different parent nodes.
+2. **Check leaf entity runtime objects**: Check if the actual child entities have their runtime GameObject missing:
+   ```csharp
+   if (VirtualKeys != null && VirtualKeys.Length > 0 && VirtualKeys[0] != null && VirtualKeys[0].KeyGameObject == null) {
+       UpdateFloatingKeysState();
+   }
+   ```
+   Once constructed on the first frame, `VirtualKeys[0].KeyGameObject` remains valid until the next domain reload.
+3. **Hook `Watch(nameof(IsEnabled))` in `OnCreate()`**:
+   ```csharp
+   Watch(nameof(IsEnabled), delegate { UpdateFloatingKeysState(); });
+   ```
+   During initial scene loading and hot-reload deserialization, `IsEnabled` transitions to `true` after `OnCreate()` completes, triggering visual creation reliably.
+
+---
+
+## 20. PBR Albedo Dimming vs. Self-Illumination / Color-Picker Fidelity
+
+### The Phenomenon
+When a user sets an appearance color in a color picker to pure red `#FF0000` (`255, 0, 0`), the 3D object appears dark maroon or washed out on screen rather than pure red.
+
+### Root Cause Analysis
+In Unity's `Standard` physically based shader, setting `material.color` configures the diffuse **Albedo**. In the rendering equation:
+$$\text{Pixel Color} = \text{Albedo} \times (\text{Direct Lights} + \text{Ambient Light}) + \text{Emission}$$
+If the scene has dim ambient light (e.g. 15–20% ambient) and the object is tilted away from directional key lights, `Albedo (1.0, 0, 0) * Ambient (0.2)` results in dark maroon `(0.2, 0, 0)`. The color picker value is physically darkened by the scene lighting.
+
+### Architectural Rule
+Provide a normalized `SelfIllumination` scale (0.0 = fully lit PBR, 1.0 = fully unlit / self-illuminating):
+```csharp
+// When SelfIllumination = 1, diffuse albedo is scaled to 0 so scene shadows cannot darken it.
+// The base color is emitted directly, with any additional glow/bloom intensity added on top:
+Color albedo = new Color(
+    baseColor.r * (1f - selfIllum),
+    baseColor.g * (1f - selfIllum),
+    baseColor.b * (1f - selfIllum),
+    baseColor.a
+);
+Color emission = (baseColor * selfIllum) + (glowColor * glowIntensity);
+
+material.color = albedo;
+material.SetColor("_EmissionColor", emission);
+```
+**Critical GI Performance Rule**: Always disable realtime emissive GI contributions on dynamic interactive objects:
+```csharp
+material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+```
+If left at `MaterialGlobalIlluminationFlags.RealtimeEmissive`, modifying `_EmissionColor` during key presses or transitions marks Warudo's realtime Enlighten/GI buffer as dirty on every frame, degrading performance.
+
+---
+
+## 21. Zero-Allocation Dynamic Mesh Morphing vs. Mesh Rebuilding
+
+### The Phenomenon
+When animating procedural properties (such as corner roundness and border thickness during key press transitions), calling `mesh = CreateRoundedRectMesh(...)` every frame causes garbage collection pauses and frame hitching.
+
+### Root Cause Analysis
+Creating a new `Mesh` allocates a new native DirectX/OpenGL buffer and C# heap arrays for vertices, UVs, normals, and triangles.
+
+### Architectural Rule
+1. Call `mesh.MarkDynamic()` on the mesh at creation time to configure the GPU buffer for dynamic CPU streaming.
+2. In-place update only the `vertices` array when dimensions, corner roundness, or border widths morph:
+   ```csharp
+   public static void UpdateRoundedRectVertices(Mesh mesh, float width, float height, float radius, int cornerSegments = 8) {
+       var perimeter = GeneratePerimeterPoints(width, height, radius, cornerSegments);
+       var vertices = mesh.vertices;
+       vertices[0] = Vector3.zero;
+       for (int i = 0; i < perimeter.Count; i++) {
+           vertices[i + 1] = perimeter[i];
+       }
+       mesh.vertices = vertices;
+       mesh.RecalculateBounds();
+   }
+   ```
+   Triangle topology and UV coordinate arrays remain untouched.
+3. **Layering Transparent Meshes**: When combining an outer border frame over an inner body mesh:
+   - Separate them by a slight Y offset (e.g. Body at `Y = 0.0001f`, Border at `Y = 0.0006f`) to prevent depth precision fighting.
+   - Use distinct render queues with `_ZWrite = 0`: Body at `renderQueue = 3000`, Border at `renderQueue = 3001` so the border cleanly renders on top regardless of camera viewing angle.
+
 
 

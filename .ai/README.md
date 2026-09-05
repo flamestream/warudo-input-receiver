@@ -36,3 +36,7 @@ This directory contains key architecture notes, integration patterns, build pipe
    - Visual setup anchor lifecycle and localization key token traps.
    - Dynamic rotation spherical pivot geometry and interactive drag feedback.
    - Silent stale code execution during Playground hot-reload failures.
+   - Two-sided procedural geometry requirement (Unity `Standard` shader ignores `_Cull = Off`).
+   - Hot-reload auto-restoration loop trap and high-frequency input strobing.
+   - PBR diffuse albedo dimming vs. unlit self-illumination and Enlighten GI dirtiness.
+   - Zero-allocation dynamic mesh vertex morphing vs. mesh rebuild allocations.
