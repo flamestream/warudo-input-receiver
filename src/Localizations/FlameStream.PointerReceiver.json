@@ -383,7 +383,6 @@
         "ROOT_INITIAL_TRANSFORM": "Keyboard Root Transform",
         "ROOT_INITIAL_3D_POSITION": "Root Initial 3D Position",
         "ROOT_INITIAL_3D_ROTATION": "Root Initial 3D Rotation",
-        "PLAY_ANIM_ON_DISABLED_KEYS": "Play Finger Anim on Disabled Keys",
         "RETURN_TO_REST": "Return to Rest Pose",
         "REST_TIMEOUT": "Rest Timeout (Seconds)",
         "LEFT_HAND_REST_POSITION": "Left Hand Rest Position",

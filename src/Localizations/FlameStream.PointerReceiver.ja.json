@@ -342,7 +342,6 @@
         "ROOT_INITIAL_TRANSFORM": "キーボードルート変形",
         "ROOT_INITIAL_3D_POSITION": "ルート初期3D位置",
         "ROOT_INITIAL_3D_ROTATION": "ルート初期3D回転",
-        "PLAY_ANIM_ON_DISABLED_KEYS": "移動無効キーでも指アニメーションを再生",
         "RETURN_TO_REST": "待機姿勢に戻る",
         "REST_TIMEOUT": "待機姿勢に戻るまでの時間（秒）",
         "LEFT_HAND_REST_POSITION": "左手の待機位置",

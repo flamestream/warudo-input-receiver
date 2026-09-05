@@ -42,9 +42,6 @@ namespace FlameStream
                 : (RightHandRestTransform?.Scale ?? Vector3.one);
         }
 
-        [DataInput(45)]
-        [Label("PLAY_ANIM_ON_DISABLED_KEYS")]
-        public bool PlayAnimationOnDisabledKey = true;
 
         [DataInput(46)]
         [Label("RETURN_TO_REST")]

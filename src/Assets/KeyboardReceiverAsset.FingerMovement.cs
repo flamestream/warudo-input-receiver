@@ -293,15 +293,11 @@ namespace FlameStream
                     if (!isLeft && isRightInVisualSetup) continue;
 
                     if (Down((int)binding.Key)) {
-                        if (binding.EnableHandMovement || PlayAnimationOnDisabledKey) {
-                            targetFingerWeights[(int)binding.Finger] = 1.0f;
-                        }
+                        targetFingerWeights[(int)binding.Finger] = 1.0f;
                     }
 
                     if (Activated((int)binding.Key)) {
-                        if (binding.EnableHandMovement || PlayAnimationOnDisabledKey) {
-                            PlayFingerAnimation(binding.Finger);
-                        }
+                        PlayFingerAnimation(binding.Finger);
                     }
                 }
             }
