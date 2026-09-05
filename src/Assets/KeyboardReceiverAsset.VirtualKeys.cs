@@ -60,23 +60,6 @@ namespace FlameStream
         [Label("DEFAULT_KEY_APPEARANCE")]
         public VirtualKeyAppearance DefaultAppearance;
 
-        [Trigger(575)]
-        [Label("RESET_DEFAULT_APPEARANCE")]
-        public void TriggerResetDefaultAppearance() {
-            if (DefaultAppearance == null) {
-                DefaultAppearance = VirtualKeyAppearance.CreateDefault();
-            } else {
-                DefaultAppearance.ResetToDefaultTheme();
-            }
-            UpdateAllVirtualKeyColors();
-        }
-
-        [Trigger(600)]
-        [Label("IDENTIFY_ALL_KEYS")]
-        public void TriggerIdentifyAllKeys() {
-            IdentifyAllKeys();
-        }
-
         [DataInput(610)]
         [Label("VIRTUAL_KEYS")]
         public VirtualKeyDefinition[] VirtualKeys = new VirtualKeyDefinition[0];
@@ -94,8 +77,14 @@ namespace FlameStream
             if (DefaultAppearance == null) {
                 DefaultAppearance = VirtualKeyAppearance.CreateDefault();
             }
+            DefaultAppearance.OnAppearanceChanged = () => {
+                UpdateAllVirtualKeyColors();
+            };
 
             Watch(nameof(EnableFloatingKeys), delegate {
+                UpdateFloatingKeysState();
+            });
+            Watch(nameof(IsEnabled), delegate {
                 UpdateFloatingKeysState();
             });
             Watch(nameof(KeysLayoutPreset), delegate { });
@@ -111,11 +100,20 @@ namespace FlameStream
             Watch(nameof(DefaultKeySize), delegate { RebuildAllVirtualKeyMeshes(); });
             Watch(nameof(DefaultCornerRadius), delegate { RebuildAllVirtualKeyMeshes(); });
             Watch(nameof(DefaultBorderWidth), delegate { RebuildAllVirtualKeyMeshes(); });
-            Watch(nameof(DefaultAppearance), delegate { UpdateAllVirtualKeyColors(); });
+            Watch(nameof(DefaultAppearance), delegate {
+                if (DefaultAppearance != null) {
+                    DefaultAppearance.OnAppearanceChanged = () => { UpdateAllVirtualKeyColors(); };
+                }
+                UpdateAllVirtualKeyColors();
+            });
 
             RefreshVirtualKeysParent();
             if (VirtualKeys == null || VirtualKeys.Length == 0) {
                 ApplyVirtualKeyPreset(KeysLayoutPreset, false);
+            }
+
+            if (EnableFloatingKeys && IsEnabled) {
+                UpdateFloatingKeysState();
             }
         }
 
@@ -363,6 +361,11 @@ namespace FlameStream
         void OnUpdateVirtualKeys() {
             if (!EnableFloatingKeys || !IsEnabled) return;
 
+            // Auto-restore meshes if hot-reloaded and visuals haven't been built yet
+            if (VirtualKeys != null && VirtualKeys.Length > 0 && VirtualKeys[0] != null && VirtualKeys[0].KeyGameObject == null) {
+                UpdateFloatingKeysState();
+            }
+
             // Ensure parent references
             if (VirtualKeys != null && VirtualKeys.Length > 0 && VirtualKeys[0] != null && VirtualKeys[0].Parent == null) {
                 RefreshVirtualKeysParent();
@@ -399,16 +402,60 @@ namespace FlameStream
         void ApplyKeyGlowState(VirtualKeyDefinition keyDef, bool isDown, float dt = 0f) {
             if (keyDef.BorderMaterial == null || keyDef.BodyMaterial == null) return;
 
-            var app = (keyDef.UseCustomAppearance && keyDef.CustomAppearance != null) ? keyDef.CustomAppearance : DefaultAppearance;
-            if (app == null) return;
+            var customApp = (keyDef.UseCustomAppearance && keyDef.CustomAppearance != null) ? keyDef.CustomAppearance : null;
+            var baseApp = DefaultAppearance;
 
-            // Determine factor: smooth transition, instant replace, or identify pulse
+            // Resolve Body Normal style
+            var bodyNormal = (customApp?.Body?.Normal != null && customApp.Body.Normal.Enabled)
+                ? customApp.Body.Normal
+                : baseApp?.Body?.Normal;
+
+            // Resolve Body Pressed style
+            bool customHasPressed = (customApp?.Body != null && customApp.Body.EnablePressedState && customApp.Body.Pressed != null && customApp.Body.Pressed.Enabled);
+            bool baseHasPressed = (baseApp?.Body != null && baseApp.Body.EnablePressedState && baseApp.Body.Pressed != null && baseApp.Body.Pressed.Enabled);
+
+            VirtualKeyStateStyle bodyPressed = null;
+            if (customHasPressed) {
+                bodyPressed = customApp.Body.Pressed;
+            } else if (customApp != null && customApp.Body != null && !customApp.Body.EnablePressedState) {
+                bodyPressed = bodyNormal;
+            } else if (baseHasPressed) {
+                bodyPressed = baseApp.Body.Pressed;
+            } else {
+                bodyPressed = bodyNormal;
+            }
+
+            // Resolve Border Normal style
+            var borderNormal = (customApp?.Border?.Normal != null && customApp.Border.Normal.Enabled)
+                ? customApp.Border.Normal
+                : baseApp?.Border?.Normal;
+
+            // Resolve Border Pressed style
+            bool customBorderHasPressed = (customApp?.Border != null && customApp.Border.EnablePressedState && customApp.Border.Pressed != null && customApp.Border.Pressed.Enabled);
+            bool baseBorderHasPressed = (baseApp?.Border != null && baseApp.Border.EnablePressedState && baseApp.Border.Pressed != null && baseApp.Border.Pressed.Enabled);
+
+            VirtualKeyStateStyle borderPressed = null;
+            if (customBorderHasPressed) {
+                borderPressed = customApp.Border.Pressed;
+            } else if (customApp != null && customApp.Border != null && !customApp.Border.EnablePressedState) {
+                borderPressed = borderNormal;
+            } else if (baseBorderHasPressed) {
+                borderPressed = baseApp.Border.Pressed;
+            } else {
+                borderPressed = borderNormal;
+            }
+
+            // Resolve transition duration
+            float transDuration = (customApp != null && customApp.TransitionDuration >= 0f)
+                ? customApp.TransitionDuration
+                : (baseApp?.TransitionDuration ?? 0.05f);
+
+            // Progress interpolation
             float factor = 0f;
             if (keyDef.IdentifyGlowTimer > 0f) {
                 factor = Mathf.PingPong(Time.time * 6f, 1f);
             } else {
                 float target = isDown ? 1.0f : 0.0f;
-                float transDuration = app.TransitionDuration;
                 if (transDuration <= 0.001f || dt <= 0f) {
                     keyDef.CurrentPressProgress = target;
                 } else {
@@ -417,28 +464,71 @@ namespace FlameStream
                 factor = keyDef.CurrentPressProgress;
             }
 
-            // Body interpolation
-            var bodyNormal = app.Body?.Normal;
-            var bodyPressed = app.Body?.Pressed;
-            if (bodyNormal != null && bodyPressed != null) {
-                Color bodyColor = Color.Lerp(bodyNormal.Color, bodyPressed.Color, factor);
-                Color bodyGlowColor = Color.Lerp(bodyNormal.GlowColor, bodyPressed.GlowColor, factor);
-                float bodyGlowIntensity = Mathf.Lerp(bodyNormal.GlowIntensity, bodyPressed.GlowIntensity, factor);
+            // Calculate animated dimensions
+            Vector2 size = (keyDef.UseCustomSize && keyDef.Size.x > 0f && keyDef.Size.y > 0f) ? keyDef.Size : DefaultKeySize;
 
-                keyDef.BodyMaterial.color = bodyColor;
-                keyDef.BodyMaterial.SetColor("_EmissionColor", bodyGlowColor * bodyGlowIntensity);
+            float normalBorderWidth = keyDef.UseCustomSize
+                ? keyDef.BorderWidth
+                : (borderNormal != null ? borderNormal.BorderWidth : DefaultBorderWidth);
+            float pressedBorderWidth = keyDef.UseCustomSize
+                ? keyDef.PressedBorderWidth
+                : (borderPressed != null ? borderPressed.BorderWidth : normalBorderWidth);
+            float currentBorderWidth = Mathf.Lerp(normalBorderWidth, pressedBorderWidth, factor);
+
+            float normalRadius = keyDef.UseCustomSize
+                ? keyDef.CornerRadius
+                : (customApp?.CornerRadius ?? baseApp?.CornerRadius ?? DefaultCornerRadius);
+            float pressedRadius = keyDef.UseCustomSize
+                ? keyDef.PressedCornerRadius
+                : (customApp?.PressedCornerRadius ?? baseApp?.PressedCornerRadius ?? normalRadius);
+            float currentRadius = Mathf.Lerp(normalRadius, pressedRadius, factor);
+
+            float maxRadius = Mathf.Min(size.x, size.y) * 0.5f;
+            float absoluteRadius = currentRadius * maxRadius;
+
+            // In-place mesh vertex morphing during press transitions
+            if (Mathf.Abs(keyDef.CurrentBorderWidth - currentBorderWidth) > 0.00001f || Mathf.Abs(keyDef.CurrentCornerRadius - currentRadius) > 0.0001f) {
+                keyDef.CurrentBorderWidth = currentBorderWidth;
+                keyDef.CurrentCornerRadius = currentRadius;
+
+                if (keyDef.BodyMesh != null) {
+                    VirtualKeyMeshBuilder.UpdateRoundedRectVertices(keyDef.BodyMesh, size.x, size.y, absoluteRadius);
+                }
+                if (keyDef.FrameMesh != null) {
+                    VirtualKeyMeshBuilder.UpdateRoundedRectFrameVertices(keyDef.FrameMesh, size.x, size.y, absoluteRadius, currentBorderWidth);
+                }
             }
 
-            // Border interpolation
-            var borderNormal = app.Border?.Normal;
-            var borderPressed = app.Border?.Pressed;
-            if (borderNormal != null && borderPressed != null) {
-                Color borderColor = Color.Lerp(borderNormal.Color, borderPressed.Color, factor);
-                Color borderGlowColor = Color.Lerp(borderNormal.GlowColor, borderPressed.GlowColor, factor);
-                float borderGlowIntensity = Mathf.Lerp(borderNormal.GlowIntensity, borderPressed.GlowIntensity, factor);
+            // Apply Body
+            if (bodyNormal != null) {
+                var targetPressed = bodyPressed ?? bodyNormal;
+                Color bodyColor = Color.Lerp(bodyNormal.Color, targetPressed.Color, factor);
+                float bodySelfIllum = Mathf.Clamp01(Mathf.Lerp(bodyNormal.SelfIllumination, targetPressed.SelfIllumination, factor));
+                Color bodyGlowColor = Color.Lerp(bodyNormal.GlowColor, targetPressed.GlowColor, factor);
+                float bodyGlowIntensity = Mathf.Lerp(bodyNormal.GlowIntensity, targetPressed.GlowIntensity, factor);
 
-                keyDef.BorderMaterial.color = borderColor;
-                keyDef.BorderMaterial.SetColor("_EmissionColor", borderGlowColor * borderGlowIntensity);
+                // When SelfIllumination = 1, diffuse albedo is dimmed to 0 so scene lighting/shadows cannot darken or tint it.
+                // The base color is self-emitted, with any additional glow/bloom added on top.
+                Color albedo = new Color(bodyColor.r * (1f - bodySelfIllum), bodyColor.g * (1f - bodySelfIllum), bodyColor.b * (1f - bodySelfIllum), bodyColor.a);
+                Color emission = (bodyColor * bodySelfIllum) + (bodyGlowColor * bodyGlowIntensity);
+
+                keyDef.BodyMaterial.color = albedo;
+                keyDef.BodyMaterial.SetColor("_EmissionColor", emission);
+            }
+
+            // Apply Border
+            if (borderNormal != null) {
+                var targetPressed = borderPressed ?? borderNormal;
+                Color borderColor = Color.Lerp(borderNormal.Color, targetPressed.Color, factor);
+                float borderSelfIllum = Mathf.Clamp01(Mathf.Lerp(borderNormal.SelfIllumination, targetPressed.SelfIllumination, factor));
+                Color borderGlowColor = Color.Lerp(borderNormal.GlowColor, targetPressed.GlowColor, factor);
+                float borderGlowIntensity = Mathf.Lerp(borderNormal.GlowIntensity, targetPressed.GlowIntensity, factor);
+
+                Color albedo = new Color(borderColor.r * (1f - borderSelfIllum), borderColor.g * (1f - borderSelfIllum), borderColor.b * (1f - borderSelfIllum), borderColor.a);
+                Color emission = (borderColor * borderSelfIllum) + (borderGlowColor * borderGlowIntensity);
+
+                keyDef.BorderMaterial.color = albedo;
+                keyDef.BorderMaterial.SetColor("_EmissionColor", emission);
             }
         }
 
@@ -475,15 +565,16 @@ namespace FlameStream
             keyGo.transform.localScale = scale;
 
             // Calculate dimensions
-            Vector2 size = keyDef.UseCustomAppearance ? keyDef.Size : DefaultKeySize;
-            float cornerRadius = keyDef.UseCustomAppearance ? keyDef.CornerRadius : DefaultCornerRadius;
-            float borderWidth = keyDef.UseCustomAppearance ? keyDef.BorderWidth : DefaultBorderWidth;
+            Vector2 size = (keyDef.UseCustomSize && keyDef.Size.x > 0f && keyDef.Size.y > 0f) ? keyDef.Size : DefaultKeySize;
+            float cornerRadius = keyDef.UseCustomSize ? keyDef.CornerRadius : DefaultCornerRadius;
+            float borderWidth = keyDef.UseCustomSize ? keyDef.BorderWidth : DefaultBorderWidth;
 
             float maxRadius = Mathf.Min(size.x, size.y) * 0.5f;
             float absoluteRadius = cornerRadius * maxRadius;
 
             // 1. Inner Body Mesh & Material
             var bodyMesh = VirtualKeyMeshBuilder.CreateRoundedRectMesh(size.x, size.y, absoluteRadius);
+            bodyMesh.MarkDynamic();
             var bodyGo = new GameObject("Body");
             bodyGo.transform.SetParent(keyGo.transform, false);
             bodyGo.transform.localPosition = new Vector3(0f, 0.0001f, 0f); // Slight elevation above base
@@ -498,9 +589,10 @@ namespace FlameStream
 
             // 2. Hollow Border Frame Mesh & Material
             var frameMesh = VirtualKeyMeshBuilder.CreateRoundedRectFrameMesh(size.x, size.y, absoluteRadius, borderWidth);
+            frameMesh.MarkDynamic();
             var frameGo = new GameObject("Border");
             frameGo.transform.SetParent(keyGo.transform, false);
-            frameGo.transform.localPosition = new Vector3(0f, 0.0002f, 0f);
+            frameGo.transform.localPosition = new Vector3(0f, 0.0006f, 0f); // Cleanly above body
 
             var frameMf = frameGo.AddComponent<MeshFilter>();
             frameMf.sharedMesh = frameMesh;
@@ -517,7 +609,8 @@ namespace FlameStream
             keyDef.BodyMaterial = bodyMat;
             keyDef.BorderMaterial = borderMat;
 
-            ApplyKeyGlowState(keyDef, false, 0f);
+            bool isDown = Down((int)keyDef.Key);
+            ApplyKeyGlowState(keyDef, isDown, 0f);
         }
 
         Material CreateKeyMaterial() {
@@ -540,7 +633,7 @@ namespace FlameStream
 
             // Always enable emission keyword on both Body & Border materials
             mat.EnableKeyword("_EMISSION");
-            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
             mat.SetColor("_EmissionColor", Color.black);
 
             return mat;
@@ -569,18 +662,6 @@ namespace FlameStream
             }
         }
 
-        public void IdentifyAllKeys() {
-            if (VirtualKeys == null) return;
-            for (int i = 0; i < VirtualKeys.Length; i++) {
-                VirtualKeys[i]?.Identify(2.5f);
-            }
-            Context.Service?.Toast(
-                Warudo.Core.Server.ToastSeverity.Info,
-                Name,
-                "Flashing all virtual keys with glow sequence."
-            );
-        }
-
         public void DestroyAllVirtualKeyVisuals() {
             if (VirtualKeys != null) {
                 for (int i = 0; i < VirtualKeys.Length; i++) {
@@ -607,7 +688,7 @@ namespace FlameStream
 
             float pitch = 0.036f; // Standard key spacing (32mm key + 4mm gap)
 
-            void AddKey(VKCode key, string label, VirtualKeyAnchor anchor, float posX, float posZ, float scaleX = 1f, float scaleZ = 1f, float rotY = 0f) {
+            void AddKey(VKCode key, string label, VirtualKeyAnchor anchor, float posX, float posZ, float unitWidth = 1f, float unitHeight = 1f, float rotY = 0f) {
                 var def = StructuredData.Create<VirtualKeyDefinition>(d => {
                     d.Parent = this;
                     d.Key = key;
@@ -615,7 +696,13 @@ namespace FlameStream
                     d.AttachmentAnchor = anchor;
                     d.Transform.Position = new Vector3(posX, 0f, posZ);
                     d.Transform.Rotation = new Vector3(0f, rotY, 0f);
-                    d.Transform.Scale = new Vector3(scaleX, 1f, scaleZ);
+                    d.Transform.Scale = Vector3.one;
+                    if (unitWidth != 1f || unitHeight != 1f) {
+                        d.UseCustomSize = true;
+                        float w = (unitWidth * pitch) - (pitch - DefaultKeySize.x);
+                        float h = (unitHeight * pitch) - (pitch - DefaultKeySize.y);
+                        d.Size = new Vector2(w, h);
+                    }
                     d.SetupTransformCallbacks();
                 });
                 list.Add(def);

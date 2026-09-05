@@ -33,17 +33,12 @@ namespace FlameStream
                 normals[i + 1] = Vector3.up;
             }
 
-            var triangles = new int[count * 3 * 2];
+            var triangles = new int[count * 3];
             for (int i = 0; i < count; i++) {
                 int next = (i + 1) % count;
-                // Front face
-                triangles[i * 6 + 0] = 0;
-                triangles[i * 6 + 1] = i + 1;
-                triangles[i * 6 + 2] = next + 1;
-                // Back face (no backface culling)
-                triangles[i * 6 + 3] = 0;
-                triangles[i * 6 + 4] = next + 1;
-                triangles[i * 6 + 5] = i + 1;
+                triangles[i * 3 + 0] = 0;
+                triangles[i * 3 + 1] = i + 1;
+                triangles[i * 3 + 2] = next + 1;
             }
 
             mesh.vertices = vertices;
@@ -89,7 +84,7 @@ namespace FlameStream
                 normals[count + i] = Vector3.up;
             }
 
-            var triangles = new int[count * 6 * 2];
+            var triangles = new int[count * 6];
             for (int i = 0; i < count; i++) {
                 int next = (i + 1) % count;
 
@@ -98,25 +93,15 @@ namespace FlameStream
                 int iCurrent = count + i;
                 int iNext = count + next;
 
-                // Triangle 1: Front face
-                triangles[i * 12 + 0] = oCurrent;
-                triangles[i * 12 + 1] = oNext;
-                triangles[i * 12 + 2] = iNext;
+                // Triangle 1
+                triangles[i * 6 + 0] = oCurrent;
+                triangles[i * 6 + 1] = oNext;
+                triangles[i * 6 + 2] = iNext;
 
-                // Triangle 2: Front face
-                triangles[i * 12 + 3] = oCurrent;
-                triangles[i * 12 + 4] = iNext;
-                triangles[i * 12 + 5] = iCurrent;
-
-                // Triangle 1: Back face (no backface culling)
-                triangles[i * 12 + 6] = oCurrent;
-                triangles[i * 12 + 7] = iNext;
-                triangles[i * 12 + 8] = oNext;
-
-                // Triangle 2: Back face (no backface culling)
-                triangles[i * 12 + 9] = oCurrent;
-                triangles[i * 12 + 10] = iCurrent;
-                triangles[i * 12 + 11] = iNext;
+                // Triangle 2
+                triangles[i * 6 + 3] = oCurrent;
+                triangles[i * 6 + 4] = iNext;
+                triangles[i * 6 + 5] = iCurrent;
             }
 
             mesh.vertices = vertices;
@@ -128,21 +113,69 @@ namespace FlameStream
             return mesh;
         }
 
+        /// <summary>
+        /// Updates the vertex positions of an existing body mesh in-place.
+        /// </summary>
+        public static void UpdateRoundedRectVertices(Mesh mesh, float width, float height, float radius, int cornerSegments = 8) {
+            if (mesh == null) return;
+            radius = Mathf.Clamp(radius, 0f, Mathf.Min(width, height) * 0.5f);
+            cornerSegments = Mathf.Max(2, cornerSegments);
+
+            var perimeter = GeneratePerimeterPoints(width, height, radius, cornerSegments);
+            int count = perimeter.Count;
+
+            var vertices = mesh.vertices;
+            if (vertices == null || vertices.Length != count + 1) {
+                vertices = new Vector3[count + 1];
+            }
+
+            vertices[0] = Vector3.zero;
+            for (int i = 0; i < count; i++) {
+                vertices[i + 1] = perimeter[i];
+            }
+
+            mesh.vertices = vertices;
+            mesh.RecalculateBounds();
+        }
+
+        /// <summary>
+        /// Updates the vertex positions of an existing border frame mesh in-place.
+        /// </summary>
+        public static void UpdateRoundedRectFrameVertices(Mesh mesh, float width, float height, float radius, float borderWidth, int cornerSegments = 8) {
+            if (mesh == null) return;
+            radius = Mathf.Clamp(radius, 0f, Mathf.Min(width, height) * 0.5f);
+            borderWidth = Mathf.Clamp(borderWidth, 0.0005f, Mathf.Min(width, height) * 0.5f - 0.0005f);
+            cornerSegments = Mathf.Max(2, cornerSegments);
+
+            float innerWidth = Mathf.Max(0.001f, width - 2f * borderWidth);
+            float innerHeight = Mathf.Max(0.001f, height - 2f * borderWidth);
+            float innerRadius = Mathf.Max(0f, radius - borderWidth);
+
+            var outerPerimeter = GeneratePerimeterPoints(width, height, radius, cornerSegments);
+            var innerPerimeter = GeneratePerimeterPoints(innerWidth, innerHeight, innerRadius, cornerSegments);
+            int count = outerPerimeter.Count;
+
+            var vertices = mesh.vertices;
+            if (vertices == null || vertices.Length != count * 2) {
+                vertices = new Vector3[count * 2];
+            }
+
+            for (int i = 0; i < count; i++) {
+                vertices[i] = outerPerimeter[i];
+                vertices[count + i] = innerPerimeter[i];
+            }
+
+            mesh.vertices = vertices;
+            mesh.RecalculateBounds();
+        }
+
         private static List<Vector3> GeneratePerimeterPoints(float width, float height, float radius, int segmentsPerCorner) {
             var points = new List<Vector3>(segmentsPerCorner * 4);
 
             float hw = width * 0.5f;
             float hh = height * 0.5f;
 
-            if (radius <= 0.0001f) {
-                // Sharp rectangle
-                points.Add(new Vector3(hw, 0f, hh));
-                points.Add(new Vector3(-hw, 0f, hh));
-                points.Add(new Vector3(-hw, 0f, -hh));
-                points.Add(new Vector3(hw, 0f, -hh));
-                return points;
-            }
-
+            radius = Mathf.Clamp(radius, 0f, Mathf.Min(hw, hh));
             float cx = hw - radius;
             float cz = hh - radius;
 

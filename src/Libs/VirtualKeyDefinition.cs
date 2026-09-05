@@ -25,40 +25,41 @@ namespace FlameStream
         [Label("TRANSFORM")]
         public VisualSetupTransform Transform;
 
-        [DataInput(50)]
-        [Label("USE_CUSTOM_APPEARANCE")]
-        public bool UseCustomAppearance = false;
+        [DataInput(48)]
+        [Label("USE_CUSTOM_SIZE")]
+        public bool UseCustomSize = false;
 
-        [DataInput(60)]
+        [DataInput(50)]
         [Label("KEY_SIZE")]
         public Vector2 Size = new Vector2(0.032f, 0.032f);
 
-        [DataInput(70)]
+        [DataInput(52)]
         [FloatSlider(0f, 0.5f, 0.01f)]
         [Label("CORNER_ROUNDNESS")]
         public float CornerRadius = 0.28f;
 
-        [DataInput(80)]
-        [FloatSlider(0.0005f, 0.01f, 0.0005f)]
+        [DataInput(53)]
+        [FloatSlider(0f, 0.5f, 0.01f)]
+        [Label("PRESSED_CORNER_ROUNDNESS")]
+        public float PressedCornerRadius = 0.28f;
+
+        [DataInput(54)]
+        [FloatSlider(0.0005f, 0.015f, 0.0002f)]
         [Label("BORDER_WIDTH")]
         public float BorderWidth = 0.0025f;
 
         [DataInput(55)]
+        [FloatSlider(0.0005f, 0.015f, 0.0002f)]
+        [Label("PRESSED_BORDER_WIDTH")]
+        public float PressedBorderWidth = 0.0035f;
+
+        [DataInput(60)]
+        [Label("USE_CUSTOM_APPEARANCE")]
+        public bool UseCustomAppearance = false;
+
+        [DataInput(65)]
         [Label("CUSTOM_APPEARANCE")]
         public VirtualKeyAppearance CustomAppearance;
-
-        [Trigger(58)]
-        [Label("RESET_CUSTOM_APPEARANCE")]
-        public void TriggerResetCustomAppearance() {
-            if (CustomAppearance == null) {
-                CustomAppearance = VirtualKeyAppearance.CreateDefault();
-            } else {
-                CustomAppearance.ResetToDefaultTheme();
-            }
-            if (Parent != null) {
-                Parent.UpdateVirtualKeyColors(this);
-            }
-        }
 
         [Trigger(120)]
         [Label("IDENTIFY_KEY")]
@@ -75,6 +76,8 @@ namespace FlameStream
 
         public float IdentifyGlowTimer { get; internal set; } = 0f;
         public float CurrentPressProgress { get; internal set; } = 0f;
+        public float CurrentBorderWidth { get; internal set; } = -1f;
+        public float CurrentCornerRadius { get; internal set; } = -1f;
 
         public void Identify(float duration = 2.5f) {
             IdentifyGlowTimer = duration;
@@ -105,9 +108,17 @@ namespace FlameStream
                 Transform.Scale = Vector3.one;
             }
             if (CustomAppearance == null) {
-                CustomAppearance = VirtualKeyAppearance.CreateDefault();
+                CustomAppearance = VirtualKeyAppearance.CreateForOverride();
+            } else {
+                CustomAppearance.IsBaseAppearance = false;
+                CustomAppearance.ConfigureElements();
             }
+            CustomAppearance.OnAppearanceChanged = () => {
+                if (Parent != null) Parent.UpdateVirtualKeyColors(this);
+            };
+
             SetupTransformCallbacks();
+            SyncUI();
 
             Watch(nameof(Transform), delegate {
                 SetupTransformCallbacks();
@@ -125,11 +136,47 @@ namespace FlameStream
                 }
                 BroadcastDataInput(nameof(Transform));
             });
-            Watch(nameof(UseCustomAppearance), delegate { if (Parent != null) Parent.UpdateVirtualKeyColors(this); });
-            Watch(nameof(CustomAppearance), delegate { if (Parent != null) Parent.UpdateVirtualKeyColors(this); });
+            Watch(nameof(UseCustomSize), delegate {
+                SyncUI();
+                if (Parent != null) Parent.RebuildVirtualKeyMesh(this);
+            });
+            Watch(nameof(UseCustomAppearance), delegate {
+                SyncUI();
+                if (Parent != null) Parent.UpdateVirtualKeyColors(this);
+            });
+            Watch(nameof(CustomAppearance), delegate {
+                if (CustomAppearance != null) {
+                    CustomAppearance.OnAppearanceChanged = () => {
+                        if (Parent != null) Parent.UpdateVirtualKeyColors(this);
+                    };
+                }
+                if (Parent != null) Parent.UpdateVirtualKeyColors(this);
+            });
             Watch(nameof(Size), delegate { if (Parent != null) Parent.RebuildVirtualKeyMesh(this); });
             Watch(nameof(CornerRadius), delegate { if (Parent != null) Parent.RebuildVirtualKeyMesh(this); });
+            Watch(nameof(PressedCornerRadius), delegate { if (Parent != null) Parent.UpdateVirtualKeyColors(this); });
             Watch(nameof(BorderWidth), delegate { if (Parent != null) Parent.RebuildVirtualKeyMesh(this); });
+            Watch(nameof(PressedBorderWidth), delegate { if (Parent != null) Parent.UpdateVirtualKeyColors(this); });
+        }
+
+        public void SyncUI() {
+            try {
+                bool hideSize = !UseCustomSize;
+                var sizePort = GetDataInputPort(nameof(Size));
+                if (sizePort != null) { sizePort.Properties.hidden = hideSize; BroadcastDataInputProperties(nameof(Size)); }
+                var crPort = GetDataInputPort(nameof(CornerRadius));
+                if (crPort != null) { crPort.Properties.hidden = hideSize; BroadcastDataInputProperties(nameof(CornerRadius)); }
+                var pcrPort = GetDataInputPort(nameof(PressedCornerRadius));
+                if (pcrPort != null) { pcrPort.Properties.hidden = hideSize; BroadcastDataInputProperties(nameof(PressedCornerRadius)); }
+                var bwPort = GetDataInputPort(nameof(BorderWidth));
+                if (bwPort != null) { bwPort.Properties.hidden = hideSize; BroadcastDataInputProperties(nameof(BorderWidth)); }
+                var pbwPort = GetDataInputPort(nameof(PressedBorderWidth));
+                if (pbwPort != null) { pbwPort.Properties.hidden = hideSize; BroadcastDataInputProperties(nameof(PressedBorderWidth)); }
+
+                bool hideApp = !UseCustomAppearance;
+                var appPort = GetDataInputPort(nameof(CustomAppearance));
+                if (appPort != null) { appPort.Properties.hidden = hideApp; BroadcastDataInputProperties(nameof(CustomAppearance)); }
+            } catch { }
         }
 
         protected override void OnDestroy() {
@@ -221,6 +268,8 @@ Click **[Apply Transform]** when finished.
                 UnityEngine.Object.Destroy(BorderMaterial);
                 BorderMaterial = null;
             }
+            CurrentBorderWidth = -1f;
+            CurrentCornerRadius = -1f;
         }
     }
 }

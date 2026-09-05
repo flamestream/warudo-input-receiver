@@ -372,9 +372,11 @@ namespace FlameStream
                 LeftHandRestTransform = StructuredData.Create<VisualSetupTransform>();
                 LeftHandRestTransform.Position = new Vector3(-0.07f, 0.02f, 0f);
                 LeftHandRestTransform.Rotation = new Vector3(0f, 90f, 0f);
+                LeftHandRestTransform.Scale = Vector3.one;
+            } else if (LeftHandRestTransform.Scale == Vector3.zero) {
+                LeftHandRestTransform.Scale = Vector3.one;
             }
             LeftHandRestTransform.LocalizationKey = "KEYBOARD_LEFT_HAND_REST";
-            LeftHandRestTransform.HideScale();
             LeftHandRestTransform.OnEnterVisualSetup = (tr) => {
                 EnsureAnchors();
             };
@@ -388,11 +390,13 @@ namespace FlameStream
                 }
                 setupAnchor.Transform.Position = tr.Position;
                 setupAnchor.Transform.Rotation = tr.Rotation;
+                setupAnchor.Transform.Scale = tr.Scale;
                 setupAnchor.Transform.Broadcast();
             };
             LeftHandRestTransform.OnApplyAnchor = (tr, setupAnchor) => {
                 tr.Position = setupAnchor.Transform.Position;
                 tr.Rotation = setupAnchor.Transform.Rotation;
+                tr.Scale = setupAnchor.Transform.Scale;
                 UpdateHandRestTransforms();
             };
             LeftHandRestTransform.OnExitVisualSetup = (isApplied) => {
@@ -408,9 +412,11 @@ namespace FlameStream
                 RightHandRestTransform = StructuredData.Create<VisualSetupTransform>();
                 RightHandRestTransform.Position = new Vector3(0.07f, 0.02f, 0f);
                 RightHandRestTransform.Rotation = new Vector3(0f, -90f, 0f);
+                RightHandRestTransform.Scale = Vector3.one;
+            } else if (RightHandRestTransform.Scale == Vector3.zero) {
+                RightHandRestTransform.Scale = Vector3.one;
             }
             RightHandRestTransform.LocalizationKey = "KEYBOARD_RIGHT_HAND_REST";
-            RightHandRestTransform.HideScale();
             RightHandRestTransform.OnEnterVisualSetup = (tr) => {
                 EnsureAnchors();
             };
@@ -424,11 +430,13 @@ namespace FlameStream
                 }
                 setupAnchor.Transform.Position = tr.Position;
                 setupAnchor.Transform.Rotation = tr.Rotation;
+                setupAnchor.Transform.Scale = tr.Scale;
                 setupAnchor.Transform.Broadcast();
             };
             RightHandRestTransform.OnApplyAnchor = (tr, setupAnchor) => {
                 tr.Position = setupAnchor.Transform.Position;
                 tr.Rotation = setupAnchor.Transform.Rotation;
+                tr.Scale = setupAnchor.Transform.Scale;
                 UpdateHandRestTransforms();
             };
             RightHandRestTransform.OnExitVisualSetup = (isApplied) => {
