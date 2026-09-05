@@ -662,11 +662,30 @@ namespace FlameStream
         [Trigger(50)]
         [Label("RESET_TO_DEFAULTS")]
         public void TriggerResetToDefaults() {
-            ResetToDefaultTheme();
+            var baseApp = GetBaseAppearance?.Invoke();
+            if (!IsBaseAppearance && baseApp != null) {
+                CopyFrom(baseApp);
+                IsBaseAppearance = false;
+                if (Shape != null) {
+                    Shape.IsBaseAppearance = false;
+                    Shape.Enabled = true;
+                }
+                if (Body != null) {
+                    Body.IsBaseAppearance = false;
+                    Body.Enabled = true;
+                }
+                if (Border != null) {
+                    Border.IsBaseAppearance = false;
+                    Border.Enabled = true;
+                }
+            } else {
+                ResetToDefaultTheme();
+            }
             BroadcastAll();
         }
 
         public bool IsBaseAppearance = true;
+        public Func<VirtualKeyAppearance> GetBaseAppearance;
         public Action OnAppearanceChanged;
 
         protected override void OnCreate() {

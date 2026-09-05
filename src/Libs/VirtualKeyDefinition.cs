@@ -100,6 +100,7 @@ namespace FlameStream
                 CustomAppearance.IsBaseAppearance = false;
                 CustomAppearance.ConfigureElements();
             }
+            CustomAppearance.GetBaseAppearance = () => Parent?.DefaultAppearance;
             CustomAppearance.OnAppearanceChanged = () => {
                 if (Parent != null) Parent.RebuildVirtualKeyMesh(this);
             };
@@ -131,6 +132,8 @@ namespace FlameStream
             });
             Watch(nameof(CustomAppearance), delegate {
                 if (CustomAppearance != null) {
+                    CustomAppearance.IsBaseAppearance = false;
+                    CustomAppearance.GetBaseAppearance = () => Parent?.DefaultAppearance;
                     CustomAppearance.OnAppearanceChanged = () => {
                         if (Parent != null) Parent.RebuildVirtualKeyMesh(this);
                     };
