@@ -121,10 +121,7 @@ namespace FlameStream
             bool isRightKeySetup = activeKeySetup != null && !activeKeySetup.Finger.IsLeftHand() && activeKeySetup.Transform != null && activeKeySetup.Transform.InVisualSetupMode;
 
             // 1. Process Left Hand (Position & rotation driven by newest active key or visual setup)
-            bool isLeftInVisualSetup = isLeftKeySetup || (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode) || (LeftHandDynamicRotation != null && LeftHandDynamicRotation.InVisualSetupMode);
-            if (LeftHandDynamicRotation != null && LeftHandDynamicRotation.InVisualSetupMode) {
-                LeftHandDynamicRotation.UpdateDebugVisuals();
-            }
+            bool isLeftInVisualSetup = isLeftKeySetup || (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode);
             if (isLeftKeySetup) {
                 activeKeySetup.UpdateDebugVisuals();
             }
@@ -142,11 +139,7 @@ namespace FlameStream
 
             if (isLeftKeySetup && activeKeySetup.Transform.setupAnchor != null) {
                 targetLeftPos = activeKeySetup.Transform.setupAnchor.Transform.Position;
-                Vector3 deltaHand = targetLeftPos - restLeftPos;
-                Vector3 dynamicRot = (LeftHandDynamicRotation != null && LeftHandDynamicRotation.Enabled)
-                    ? LeftHandDynamicRotation.Evaluate(deltaHand)
-                    : Vector3.zero;
-                targetLeftRot = activeKeySetup.Transform.setupAnchor.Transform.Rotation + dynamicRot;
+                targetLeftRot = activeKeySetup.Transform.setupAnchor.Transform.Rotation;
                 currentLeftHandPos = targetLeftPos;
                 currentLeftHandRot = targetLeftRot;
                 lastLeftKeyPos = targetLeftPos;
@@ -167,8 +160,7 @@ namespace FlameStream
                     Vector3 leftScale = GetLeftHandMovementScale();
                     Vector3 deltaPos = Vector3.Scale(activeLeftKey.DeltaPosition, leftScale);
                     targetLeftPos = restLeftPos + deltaPos;
-                    Vector3 dynamicRot = LeftHandDynamicRotation != null ? LeftHandDynamicRotation.Evaluate(deltaPos) : Vector3.zero;
-                    targetLeftRot = restLeftRot + dynamicRot + activeLeftKey.DeltaRotation;
+                    targetLeftRot = restLeftRot + activeLeftKey.DeltaRotation;
                 } else {
                     targetLeftPos = hasLeftKeyBeenPressed ? lastLeftKeyPos : restLeftPos;
                     targetLeftRot = hasLeftKeyBeenPressed ? lastLeftKeyRot : restLeftRot;
@@ -202,10 +194,7 @@ namespace FlameStream
             }
 
             // 2. Process Right Hand (Position & rotation driven by newest active key or visual setup)
-            bool isRightInVisualSetup = isRightKeySetup || (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode) || (RightHandDynamicRotation != null && RightHandDynamicRotation.InVisualSetupMode);
-            if (RightHandDynamicRotation != null && RightHandDynamicRotation.InVisualSetupMode) {
-                RightHandDynamicRotation.UpdateDebugVisuals();
-            }
+            bool isRightInVisualSetup = isRightKeySetup || (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode);
             if (isRightKeySetup) {
                 activeKeySetup.UpdateDebugVisuals();
             }
@@ -223,11 +212,7 @@ namespace FlameStream
 
             if (isRightKeySetup && activeKeySetup.Transform.setupAnchor != null) {
                 targetRightPos = activeKeySetup.Transform.setupAnchor.Transform.Position;
-                Vector3 deltaHand = targetRightPos - restRightPos;
-                Vector3 dynamicRot = (RightHandDynamicRotation != null && RightHandDynamicRotation.Enabled)
-                    ? RightHandDynamicRotation.Evaluate(deltaHand)
-                    : Vector3.zero;
-                targetRightRot = activeKeySetup.Transform.setupAnchor.Transform.Rotation + dynamicRot;
+                targetRightRot = activeKeySetup.Transform.setupAnchor.Transform.Rotation;
                 currentRightHandPos = targetRightPos;
                 currentRightHandRot = targetRightRot;
                 lastRightKeyPos = targetRightPos;
@@ -248,8 +233,7 @@ namespace FlameStream
                     Vector3 rightScale = GetRightHandMovementScale();
                     Vector3 deltaPos = Vector3.Scale(activeRightKey.DeltaPosition, rightScale);
                     targetRightPos = restRightPos + deltaPos;
-                    Vector3 dynamicRot = RightHandDynamicRotation != null ? RightHandDynamicRotation.Evaluate(deltaPos) : Vector3.zero;
-                    targetRightRot = restRightRot + dynamicRot + activeRightKey.DeltaRotation;
+                    targetRightRot = restRightRot + activeRightKey.DeltaRotation;
                 } else {
                     targetRightPos = hasRightKeyBeenPressed ? lastRightKeyPos : restRightPos;
                     targetRightRot = hasRightKeyBeenPressed ? lastRightKeyRot : restRightRot;

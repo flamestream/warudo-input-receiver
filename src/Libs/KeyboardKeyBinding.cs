@@ -48,9 +48,7 @@ namespace FlameStream {
 
         // Visual guide objects during key setup
         GameObject debugRestSphere;
-        GameObject debugOrbitCircle;
         Material debugRestSphereMat;
-        Material debugOrbitCircleMat;
 
         public string GetHeader() {
             var handSide = Finger.IsLeftHand() ? "L" : "R";
@@ -112,7 +110,6 @@ namespace FlameStream {
 
                 Vector3 restPos = isLeft ? Parent.LeftHandRestPosition : Parent.RightHandRestPosition;
                 Vector3 restRot = isLeft ? Parent.LeftHandRestRotation : Parent.RightHandRestRotation;
-                var dynRotDef = isLeft ? Parent.LeftHandDynamicRotation : Parent.RightHandDynamicRotation;
 
                 Vector3 handScale = isLeft ? Parent.GetLeftHandMovementScale() : Parent.GetRightHandMovementScale();
                 Vector3 deltaHand = Vector3.Scale(tr.Position, handScale);
@@ -132,12 +129,7 @@ Click **[Apply Transform]** when finished.
                 setupAnchor.Transform.Broadcast();
 
                 Transform parentTr = root != null && root.GameObject != null ? root.GameObject.transform : null;
-                Vector3 sphereCenter = (dynRotDef != null && dynRotDef.SphereCenterOffset != Vector3.zero)
-                    ? (restPos + dynRotDef.SphereCenterOffset)
-                    : (restPos - new Vector3(0f, 0f, 0.3f));
-
-                bool isDynRotEnabled = dynRotDef != null && dynRotDef.Enabled;
-                CreateDebugVisuals(restPos, initialPos, sphereCenter, parentTr, isDynRotEnabled);
+                CreateDebugVisuals(restPos, parentTr);
             };
 
             Transform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -185,10 +177,10 @@ Click **[Apply Transform]** when finished.
             };
         }
 
-        public void CreateDebugVisuals(Vector3 restPos, Vector3 keyPos, Vector3 sphereCenter, Transform parentTransform, bool isDynRotEnabled) {
+        public void CreateDebugVisuals(Vector3 restPos, Transform parentTransform) {
             DestroyDebugVisuals();
 
-            // 1. 5cm red resting sphere at restPos
+            // 5cm red resting sphere at restPos
             debugRestSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             debugRestSphere.name = "KeyBinding_DebugRestSphere";
             var col1 = debugRestSphere.GetComponent("Collider");
@@ -206,30 +198,6 @@ Click **[Apply Transform]** when finished.
             debugRestSphereMat.SetColor("_EmissionColor", new Color(0.8f, 0f, 0f));
             debugRestSphere.GetComponent<Renderer>().material = debugRestSphereMat;
 
-            // 2. Dimmed red circle representing the rotation offset arc (only created if dynamic rotation is enabled)
-            if (isDynRotEnabled) {
-                debugOrbitCircle = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                debugOrbitCircle.name = "KeyBinding_DebugOrbitCircle";
-                var col2 = debugOrbitCircle.GetComponent("Collider");
-                if (col2 != null) UnityEngine.Object.Destroy(col2);
-
-                if (parentTransform != null) {
-                    debugOrbitCircle.transform.SetParent(parentTransform, false);
-                }
-
-                debugOrbitCircleMat = new Material(Shader.Find("Standard"));
-                debugOrbitCircleMat.SetFloat("_Mode", 3);
-                debugOrbitCircleMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                debugOrbitCircleMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                debugOrbitCircleMat.SetInt("_ZWrite", 0);
-                debugOrbitCircleMat.DisableKeyword("_ALPHATEST_ON");
-                debugOrbitCircleMat.EnableKeyword("_ALPHABLEND_ON");
-                debugOrbitCircleMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                debugOrbitCircleMat.renderQueue = 3000;
-                debugOrbitCircleMat.color = new Color(1f, 0f, 0f, 0.35f); // Dimmed red circle
-                debugOrbitCircle.GetComponent<Renderer>().material = debugOrbitCircleMat;
-            }
-
             UpdateDebugVisuals();
         }
 
@@ -238,50 +206,7 @@ Click **[Apply Transform]** when finished.
 
             bool isLeft = Finger.IsLeftHand();
             Vector3 restPos = isLeft ? Parent.LeftHandRestPosition : Parent.RightHandRestPosition;
-            Vector3 anchorPos = Transform.setupAnchor.Transform.Position;
-            var dynRotDef = isLeft ? Parent.LeftHandDynamicRotation : Parent.RightHandDynamicRotation;
-            bool isDynRotEnabled = dynRotDef != null && dynRotDef.Enabled;
-
             debugRestSphere.transform.localPosition = restPos;
-
-            if (!isDynRotEnabled) {
-                if (debugOrbitCircle != null) {
-                    debugOrbitCircle.SetActive(false);
-                }
-                return;
-            }
-
-            if (debugOrbitCircle != null) {
-                debugOrbitCircle.SetActive(true);
-            }
-
-            Vector3 sphereCenter = (dynRotDef != null && dynRotDef.SphereCenterOffset != Vector3.zero)
-                ? (restPos + dynRotDef.SphereCenterOffset)
-                : (restPos - new Vector3(0f, 0f, 0.3f));
-
-            if (debugOrbitCircle != null) {
-                debugOrbitCircle.transform.localPosition = sphereCenter;
-
-                Vector3 delta = restPos - sphereCenter;
-                float radius = delta.magnitude;
-                float diameter = Mathf.Max(radius * 2f, 0.05f);
-
-                debugOrbitCircle.transform.localScale = new Vector3(diameter, 0.0005f, diameter);
-
-                if (delta.sqrMagnitude > 0.0001f) {
-                    Vector3 normal = Vector3.Cross(delta, Vector3.right);
-                    if (normal.sqrMagnitude < 0.001f) {
-                        normal = Vector3.Cross(delta, Vector3.up);
-                    }
-                    if (normal.sqrMagnitude > 0.001f) {
-                        debugOrbitCircle.transform.localRotation = Quaternion.FromToRotation(Vector3.up, normal.normalized);
-                    } else {
-                        debugOrbitCircle.transform.localRotation = Quaternion.identity;
-                    }
-                } else {
-                    debugOrbitCircle.transform.localRotation = Quaternion.identity;
-                }
-            }
         }
 
         public void DestroyDebugVisuals() {
@@ -289,17 +214,9 @@ Click **[Apply Transform]** when finished.
                 UnityEngine.Object.Destroy(debugRestSphere);
                 debugRestSphere = null;
             }
-            if (debugOrbitCircle != null) {
-                UnityEngine.Object.Destroy(debugOrbitCircle);
-                debugOrbitCircle = null;
-            }
             if (debugRestSphereMat != null) {
                 UnityEngine.Object.Destroy(debugRestSphereMat);
                 debugRestSphereMat = null;
-            }
-            if (debugOrbitCircleMat != null) {
-                UnityEngine.Object.Destroy(debugOrbitCircleMat);
-                debugOrbitCircleMat = null;
             }
         }
     }

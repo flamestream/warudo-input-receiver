@@ -56,17 +56,9 @@ namespace FlameStream
         [Label("LEFT_HAND_REST_TRANSFORM")]
         public VisualSetupTransform LeftHandRestTransform;
 
-        [DataInput(52)]
-        [Label("LEFT_HAND_DYNAMIC_ROTATION")]
-        public DynamicVector3 LeftHandDynamicRotation;
-
         [DataInput(60)]
         [Label("RIGHT_HAND_REST_TRANSFORM")]
         public VisualSetupTransform RightHandRestTransform;
-
-        [DataInput(62)]
-        [Label("RIGHT_HAND_DYNAMIC_ROTATION")]
-        public DynamicVector3 RightHandDynamicRotation;
 
         public Vector3 KeyboardRootPosition {
             get => RootTransform?.Position ?? new Vector3(0f, 0.6218f, 0.1484f);
@@ -300,42 +292,6 @@ namespace FlameStream
             SetupRootTransform();
             SetupLeftHandRestTransform();
             SetupRightHandRestTransform();
-            SetupLeftHandDynamicRotation();
-            SetupRightHandDynamicRotation();
-        }
-
-        void SetupLeftHandDynamicRotation() {
-            if (LeftHandDynamicRotation == null) {
-                LeftHandDynamicRotation = StructuredData.Create<DynamicVector3>();
-            }
-            LeftHandDynamicRotation.LocalizationKey = "KEYBOARD_LEFT_HAND_DYNAMIC_ROTATION";
-            LeftHandDynamicRotation.GetRestPosition = () => LeftHandRestPosition;
-            LeftHandDynamicRotation.GetParentAnchor = () => GetRootAnchor(false);
-            LeftHandDynamicRotation.OnEnterVisualSetup = (dv) => {
-                EnsureAnchors();
-            };
-            LeftHandDynamicRotation.OnExitVisualSetup = (isApplied) => {
-                ResetActiveKeyValues();
-                Context.Service.NavigateToAsset(Id);
-                Context.Service.BroadcastOpenedScene();
-            };
-        }
-
-        void SetupRightHandDynamicRotation() {
-            if (RightHandDynamicRotation == null) {
-                RightHandDynamicRotation = StructuredData.Create<DynamicVector3>();
-            }
-            RightHandDynamicRotation.LocalizationKey = "KEYBOARD_RIGHT_HAND_DYNAMIC_ROTATION";
-            RightHandDynamicRotation.GetRestPosition = () => RightHandRestPosition;
-            RightHandDynamicRotation.GetParentAnchor = () => GetRootAnchor(false);
-            RightHandDynamicRotation.OnEnterVisualSetup = (dv) => {
-                EnsureAnchors();
-            };
-            RightHandDynamicRotation.OnExitVisualSetup = (isApplied) => {
-                ResetActiveKeyValues();
-                Context.Service.NavigateToAsset(Id);
-                Context.Service.BroadcastOpenedScene();
-            };
         }
 
         void SetupRootTransform() {
@@ -456,8 +412,6 @@ namespace FlameStream
             Watch(nameof(RootTransform), delegate { SetupRootTransform(); });
             Watch(nameof(LeftHandRestTransform), delegate { SetupLeftHandRestTransform(); });
             Watch(nameof(RightHandRestTransform), delegate { SetupRightHandRestTransform(); });
-            Watch(nameof(LeftHandDynamicRotation), delegate { SetupLeftHandDynamicRotation(); });
-            Watch(nameof(RightHandDynamicRotation), delegate { SetupRightHandDynamicRotation(); });
 
             Watch(nameof(IsEnabled), delegate { UpdateHandTrackingState(); });
             Watch(nameof(IsHandEnabled), delegate { UpdateHandTrackingState(); });
