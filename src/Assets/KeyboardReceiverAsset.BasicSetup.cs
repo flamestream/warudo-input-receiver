@@ -36,19 +36,15 @@ namespace FlameStream
         public Vector3 MovementFactor = Vector3.one;
 
         public Vector3 GetLeftHandMovementScale() {
-            Vector3 scale = (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode && LeftHandRestTransform.setupAnchor != null)
+            return (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode && LeftHandRestTransform.setupAnchor != null)
                 ? LeftHandRestTransform.setupAnchor.Transform.Scale
                 : (LeftHandRestTransform?.Scale ?? Vector3.one);
-            if (scale.sqrMagnitude < 0.0001f) return Vector3.one;
-            return scale;
         }
 
         public Vector3 GetRightHandMovementScale() {
-            Vector3 scale = (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode && RightHandRestTransform.setupAnchor != null)
+            return (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode && RightHandRestTransform.setupAnchor != null)
                 ? RightHandRestTransform.setupAnchor.Transform.Scale
                 : (RightHandRestTransform?.Scale ?? Vector3.one);
-            if (scale.sqrMagnitude < 0.0001f) return Vector3.one;
-            return scale;
         }
 
         [DataInput(45)]
@@ -391,9 +387,6 @@ namespace FlameStream
                 LeftHandRestTransform.Rotation = new Vector3(0f, 90f, 0f);
                 LeftHandRestTransform.Scale = Vector3.one;
                 LeftHandRestTransform.SetDataInput(nameof(LeftHandRestTransform.Scale), Vector3.one, true);
-            } else if (LeftHandRestTransform.Scale == Vector3.zero || LeftHandRestTransform.Scale.sqrMagnitude < 0.0001f) {
-                LeftHandRestTransform.Scale = Vector3.one;
-                LeftHandRestTransform.SetDataInput(nameof(LeftHandRestTransform.Scale), Vector3.one, true);
             }
             LeftHandRestTransform.LocalizationKey = "KEYBOARD_LEFT_HAND_REST";
             LeftHandRestTransform.OnEnterVisualSetup = (tr) => {
@@ -431,9 +424,6 @@ namespace FlameStream
                 RightHandRestTransform = StructuredData.Create<VisualSetupTransform>();
                 RightHandRestTransform.Position = new Vector3(0.07f, 0.02f, 0f);
                 RightHandRestTransform.Rotation = new Vector3(0f, -90f, 0f);
-                RightHandRestTransform.Scale = Vector3.one;
-                RightHandRestTransform.SetDataInput(nameof(RightHandRestTransform.Scale), Vector3.one, true);
-            } else if (RightHandRestTransform.Scale == Vector3.zero || RightHandRestTransform.Scale.sqrMagnitude < 0.0001f) {
                 RightHandRestTransform.Scale = Vector3.one;
                 RightHandRestTransform.SetDataInput(nameof(RightHandRestTransform.Scale), Vector3.one, true);
             }
@@ -509,15 +499,6 @@ namespace FlameStream
         void OnUpdateBasicSetup() {
             if (RootTransform != null && string.IsNullOrEmpty(RootTransform.LocalizationKey)) {
                 SetupVisualTransforms();
-            }
-
-            if (LeftHandRestTransform != null && LeftHandRestTransform.Scale.sqrMagnitude < 0.0001f) {
-                LeftHandRestTransform.Scale = Vector3.one;
-                LeftHandRestTransform.SetDataInput(nameof(LeftHandRestTransform.Scale), Vector3.one, true);
-            }
-            if (RightHandRestTransform != null && RightHandRestTransform.Scale.sqrMagnitude < 0.0001f) {
-                RightHandRestTransform.Scale = Vector3.one;
-                RightHandRestTransform.SetDataInput(nameof(RightHandRestTransform.Scale), Vector3.one, true);
             }
 
             var root = RootAnchor;

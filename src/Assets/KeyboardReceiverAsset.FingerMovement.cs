@@ -630,6 +630,15 @@ namespace FlameStream
                 RightHandRestRotation = new Vector3(0f, -90f, 0f);
             }
 
+            if (LeftHandRestTransform != null && LeftHandRestTransform.Scale == Vector3.zero) {
+                LeftHandRestTransform.Scale = Vector3.one;
+                LeftHandRestTransform.SetDataInput(nameof(LeftHandRestTransform.Scale), Vector3.one, true);
+            }
+            if (RightHandRestTransform != null && RightHandRestTransform.Scale == Vector3.zero) {
+                RightHandRestTransform.Scale = Vector3.one;
+                RightHandRestTransform.SetDataInput(nameof(RightHandRestTransform.Scale), Vector3.one, true);
+            }
+
             KeyBindings = list.ToArray();
             BroadcastDataInput(nameof(KeyBindings));
             BroadcastDataInput(nameof(LeftHandRestTransform));
