@@ -701,5 +701,89 @@ Creating a new `Mesh` allocates a new native DirectX/OpenGL buffer and C# heap a
    - Separate them by a slight Y offset (e.g. Body at `Y = 0.0001f`, Border at `Y = 0.0006f`) to prevent depth precision fighting.
    - Use distinct render queues with `_ZWrite = 0`: Body at `renderQueue = 3000`, Border at `renderQueue = 3001` so the border cleanly renders on top regardless of camera viewing angle.
 
+---
 
+## 22. Allocation-Free Input Transitions with DOTween Easing (`DOVirtual.EasedValue`)
 
+### The Phenomenon
+When driving smooth visual transitions for high-frequency user inputs (such as 50–100 keyboard keys, gamepad buttons, or MIDI pads being pressed and released rapidly at 60–120 FPS), creating `Tweener` or `Tween` objects via `DOTween.To()` or `transform.DOMove()` produces continuous heap allocations and garbage collection spikes. Furthermore, rapid key mashing causes overlapping tweens to fight each other unless tracked, killed, or recycled through complex pooling logic.
+
+### Root Cause Analysis
+- Every call to `DOTween.To()` allocates internal tween controller instances, callback delegates, and linked-list node structures on the managed heap.
+- High-frequency input states (e.g. typing at 100+ WPM or playing rhythm games) create and discard dozens of tweens every second.
+- Handling distinct transition speeds and easing curves for **Press In** (e.g. fast 0.02s linear snap) versus **Press Out** (e.g. smooth 0.12s cubic decay) with active `Tween` objects requires canceling the active press tween mid-flight, calculating the remaining proportional duration, and spawning a new release tween.
+
+### Architectural Pattern & Rule
+Use a normalized scalar progress tracker and sample DOTween's mathematical easing functions statically via `DOVirtual.EasedValue()`:
+
+1. **Track Normalized Scalar Progress**:
+   Store a single float `CurrentPressProgress` (0.0 = fully released, 1.0 = fully pressed) on each visual key/item.
+2. **Step Progress Linearly in Update Loop**:
+   In `OnUpdate()`, step `CurrentPressProgress` towards `targetProgress` (1.0 if down, 0.0 if up) using `Mathf.MoveTowards()`:
+   ```csharp
+   float targetProgress = isDown ? 1.0f : 0.0f;
+   var transition = isDown ? appearance.PressInTransition : appearance.PressOutTransition;
+   float duration = Mathf.Max(0.001f, transition.Duration);
+   float speed = (1.0f / duration) * Time.deltaTime;
+
+   key.CurrentPressProgress = Mathf.MoveTowards(key.CurrentPressProgress, targetProgress, speed);
+   ```
+3. **Evaluate DOTween Easing Function Statically**:
+   Instead of allocating a tween, evaluate the eased interpolation factor using `DOVirtual.EasedValue()`:
+   ```csharp
+   float easedT = DOVirtual.EasedValue(0f, 1f, key.CurrentPressProgress, transition.Ease);
+   ```
+4. **Interpolate Visual Attributes**:
+   Use `easedT` to interpolate colors, transform elevation/scale, corner roundness, and border widths:
+   ```csharp
+   // 100% allocation-free interpolation
+   Color currentColor = Color.Lerp(upColor, downColor, easedT);
+   Vector4 currentRadii = Vector4.Lerp(upRadii, downRadii, easedT);
+   Vector4 currentBorders = Vector4.Lerp(upBorders, downBorders, easedT);
+   ```
+
+### Benefits
+- **Zero GC Allocations**: No heap allocations, no delegate creations, and no garbage collection overhead during rapid input hammering.
+- **Zero Tween Tracking**: No list of active tweens, no `.Kill()` calls, and no risk of orphaned tween leaks.
+- **Seamless Reversal**: If a user releases or re-presses a key mid-transition, `Mathf.MoveTowards()` smoothly reverses direction from the exact current progress value without visual snapping or time calculation bugs.
+
+---
+
+## 23. Constant-Topology Procedural Meshes for Zero-Allocation Morphing
+
+### The Phenomenon
+When procedural UI components, keys, or props support asymmetric styles (such as individual corner roundness where some corners are sharp `0mm` while others are rounded `5mm`, or varying border widths per edge), re-generating the mesh geometry on style changes or during press transitions often alters the vertex count. This forces rebuilding the entire triangle index buffer (`mesh.triangles = ...`), causing heap allocations and stalling the GPU render pipeline.
+
+### Root Cause Analysis
+- Naive arc generators emit fewer vertices for sharp corners (e.g. 1 point) and more vertices for rounded corners (e.g. $N$ arc segments).
+- When a corner transitions between sharp and rounded (or between different asymmetric styles), the total vertex count of the mesh fluctuates.
+- Unity's `Mesh` API forbids assigning a new `mesh.vertices` array whose length does not match the existing vertex count without completely clearing the mesh and reassigning `mesh.triangles`, which reallocates native DirectX/OpenGL vertex and index buffers.
+
+### Architectural Pattern & Rule
+Enforce **fixed vertex count and constant topology** across all geometric configurations:
+
+1. **Fixed Segment Allocation per Corner**:
+   Always evaluate a fixed number of perimeter points per corner (e.g. $N = 8$ segments per corner $\times 4$ corners $= 32$ perimeter vertices), regardless of whether the corner radius is $0$ or positive.
+2. **Collapse Arc Points at Sharp Corners**:
+   When a corner radius is $0$ (sharp corner), evaluate all $N$ arc segment vertices at the exact same geometric corner position $(hw, 0, hh)$:
+   ```csharp
+   if (cornerRad <= 0f) {
+       // Collapse all arc segments to the sharp point without changing vertex count or triangle topology
+       for (int s = 0; s <= cornerSegments; s++) {
+           points.Add(new Vector3(centerX + hw, 0, centerZ + hh));
+       }
+   } else {
+       // Generate smooth arc
+       for (int s = 0; s <= cornerSegments; s++) {
+           float angle = ...;
+           points.Add(new Vector3(centerX + Mathf.Cos(angle) * cornerRad, 0, centerZ + Mathf.Sin(angle) * cornerRad));
+       }
+   }
+   ```
+3. **In-Place Vertex Streaming**:
+   Because the vertex count and triangle winding order are invariant, asymmetric corners, border widths, widths, and heights can be morphed dynamically in-place:
+   ```csharp
+   // Fast dynamic CPU-to-GPU stream: 0 allocations
+   VirtualKeyMeshBuilder.UpdateRoundedRectVertices(key.BodyMesh, key.CurrentSize.x, key.CurrentSize.y, key.CurrentCornerRadii);
+   ```
+   Only `mesh.vertices = verts; mesh.RecalculateBounds();` is executed. The triangle index buffer and UV layout remain unchanged on the GPU.

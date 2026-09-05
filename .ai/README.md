@@ -40,3 +40,5 @@ This directory contains key architecture notes, integration patterns, build pipe
    - Hot-reload auto-restoration loop trap and high-frequency input strobing.
    - PBR diffuse albedo dimming vs. unlit self-illumination and Enlighten GI dirtiness.
    - Zero-allocation dynamic mesh vertex morphing vs. mesh rebuild allocations.
+   - Allocation-free input transitions with DOTween easing (`DOVirtual.EasedValue`).
+   - Constant-topology procedural arc generation for zero-allocation dynamic morphing.
