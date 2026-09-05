@@ -43,13 +43,11 @@ namespace FlameStream
         public VisualSetupTransform RootKeysetTransform;
 
         // Base Look & Feel
-        [DataInput(560)]
-        [Label("DEFAULT_KEY_SIZE")]
-        public Vector2 DefaultKeySize = new Vector2(0.032f, 0.032f);
-
         [DataInput(570)]
         [Label("DEFAULT_KEY_APPEARANCE")]
         public VirtualKeyAppearance DefaultAppearance;
+
+        public Vector2 BaseKeySize => DefaultAppearance?.Shape?.Normal?.Size ?? new Vector2(0.032f, 0.032f);
 
         [DataInput(610)]
         [Label("VIRTUAL_KEYS")]
@@ -69,7 +67,7 @@ namespace FlameStream
                 DefaultAppearance = VirtualKeyAppearance.CreateDefault();
             }
             DefaultAppearance.OnAppearanceChanged = () => {
-                UpdateAllVirtualKeyColors();
+                RebuildAllVirtualKeyMeshes();
             };
 
             Watch(nameof(EnableFloatingKeys), delegate {
@@ -88,12 +86,11 @@ namespace FlameStream
             Watch(nameof(RightKeysetTransform), delegate { SetupRightKeysetTransform(); });
             Watch(nameof(RootKeysetTransform), delegate { SetupRootKeysetTransform(); });
 
-            Watch(nameof(DefaultKeySize), delegate { RebuildAllVirtualKeyMeshes(); });
             Watch(nameof(DefaultAppearance), delegate {
                 if (DefaultAppearance != null) {
-                    DefaultAppearance.OnAppearanceChanged = () => { UpdateAllVirtualKeyColors(); };
+                    DefaultAppearance.OnAppearanceChanged = () => { RebuildAllVirtualKeyMeshes(); };
                 }
-                UpdateAllVirtualKeyColors();
+                RebuildAllVirtualKeyMeshes();
             });
 
             RefreshVirtualKeysParent();
@@ -394,44 +391,70 @@ namespace FlameStream
             var customApp = (keyDef.UseCustomAppearance && keyDef.CustomAppearance != null) ? keyDef.CustomAppearance : null;
             var baseApp = DefaultAppearance;
 
-            // Resolve Body Normal style
-            var bodyNormal = (customApp?.Body?.Normal != null && customApp.Body.Normal.Enabled)
+            // 1. Resolve Shape Normal and Pressed styles
+            bool customShapeEnabled = (customApp?.Shape != null && customApp.Shape.Enabled);
+            var shapeNormal = (customShapeEnabled && customApp.Shape.Normal != null && customApp.Shape.Normal.Enabled)
+                ? customApp.Shape.Normal
+                : baseApp?.Shape?.Normal;
+
+            VirtualKeyShapeStateStyle shapePressed = null;
+            if (customShapeEnabled) {
+                if (customApp.Shape.EnablePressedState && customApp.Shape.Pressed != null && customApp.Shape.Pressed.Enabled) {
+                    shapePressed = customApp.Shape.Pressed;
+                } else if (!customApp.Shape.EnablePressedState) {
+                    shapePressed = shapeNormal; // User explicitly disabled press squish for this key
+                } else if (baseApp?.Shape != null && baseApp.Shape.EnablePressedState && baseApp.Shape.Pressed != null && baseApp.Shape.Pressed.Enabled) {
+                    shapePressed = baseApp.Shape.Pressed;
+                } else {
+                    shapePressed = shapeNormal;
+                }
+            } else {
+                bool baseHasPressed = (baseApp?.Shape != null && baseApp.Shape.EnablePressedState && baseApp.Shape.Pressed != null && baseApp.Shape.Pressed.Enabled);
+                shapePressed = baseHasPressed ? baseApp.Shape.Pressed : shapeNormal;
+            }
+
+            // 2. Resolve Body Normal and Pressed styles
+            bool customBodyEnabled = (customApp?.Body != null && customApp.Body.Enabled);
+            var bodyNormal = (customBodyEnabled && customApp.Body.Normal != null && customApp.Body.Normal.Enabled)
                 ? customApp.Body.Normal
                 : baseApp?.Body?.Normal;
 
-            // Resolve Body Pressed style
-            bool customHasPressed = (customApp?.Body != null && customApp.Body.EnablePressedState && customApp.Body.Pressed != null && customApp.Body.Pressed.Enabled);
-            bool baseHasPressed = (baseApp?.Body != null && baseApp.Body.EnablePressedState && baseApp.Body.Pressed != null && baseApp.Body.Pressed.Enabled);
-
-            VirtualKeyStateStyle bodyPressed = null;
-            if (customHasPressed) {
-                bodyPressed = customApp.Body.Pressed;
-            } else if (customApp != null && customApp.Body != null && !customApp.Body.EnablePressedState) {
-                bodyPressed = bodyNormal;
-            } else if (baseHasPressed) {
-                bodyPressed = baseApp.Body.Pressed;
+            VirtualKeyMaterialStateStyle bodyPressed = null;
+            if (customBodyEnabled) {
+                if (customApp.Body.EnablePressedState && customApp.Body.Pressed != null && customApp.Body.Pressed.Enabled) {
+                    bodyPressed = customApp.Body.Pressed;
+                } else if (!customApp.Body.EnablePressedState) {
+                    bodyPressed = bodyNormal; // User explicitly disabled press state for this key
+                } else if (baseApp?.Body != null && baseApp.Body.EnablePressedState && baseApp.Body.Pressed != null && baseApp.Body.Pressed.Enabled) {
+                    bodyPressed = baseApp.Body.Pressed;
+                } else {
+                    bodyPressed = bodyNormal;
+                }
             } else {
-                bodyPressed = bodyNormal;
+                bool baseHasPressed = (baseApp?.Body != null && baseApp.Body.EnablePressedState && baseApp.Body.Pressed != null && baseApp.Body.Pressed.Enabled);
+                bodyPressed = baseHasPressed ? baseApp.Body.Pressed : bodyNormal;
             }
 
-            // Resolve Border Normal style
-            var borderNormal = (customApp?.Border?.Normal != null && customApp.Border.Normal.Enabled)
+            // 3. Resolve Border Normal and Pressed styles
+            bool customBorderEnabled = (customApp?.Border != null && customApp.Border.Enabled);
+            var borderNormal = (customBorderEnabled && customApp.Border.Normal != null && customApp.Border.Normal.Enabled)
                 ? customApp.Border.Normal
                 : baseApp?.Border?.Normal;
 
-            // Resolve Border Pressed style
-            bool customBorderHasPressed = (customApp?.Border != null && customApp.Border.EnablePressedState && customApp.Border.Pressed != null && customApp.Border.Pressed.Enabled);
-            bool baseBorderHasPressed = (baseApp?.Border != null && baseApp.Border.EnablePressedState && baseApp.Border.Pressed != null && baseApp.Border.Pressed.Enabled);
-
-            VirtualKeyStateStyle borderPressed = null;
-            if (customBorderHasPressed) {
-                borderPressed = customApp.Border.Pressed;
-            } else if (customApp != null && customApp.Border != null && !customApp.Border.EnablePressedState) {
-                borderPressed = borderNormal;
-            } else if (baseBorderHasPressed) {
-                borderPressed = baseApp.Border.Pressed;
+            VirtualKeyMaterialStateStyle borderPressed = null;
+            if (customBorderEnabled) {
+                if (customApp.Border.EnablePressedState && customApp.Border.Pressed != null && customApp.Border.Pressed.Enabled) {
+                    borderPressed = customApp.Border.Pressed;
+                } else if (!customApp.Border.EnablePressedState) {
+                    borderPressed = borderNormal; // User explicitly disabled press state for this key
+                } else if (baseApp?.Border != null && baseApp.Border.EnablePressedState && baseApp.Border.Pressed != null && baseApp.Border.Pressed.Enabled) {
+                    borderPressed = baseApp.Border.Pressed;
+                } else {
+                    borderPressed = borderNormal;
+                }
             } else {
-                borderPressed = borderNormal;
+                bool baseHasPressed = (baseApp?.Border != null && baseApp.Border.EnablePressedState && baseApp.Border.Pressed != null && baseApp.Border.Pressed.Enabled);
+                borderPressed = baseHasPressed ? baseApp.Border.Pressed : borderNormal;
             }
 
             // Resolve transitions (onPress / onRelease)
@@ -466,37 +489,35 @@ namespace FlameStream
             }
 
             // Calculate animated dimensions
-            Vector2 size = (keyDef.UseCustomSize && keyDef.Size.x > 0f && keyDef.Size.y > 0f) ? keyDef.Size : DefaultKeySize;
+            Vector2 normalSize = shapeNormal != null ? shapeNormal.Size : BaseKeySize;
+            Vector2 pressedSize = shapePressed != null ? shapePressed.Size : normalSize;
+            Vector2 currentSize = Vector2.Lerp(normalSize, pressedSize, factor);
 
-            Vector4 normalBorders = keyDef.UseCustomSize
-                ? keyDef.GetBorderWidths()
-                : (borderNormal != null ? borderNormal.GetBorderWidths() : BorderVector4Extensions.Uniform(0.0025f));
-            Vector4 pressedBorders = keyDef.UseCustomSize
-                ? (keyDef.PressedBorderWidth > 0f ? BorderVector4Extensions.Uniform(keyDef.PressedBorderWidth) : normalBorders)
-                : (borderPressed != null ? borderPressed.GetBorderWidths() : normalBorders);
-            Vector4 currentBorders = Vector4.Lerp(normalBorders, pressedBorders, factor);
-
-            Vector4 normalCorners = keyDef.UseCustomSize
-                ? keyDef.GetCornerRadii()
-                : (borderNormal != null ? borderNormal.GetCornerRadii() : BorderVector4Extensions.Uniform(0.25f));
-            Vector4 pressedCorners = keyDef.UseCustomSize
-                ? (keyDef.PressedCornerRadius >= 0f ? BorderVector4Extensions.Uniform(keyDef.PressedCornerRadius) : normalCorners)
-                : (borderPressed != null ? borderPressed.GetCornerRadii() : normalCorners);
+            Vector4 normalCorners = shapeNormal != null ? shapeNormal.GetCornerRadii() : BorderVector4Extensions.Uniform(0.25f);
+            Vector4 pressedCorners = shapePressed != null ? shapePressed.GetCornerRadii() : normalCorners;
             Vector4 currentCorners = Vector4.Lerp(normalCorners, pressedCorners, factor);
 
-            float maxRadius = Mathf.Min(size.x, size.y) * 0.5f;
+            Vector4 normalBorders = shapeNormal != null ? shapeNormal.GetBorderWidths() : BorderVector4Extensions.Uniform(0.0025f);
+            Vector4 pressedBorders = shapePressed != null ? shapePressed.GetBorderWidths() : normalBorders;
+            Vector4 currentBorders = Vector4.Lerp(normalBorders, pressedBorders, factor);
+
+            float maxRadius = Mathf.Min(currentSize.x, currentSize.y) * 0.5f;
             Vector4 absoluteCorners = currentCorners * maxRadius;
 
             // In-place mesh vertex morphing during press transitions
-            if (Vector4.Distance(keyDef.CurrentBorderWidths, currentBorders) > 0.00001f || Vector4.Distance(keyDef.CurrentCornerRadii, currentCorners) > 0.0001f) {
+            if (Vector2.Distance(keyDef.CurrentSize, currentSize) > 0.0001f ||
+                Vector4.Distance(keyDef.CurrentBorderWidths, currentBorders) > 0.00001f ||
+                Vector4.Distance(keyDef.CurrentCornerRadii, currentCorners) > 0.0001f) {
+
+                keyDef.CurrentSize = currentSize;
                 keyDef.CurrentBorderWidths = currentBorders;
                 keyDef.CurrentCornerRadii = currentCorners;
 
                 if (keyDef.BodyMesh != null) {
-                    VirtualKeyMeshBuilder.UpdateRoundedRectVertices(keyDef.BodyMesh, size.x, size.y, absoluteCorners);
+                    VirtualKeyMeshBuilder.UpdateRoundedRectVertices(keyDef.BodyMesh, currentSize.x, currentSize.y, absoluteCorners);
                 }
                 if (keyDef.FrameMesh != null) {
-                    VirtualKeyMeshBuilder.UpdateRoundedRectFrameVertices(keyDef.FrameMesh, size.x, size.y, absoluteCorners, currentBorders);
+                    VirtualKeyMeshBuilder.UpdateRoundedRectFrameVertices(keyDef.FrameMesh, currentSize.x, currentSize.y, absoluteCorners, currentBorders);
                 }
             }
 
@@ -566,26 +587,23 @@ namespace FlameStream
             keyGo.transform.localScale = scale;
 
             // Calculate dimensions
-            Vector2 size = (keyDef.UseCustomSize && keyDef.Size.x > 0f && keyDef.Size.y > 0f) ? keyDef.Size : DefaultKeySize;
-
             var customApp = (keyDef.UseCustomAppearance && keyDef.CustomAppearance != null) ? keyDef.CustomAppearance : null;
             var baseApp = DefaultAppearance;
-            var borderNormal = (customApp?.Border?.Normal != null && customApp.Border.Normal.Enabled)
-                ? customApp.Border.Normal
-                : baseApp?.Border?.Normal;
 
-            Vector4 initialBorders = keyDef.UseCustomSize
-                ? keyDef.GetBorderWidths()
-                : (borderNormal != null ? borderNormal.GetBorderWidths() : BorderVector4Extensions.Uniform(0.0025f));
-            Vector4 initialCorners = keyDef.UseCustomSize
-                ? keyDef.GetCornerRadii()
-                : (borderNormal != null ? borderNormal.GetCornerRadii() : BorderVector4Extensions.Uniform(0.25f));
+            bool customShapeEnabled = (customApp?.Shape != null && customApp.Shape.Enabled && customApp.Shape.Normal != null && customApp.Shape.Normal.Enabled);
+            var shapeNormal = customShapeEnabled
+                ? customApp.Shape.Normal
+                : baseApp?.Shape?.Normal;
 
-            float maxRadius = Mathf.Min(size.x, size.y) * 0.5f;
+            Vector2 initialSize = shapeNormal != null ? shapeNormal.Size : BaseKeySize;
+            Vector4 initialBorders = shapeNormal != null ? shapeNormal.GetBorderWidths() : BorderVector4Extensions.Uniform(0.0025f);
+            Vector4 initialCorners = shapeNormal != null ? shapeNormal.GetCornerRadii() : BorderVector4Extensions.Uniform(0.25f);
+
+            float maxRadius = Mathf.Min(initialSize.x, initialSize.y) * 0.5f;
             Vector4 absoluteCorners = initialCorners * maxRadius;
 
             // 1. Inner Body Mesh & Material
-            var bodyMesh = VirtualKeyMeshBuilder.CreateRoundedRectMesh(size.x, size.y, absoluteCorners);
+            var bodyMesh = VirtualKeyMeshBuilder.CreateRoundedRectMesh(initialSize.x, initialSize.y, absoluteCorners);
             bodyMesh.MarkDynamic();
             var bodyGo = new GameObject("Body");
             bodyGo.transform.SetParent(keyGo.transform, false);
@@ -600,7 +618,7 @@ namespace FlameStream
             bodyMr.material = bodyMat;
 
             // 2. Hollow Border Frame Mesh & Material
-            var frameMesh = VirtualKeyMeshBuilder.CreateRoundedRectFrameMesh(size.x, size.y, absoluteCorners, initialBorders);
+            var frameMesh = VirtualKeyMeshBuilder.CreateRoundedRectFrameMesh(initialSize.x, initialSize.y, absoluteCorners, initialBorders);
             frameMesh.MarkDynamic();
             var frameGo = new GameObject("Border");
             frameGo.transform.SetParent(keyGo.transform, false);
@@ -710,10 +728,18 @@ namespace FlameStream
                     d.Transform.Rotation = new Vector3(0f, rotY, 0f);
                     d.Transform.Scale = Vector3.one;
                     if (unitWidth != 1f || unitHeight != 1f) {
-                        d.UseCustomSize = true;
-                        float w = (unitWidth * pitch) - (pitch - DefaultKeySize.x);
-                        float h = (unitHeight * pitch) - (pitch - DefaultKeySize.y);
-                        d.Size = new Vector2(w, h);
+                        d.UseCustomAppearance = true;
+                        d.CustomAppearance = VirtualKeyAppearance.CreateForOverride();
+                        d.CustomAppearance.Shape.Enabled = true;
+                        d.CustomAppearance.Shape.Normal.Enabled = true;
+                        float baseW = BaseKeySize.x;
+                        float baseH = BaseKeySize.y;
+                        float w = (unitWidth * pitch) - (pitch - baseW);
+                        float h = (unitHeight * pitch) - (pitch - baseH);
+                        d.CustomAppearance.Shape.Normal.Size = new Vector2(w, h);
+                        d.CustomAppearance.Shape.EnablePressedState = true;
+                        d.CustomAppearance.Shape.Pressed.Enabled = true;
+                        d.CustomAppearance.Shape.Pressed.Size = new Vector2(w, h);
                     }
                     d.SetupTransformCallbacks();
                 });

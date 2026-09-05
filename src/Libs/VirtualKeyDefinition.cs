@@ -25,50 +25,6 @@ namespace FlameStream
         [Label("TRANSFORM")]
         public VisualSetupTransform Transform;
 
-        [DataInput(48)]
-        [Label("USE_CUSTOM_SIZE")]
-        public bool UseCustomSize = false;
-
-        [DataInput(50)]
-        [Label("KEY_SIZE")]
-        public Vector2 Size = new Vector2(0.032f, 0.032f);
-
-        [DataInput(52)]
-        [FloatSlider(0f, 0.5f, 0.01f)]
-        [Label("CORNER_ROUNDNESS")]
-        public float CornerRadius = 0.28f;
-
-        [DataInput(53)]
-        [Label("USE_INDIVIDUAL_CORNERS")]
-        public bool UseIndividualCorners = false;
-
-        [DataInput(54)]
-        [Label("INDIVIDUAL_CORNER_RADII")]
-        public Vector4 IndividualCornerRadii = new Vector4(0.28f, 0.28f, 0.28f, 0.28f);
-
-        [DataInput(55)]
-        [FloatSlider(0f, 0.5f, 0.01f)]
-        [Label("PRESSED_CORNER_ROUNDNESS")]
-        public float PressedCornerRadius = 0.28f;
-
-        [DataInput(56)]
-        [FloatSlider(0.0005f, 0.015f, 0.0002f)]
-        [Label("BORDER_WIDTH")]
-        public float BorderWidth = 0.0025f;
-
-        [DataInput(57)]
-        [Label("USE_INDIVIDUAL_BORDERS")]
-        public bool UseIndividualBorders = false;
-
-        [DataInput(58)]
-        [Label("INDIVIDUAL_BORDER_WIDTHS")]
-        public Vector4 IndividualBorderWidths = new Vector4(0.0025f, 0.0025f, 0.0025f, 0.0025f);
-
-        [DataInput(59)]
-        [FloatSlider(0.0005f, 0.015f, 0.0002f)]
-        [Label("PRESSED_BORDER_WIDTH")]
-        public float PressedBorderWidth = 0.0035f;
-
         [DataInput(60)]
         [Label("USE_CUSTOM_APPEARANCE")]
         public bool UseCustomAppearance = false;
@@ -92,11 +48,23 @@ namespace FlameStream
 
         public float IdentifyGlowTimer { get; internal set; } = 0f;
         public float CurrentPressProgress { get; internal set; } = 0f;
+        public Vector2 CurrentSize { get; internal set; } = new Vector2(-1f, -1f);
         public Vector4 CurrentBorderWidths { get; internal set; } = new Vector4(-1f, -1f, -1f, -1f);
         public Vector4 CurrentCornerRadii { get; internal set; } = new Vector4(-1f, -1f, -1f, -1f);
 
-        public Vector4 GetBorderWidths() => UseIndividualBorders ? IndividualBorderWidths : BorderVector4Extensions.Uniform(BorderWidth);
-        public Vector4 GetCornerRadii() => UseIndividualCorners ? IndividualCornerRadii : BorderVector4Extensions.Uniform(CornerRadius);
+        public Vector4 GetBorderWidths() {
+            if (UseCustomAppearance && CustomAppearance?.Shape?.Normal != null && CustomAppearance.Shape.Normal.Enabled) {
+                return CustomAppearance.Shape.Normal.GetBorderWidths();
+            }
+            return Parent?.DefaultAppearance?.Shape?.Normal?.GetBorderWidths() ?? BorderVector4Extensions.Uniform(0.0025f);
+        }
+
+        public Vector4 GetCornerRadii() {
+            if (UseCustomAppearance && CustomAppearance?.Shape?.Normal != null && CustomAppearance.Shape.Normal.Enabled) {
+                return CustomAppearance.Shape.Normal.GetCornerRadii();
+            }
+            return Parent?.DefaultAppearance?.Shape?.Normal?.GetCornerRadii() ?? BorderVector4Extensions.Uniform(0.25f);
+        }
 
         public void Identify(float duration = 2.5f) {
             IdentifyGlowTimer = duration;
@@ -133,7 +101,7 @@ namespace FlameStream
                 CustomAppearance.ConfigureElements();
             }
             CustomAppearance.OnAppearanceChanged = () => {
-                if (Parent != null) Parent.UpdateVirtualKeyColors(this);
+                if (Parent != null) Parent.RebuildVirtualKeyMesh(this);
             };
 
             SetupTransformCallbacks();
@@ -155,60 +123,31 @@ namespace FlameStream
                 }
                 BroadcastDataInput(nameof(Transform));
             });
-            Watch(nameof(UseCustomSize), delegate {
-                SyncUI();
-                if (Parent != null) Parent.RebuildVirtualKeyMesh(this);
-            });
-            Watch(nameof(UseIndividualCorners), delegate {
-                SyncUI();
-                if (Parent != null) Parent.RebuildVirtualKeyMesh(this);
-            });
-            Watch(nameof(UseIndividualBorders), delegate {
-                SyncUI();
-                if (Parent != null) Parent.RebuildVirtualKeyMesh(this);
-            });
             Watch(nameof(UseCustomAppearance), delegate {
                 SyncUI();
-                if (Parent != null) Parent.UpdateVirtualKeyColors(this);
+                if (Parent != null) {
+                    Parent.RebuildVirtualKeyMesh(this);
+                }
             });
             Watch(nameof(CustomAppearance), delegate {
                 if (CustomAppearance != null) {
                     CustomAppearance.OnAppearanceChanged = () => {
-                        if (Parent != null) Parent.UpdateVirtualKeyColors(this);
+                        if (Parent != null) Parent.RebuildVirtualKeyMesh(this);
                     };
                 }
-                if (Parent != null) Parent.UpdateVirtualKeyColors(this);
+                if (Parent != null) {
+                    Parent.RebuildVirtualKeyMesh(this);
+                }
             });
-            Watch(nameof(Size), delegate { if (Parent != null) Parent.RebuildVirtualKeyMesh(this); });
-            Watch(nameof(CornerRadius), delegate { if (Parent != null) Parent.RebuildVirtualKeyMesh(this); });
-            Watch(nameof(IndividualCornerRadii), delegate { if (Parent != null) Parent.RebuildVirtualKeyMesh(this); });
-            Watch(nameof(PressedCornerRadius), delegate { if (Parent != null) Parent.UpdateVirtualKeyColors(this); });
-            Watch(nameof(BorderWidth), delegate { if (Parent != null) Parent.RebuildVirtualKeyMesh(this); });
-            Watch(nameof(IndividualBorderWidths), delegate { if (Parent != null) Parent.RebuildVirtualKeyMesh(this); });
-            Watch(nameof(PressedBorderWidth), delegate { if (Parent != null) Parent.UpdateVirtualKeyColors(this); });
         }
 
         public void SyncUI() {
             try {
-                bool hideSize = !UseCustomSize;
-                void SetHidden(string portName, bool hidden) {
-                    var port = GetDataInputPort(portName);
-                    if (port != null) { port.Properties.hidden = hidden; BroadcastDataInputProperties(portName); }
+                var port = GetDataInputPort(nameof(CustomAppearance));
+                if (port != null) {
+                    port.Properties.hidden = !UseCustomAppearance;
+                    BroadcastDataInputProperties(nameof(CustomAppearance));
                 }
-
-                SetHidden(nameof(Size), hideSize);
-                SetHidden(nameof(CornerRadius), hideSize || UseIndividualCorners);
-                SetHidden(nameof(UseIndividualCorners), hideSize);
-                SetHidden(nameof(IndividualCornerRadii), hideSize || !UseIndividualCorners);
-                SetHidden(nameof(PressedCornerRadius), hideSize);
-
-                SetHidden(nameof(BorderWidth), hideSize || UseIndividualBorders);
-                SetHidden(nameof(UseIndividualBorders), hideSize);
-                SetHidden(nameof(IndividualBorderWidths), hideSize || !UseIndividualBorders);
-                SetHidden(nameof(PressedBorderWidth), hideSize);
-
-                bool hideApp = !UseCustomAppearance;
-                SetHidden(nameof(CustomAppearance), hideApp);
             } catch { }
         }
 
@@ -286,6 +225,7 @@ namespace FlameStream
                 UnityEngine.Object.Destroy(BorderMaterial);
                 BorderMaterial = null;
             }
+            CurrentSize = new Vector2(-1f, -1f);
             CurrentBorderWidths = new Vector4(-1f, -1f, -1f, -1f);
             CurrentCornerRadii = new Vector4(-1f, -1f, -1f, -1f);
         }
