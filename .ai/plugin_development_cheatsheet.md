@@ -166,4 +166,9 @@ Key gotchas covered:
 - **Humanoid IK Orientations**: Straight forward hand facing in Warudo is `Vector3(0, 90, 0)` (Left) and `Vector3(0, -90, 0)` (Right); `(0, 0, 0)` points hands sideways in A-pose.
 - **UDP Listener Thread Boundary**: Never touch Unity objects or Warudo context from background UDP threads; buffer in `lastState` and process in `OnUpdate()`.
 - **Hot-Reload Stale Code Execution**: Roslyn compilation errors cause silent fallback to existing stale assemblies in memory without any UI error dialog.
+- **`StructuredData` Port Assignment**: Always call `data.SetDataInput(nameof(...), val, true)` instead of direct C# field assignment to prevent values being wiped on domain reload or UI sync. Never overwrite ports per-frame in `OnUpdate()`.
+- **Zero-Allocation Dynamic Mesh Morphing**: Enforce constant vertex topology (collapsing arc vertices at sharp corners) so asymmetric border widths and corner radii can be morphed dynamically via in-place vertex streaming without index buffer rebuilds.
+- **Allocation-Free Input Transitions**: Use `Mathf.MoveTowards()` on a normalized scalar and sample `DOVirtual.EasedValue()` statically instead of instantiating `Tween` objects on high-frequency (60–120 Hz) inputs.
+- **Scene JSON Inspection Workflow**: Ask the user to save the scene (`Ctrl+S`) to inspect exact evaluated port states in the saved scene JSON file without speculative debugging.
+
 

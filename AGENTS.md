@@ -139,11 +139,23 @@ All input receivers inherit from `ReceiverAsset`:
 - Calling `Scene.RemoveAsset()` inside `OnDestroy()` calls `this.assetList.Remove(asset)`, modifying the collection during enumeration and throwing `InvalidOperationException: Collection was modified`.
 - During scene teardown, Warudo already calls `Destroy()` on every asset in the scene automatically. Reserve `Scene.RemoveAsset()` strictly for explicit user-triggered cleanup actions while the scene remains active.
 
+### 4.11 `StructuredData` Port Assignment & Zero Values
+- **Always use `SetDataInput` for Programmatic Changes**: Never assign directly to C# fields on a `StructuredData` (e.g. `transform.Scale = ...`) without calling `SetDataInput(nameof(transform.Scale), value, true)`. Direct field assignment bypasses Warudo's `DataInputPortCollection`, so values are lost or silently overwritten on domain reload or UI sync.
+- **Never Overwrite User Input Per-Frame**: Do not place fallback checks (`if (scale == Vector3.zero) scale = Vector3.one;`) inside `OnUpdate()`. This blocks legitimate user configurations (such as setting displacement scale to `0` to freeze hand movement). Restrict fallback initialization strictly to object instantiation or explicit user actions (such as `ApplyPreset()`).
+
+### 4.12 Ergonomic Neutral Keys vs Reach Displacement
+- In ergonomic keyboard tracking models, resting home row keys (`A`, `S`, `D`, `F` and `J`, `K`, `L`, `;`) have $\Delta\text{Pos} = (0, 0, 0)$ because the resting hand pose is already anchored directly over them. Only finger curling animations trigger. Hand reach displacement only activates for non-neutral reach keys (`Q`, `W`, `E`, `R`, `T`, `Space`, etc.) where $\Delta\text{Pos} \neq 0$. Always test hand movement with reach keys.
+
 ---
 
 ## 5. Troubleshooting & Runtime Logs
 
 - **Warudo Runtime Log**: `C:\Users\flame\AppData\LocalLow\HakuyaLabs\Warudo\Player.log`
   - Inspect `Player.log` when debugging hot-reload compilation errors, missing types, deserialization issues, or scene loading exceptions.
+- **Scene JSON Inspection (Evaluated Runtime State)**:
+  - When diagnosing whether a port, `StructuredData`, or transform value is correctly evaluated or serialized, ask the user to save the scene (`Ctrl+S`).
+  - Warudo logs the save event (`POST /api/openedScene/save`) and writes the full, evaluated JSON state of all scene assets, nodes, and ports to the active scene file.
+  - This provides definitive verification of active port values without guessing or speculative debugging.
+
 
 
