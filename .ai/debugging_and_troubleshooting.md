@@ -76,3 +76,30 @@ Both projects should output:
 0 Warning(s)
 0 Error(s)
 ```
+
+---
+
+## 4. Inspecting Active Evaluated State via Saved Scene JSON
+
+### The Principle
+When debugging runtime values, data input ports, transform states, or `StructuredData` parameters (such as scale multipliers, offsets, or toggles), speculating about in-memory states or attempting to infer values from UI behavior often leads to false assumptions. 
+
+Warudo's entire scene graph is serialized as human-readable JSON when saved. Instead of guessing, **ask the user to save the scene (`Ctrl+S`)** in Warudo. This triggers the web server API endpoint:
+```
+PUT /api/openedScene/save: "200 OK"
+```
+
+### Locating & Inspecting the Scene File
+1. **Scene File Location**: Warudo scene files are stored in:
+   - `%USERPROFILE%\AppData\LocalLow\HakuyaLabs\Warudo\Scenes\*.warudo` (or `StreamingAssets/Scenes/`)
+   - Alternatively, check `Player.log` for the exact file path logged during scene open or save operations.
+2. **Inspecting Data Input & StructuredData Values**:
+   - Use `Select-String` or `jq` in PowerShell to inspect your specific asset ID or property names:
+   ```powershell
+   Get-Content -Path "$env:APPDATA\..\LocalLow\HakuyaLabs\Warudo\Scenes\*.json" | Select-String "LeftHandRestTransform", "Scale"
+   ```
+3. **Benefits**:
+   - Confirms whether a port was deserialized as `(0, 0, 0)` due to missing fields in older scene versions.
+   - Verifies whether UI sliders/vectors actually updated the backend port in `DataInputPortCollection`.
+   - Distinguishes between code calculation bugs versus unexpected input configurations with 100% certainty.
+

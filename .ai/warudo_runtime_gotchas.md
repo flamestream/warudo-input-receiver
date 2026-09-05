@@ -787,3 +787,45 @@ Enforce **fixed vertex count and constant topology** across all geometric config
    VirtualKeyMeshBuilder.UpdateRoundedRectVertices(key.BodyMesh, key.CurrentSize.x, key.CurrentSize.y, key.CurrentCornerRadii);
    ```
    Only `mesh.vertices = verts; mesh.RecalculateBounds();` is executed. The triangle index buffer and UV layout remain unchanged on the GPU.
+
+---
+
+## 24. `StructuredData` Port Assignment: Direct Field Assignment vs. `SetDataInput`
+
+### The Phenomenon
+Assigning directly to a C# field on a `StructuredData` item (for example, `LeftHandRestTransform.Scale = Vector3.one;` or `customApp.CornerRadius = 0.25f;`) fails to persist in Warudo's UI or internal evaluation, and can silently be overwritten back to `(0, 0, 0)` or default on domain reload or UI refresh.
+
+### Root Cause Analysis
+- Every field marked `[DataInput]` on an `Asset`, `Node`, or `StructuredData` is backed by Warudo's internal `DataInputPortCollection`.
+- Direct C# field assignment updates the memory variable temporarily, but completely bypasses the underlying `DataInputPort`.
+- Warudo's watcher system, serialization pipeline, and graph evaluations query the `DataInputPort`, which retains its old or uninitialized value.
+- When Warudo next synchronizes ports with the frontend or deserializes properties, the port's internal value overwrites the C# field, reverting the programmatic change.
+
+### Architectural Pattern & Rule
+1. **Always use `SetDataInput` for programmatic assignment**:
+   ```csharp
+   transform.SetDataInput(nameof(transform.Scale), Vector3.one, true);
+   ```
+   This updates the internal port value, triggers registered watchers, marks the scene as dirty, and broadcasts the new value to Warudo's web interface.
+2. **Avoid per-frame fallback overwrites**:
+   Do **not** place fallback assignments (such as `if (scale == Vector3.zero) scale = Vector3.one;`) inside `OnUpdate()`. Doing so prevents the user from intentionally setting a value to zero (e.g. setting displacement scale to `0` to freeze hand reach). Restrict default fallback assignment strictly to object creation or explicit user actions (such as clicking an `[Apply Preset]` button).
+
+---
+
+## 25. Ergonomic Neutral Keys vs. Reach Displacement in Keyboard Tracking
+
+### The Phenomenon
+When testing keyboard tracking, pressing home row keys (such as `A`, `S`, `D`, `F` on the left hand or `J`, `K`, `L`, `;` on the right hand) moves the avatar's fingers but produces zero displacement on the hand or wrist IK anchor, leading to false assumptions that hand tracking is broken.
+
+### Root Cause Analysis
+In ergonomic keyboard tracking models, the hand rest position (`LeftHandRestPosition` / `RightHandRestPosition`) is calibrated to sit directly above the home row keys (`A`, `S`, `D`, `F` and `J`, `K`, `L`, `;`). Therefore, the relative offset vector $\Delta\text{Position}$ for these home row keys is intentionally `(0, 0, 0)`. Only the finger overlay animation plays when typing home keys. Non-neutral keys (such as `Q`, `W`, `E`, `R`, `T`, `1`–`5`, `Space`, etc.) have non-zero delta positions (e.g. `T` has $\Delta X = +0.014\text{m}$, $\Delta Z = +0.019\text{m}$) and correctly displace the hand anchor.
+
+### Architectural Pattern & Rule
+1. **Verify with Reach Keys**: Always test hand movement by pressing reach keys (`Q`, `W`, `E`, `R`, `T`, `Space`) rather than neutral resting keys.
+2. **Per-Hand Displacement Scaling**: Use each hand's individual rest transform scale as the reach multiplier:
+   ```csharp
+   Vector3 leftScale = GetLeftHandMovementScale();
+   Vector3 deltaPos = Vector3.Scale(activeLeftKey.DeltaPosition, leftScale);
+   targetLeftPos = restLeftPos + deltaPos;
+   ```
+   Avoid redundant global multipliers (such as an asset-level `MovementFactor`) that conflict with per-hand rest transform scales.

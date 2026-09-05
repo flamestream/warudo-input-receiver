@@ -23,6 +23,7 @@ This directory contains key architecture notes, integration patterns, build pipe
    - Unity and Warudo log file paths (`Editor.log`, `Player.log`).
    - PowerShell scripts for extracting `.warudo` packages and inspecting assembly references with Mono.Cecil.
    - Headless build and verification with MSBuild.
+   - Inspecting active evaluated state via saved scene JSON (`/api/openedScene/save`).
 
 5. [warudo_runtime_gotchas.md](file:///d:/Code/FS%20Input%20Receiver/.ai/warudo_runtime_gotchas.md)
    - Runtime quirks, reflection bugs, and serialization traps uncovered from debugging.
@@ -42,3 +43,5 @@ This directory contains key architecture notes, integration patterns, build pipe
    - Zero-allocation dynamic mesh vertex morphing vs. mesh rebuild allocations.
    - Allocation-free input transitions with DOTween easing (`DOVirtual.EasedValue`).
    - Constant-topology procedural arc generation for zero-allocation dynamic morphing.
+   - `StructuredData` port assignment: C# field assignment vs. `SetDataInput`.
+   - Ergonomic neutral home-row keys vs. reach displacement in keyboard tracking.
