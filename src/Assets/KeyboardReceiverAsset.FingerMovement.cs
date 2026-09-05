@@ -164,11 +164,8 @@ namespace FlameStream
                 leftKeyReleaseTime = -1f;
             } else if (activeLeftKey != null) {
                 if (activeLeftKey.EnableHandMovement) {
-                    Vector3 leftScale = (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode && LeftHandRestTransform.setupAnchor != null)
-                        ? LeftHandRestTransform.setupAnchor.Transform.Scale
-                        : (LeftHandRestTransform?.Scale ?? Vector3.one);
-                    if (leftScale == Vector3.zero) leftScale = Vector3.one;
-                    Vector3 deltaPos = Vector3.Scale(Vector3.Scale(activeLeftKey.DeltaPosition, MovementFactor), leftScale);
+                    Vector3 leftScale = GetLeftHandMovementScale();
+                    Vector3 deltaPos = Vector3.Scale(activeLeftKey.DeltaPosition, leftScale);
                     targetLeftPos = restLeftPos + deltaPos;
                     Vector3 dynamicRot = LeftHandDynamicRotation != null ? LeftHandDynamicRotation.Evaluate(deltaPos) : Vector3.zero;
                     targetLeftRot = restLeftRot + dynamicRot + activeLeftKey.DeltaRotation;
@@ -248,11 +245,8 @@ namespace FlameStream
                 rightKeyReleaseTime = -1f;
             } else if (activeRightKey != null) {
                 if (activeRightKey.EnableHandMovement) {
-                    Vector3 rightScale = (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode && RightHandRestTransform.setupAnchor != null)
-                        ? RightHandRestTransform.setupAnchor.Transform.Scale
-                        : (RightHandRestTransform?.Scale ?? Vector3.one);
-                    if (rightScale == Vector3.zero) rightScale = Vector3.one;
-                    Vector3 deltaPos = Vector3.Scale(Vector3.Scale(activeRightKey.DeltaPosition, MovementFactor), rightScale);
+                    Vector3 rightScale = GetRightHandMovementScale();
+                    Vector3 deltaPos = Vector3.Scale(activeRightKey.DeltaPosition, rightScale);
                     targetRightPos = restRightPos + deltaPos;
                     Vector3 dynamicRot = RightHandDynamicRotation != null ? RightHandDynamicRotation.Evaluate(deltaPos) : Vector3.zero;
                     targetRightRot = restRightRot + dynamicRot + activeRightKey.DeltaRotation;

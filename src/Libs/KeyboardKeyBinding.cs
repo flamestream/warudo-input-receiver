@@ -114,7 +114,8 @@ namespace FlameStream {
                 Vector3 restRot = isLeft ? Parent.LeftHandRestRotation : Parent.RightHandRestRotation;
                 var dynRotDef = isLeft ? Parent.LeftHandDynamicRotation : Parent.RightHandDynamicRotation;
 
-                Vector3 deltaHand = Vector3.Scale(tr.Position, Parent.MovementFactor);
+                Vector3 handScale = isLeft ? Parent.GetLeftHandMovementScale() : Parent.GetRightHandMovementScale();
+                Vector3 deltaHand = Vector3.Scale(tr.Position, handScale);
                 Vector3 initialPos = restPos + deltaHand;
                 Vector3 initialRot = restRot + tr.Rotation;
 
@@ -150,11 +151,11 @@ Click **[Apply Transform]** when finished.
                 Vector3 anchorRot = setupAnchor.Transform.Rotation;
                 Vector3 deltaHand = anchorPos - restPos;
 
-                Vector3 mf = Parent.MovementFactor;
+                Vector3 handScale = isLeft ? Parent.GetLeftHandMovementScale() : Parent.GetRightHandMovementScale();
                 tr.Position = new Vector3(
-                    mf.x != 0f ? deltaHand.x / mf.x : deltaHand.x,
-                    mf.y != 0f ? deltaHand.y / mf.y : deltaHand.y,
-                    mf.z != 0f ? deltaHand.z / mf.z : deltaHand.z
+                    handScale.x != 0f ? deltaHand.x / handScale.x : deltaHand.x,
+                    handScale.y != 0f ? deltaHand.y / handScale.y : deltaHand.y,
+                    handScale.z != 0f ? deltaHand.z / handScale.z : deltaHand.z
                 );
 
                 tr.Rotation = anchorRot - restRot;
