@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 using Warudo.Core;
 using Warudo.Core.Attributes;
@@ -97,9 +98,12 @@ namespace FlameStream
             Watch(nameof(RightKeysetTransform), delegate { SetupRightKeysetTransform(); });
             Watch(nameof(RootKeysetTransform), delegate { SetupRootKeysetTransform(); });
 
+            var crPort = GetDataInputPort(nameof(DefaultCornerRadius));
+            if (crPort != null) crPort.Properties.hidden = true;
+            var bwPort = GetDataInputPort(nameof(DefaultBorderWidth));
+            if (bwPort != null) bwPort.Properties.hidden = true;
+
             Watch(nameof(DefaultKeySize), delegate { RebuildAllVirtualKeyMeshes(); });
-            Watch(nameof(DefaultCornerRadius), delegate { RebuildAllVirtualKeyMeshes(); });
-            Watch(nameof(DefaultBorderWidth), delegate { RebuildAllVirtualKeyMeshes(); });
             Watch(nameof(DefaultAppearance), delegate {
                 if (DefaultAppearance != null) {
                     DefaultAppearance.OnAppearanceChanged = () => { UpdateAllVirtualKeyColors(); };
@@ -258,7 +262,7 @@ namespace FlameStream
             }
         }
 
-        GameObject GetGroupGameObject(VirtualKeyAnchor anchorType) {
+        public GameObject GetGroupGameObject(VirtualKeyAnchor anchorType) {
             switch (anchorType) {
                 case VirtualKeyAnchor.LeftHand:
                     if (leftKeysGroupGo == null) {
@@ -445,57 +449,69 @@ namespace FlameStream
                 borderPressed = borderNormal;
             }
 
-            // Resolve transition duration
-            float transDuration = (customApp != null && customApp.TransitionDuration >= 0f)
-                ? customApp.TransitionDuration
-                : (baseApp?.TransitionDuration ?? 0.05f);
+            // Resolve transitions (onPress / onRelease)
+            var pressIn = customApp?.PressInTransition ?? baseApp?.PressInTransition;
+            float pressInTime = pressIn?.Time ?? 0.02f;
+            Ease pressInEase = pressIn?.Ease ?? Ease.Linear;
+
+            var pressOut = customApp?.PressOutTransition ?? baseApp?.PressOutTransition;
+            float pressOutTime = pressOut?.Time ?? 0.12f;
+            Ease pressOutEase = pressOut?.Ease ?? Ease.OutCubic;
 
             // Progress interpolation
             float factor = 0f;
             if (keyDef.IdentifyGlowTimer > 0f) {
                 factor = Mathf.PingPong(Time.time * 6f, 1f);
             } else {
-                float target = isDown ? 1.0f : 0.0f;
-                if (transDuration <= 0.001f || dt <= 0f) {
-                    keyDef.CurrentPressProgress = target;
+                if (isDown) {
+                    if (pressInTime <= 0.001f || dt <= 0f) {
+                        keyDef.CurrentPressProgress = 1.0f;
+                    } else {
+                        keyDef.CurrentPressProgress = Mathf.MoveTowards(keyDef.CurrentPressProgress, 1.0f, dt / pressInTime);
+                    }
+                    factor = DOVirtual.EasedValue(0f, 1f, keyDef.CurrentPressProgress, pressInEase);
                 } else {
-                    keyDef.CurrentPressProgress = Mathf.MoveTowards(keyDef.CurrentPressProgress, target, dt / transDuration);
+                    if (pressOutTime <= 0.001f || dt <= 0f) {
+                        keyDef.CurrentPressProgress = 0.0f;
+                    } else {
+                        keyDef.CurrentPressProgress = Mathf.MoveTowards(keyDef.CurrentPressProgress, 0.0f, dt / pressOutTime);
+                    }
+                    factor = DOVirtual.EasedValue(0f, 1f, keyDef.CurrentPressProgress, pressOutEase);
                 }
-                factor = keyDef.CurrentPressProgress;
             }
 
             // Calculate animated dimensions
             Vector2 size = (keyDef.UseCustomSize && keyDef.Size.x > 0f && keyDef.Size.y > 0f) ? keyDef.Size : DefaultKeySize;
 
-            float normalBorderWidth = keyDef.UseCustomSize
-                ? keyDef.BorderWidth
-                : (borderNormal != null ? borderNormal.BorderWidth : DefaultBorderWidth);
-            float pressedBorderWidth = keyDef.UseCustomSize
-                ? keyDef.PressedBorderWidth
-                : (borderPressed != null ? borderPressed.BorderWidth : normalBorderWidth);
-            float currentBorderWidth = Mathf.Lerp(normalBorderWidth, pressedBorderWidth, factor);
+            Vector4 normalBorders = keyDef.UseCustomSize
+                ? keyDef.GetBorderWidths()
+                : (borderNormal != null ? borderNormal.GetBorderWidths() : BorderVector4Extensions.Uniform(0.0025f));
+            Vector4 pressedBorders = keyDef.UseCustomSize
+                ? (keyDef.PressedBorderWidth > 0f ? BorderVector4Extensions.Uniform(keyDef.PressedBorderWidth) : normalBorders)
+                : (borderPressed != null ? borderPressed.GetBorderWidths() : normalBorders);
+            Vector4 currentBorders = Vector4.Lerp(normalBorders, pressedBorders, factor);
 
-            float normalRadius = keyDef.UseCustomSize
-                ? keyDef.CornerRadius
-                : (customApp?.CornerRadius ?? baseApp?.CornerRadius ?? DefaultCornerRadius);
-            float pressedRadius = keyDef.UseCustomSize
-                ? keyDef.PressedCornerRadius
-                : (customApp?.PressedCornerRadius ?? baseApp?.PressedCornerRadius ?? normalRadius);
-            float currentRadius = Mathf.Lerp(normalRadius, pressedRadius, factor);
+            Vector4 normalCorners = keyDef.UseCustomSize
+                ? keyDef.GetCornerRadii()
+                : (borderNormal != null ? borderNormal.GetCornerRadii() : BorderVector4Extensions.Uniform(0.25f));
+            Vector4 pressedCorners = keyDef.UseCustomSize
+                ? (keyDef.PressedCornerRadius >= 0f ? BorderVector4Extensions.Uniform(keyDef.PressedCornerRadius) : normalCorners)
+                : (borderPressed != null ? borderPressed.GetCornerRadii() : normalCorners);
+            Vector4 currentCorners = Vector4.Lerp(normalCorners, pressedCorners, factor);
 
             float maxRadius = Mathf.Min(size.x, size.y) * 0.5f;
-            float absoluteRadius = currentRadius * maxRadius;
+            Vector4 absoluteCorners = currentCorners * maxRadius;
 
             // In-place mesh vertex morphing during press transitions
-            if (Mathf.Abs(keyDef.CurrentBorderWidth - currentBorderWidth) > 0.00001f || Mathf.Abs(keyDef.CurrentCornerRadius - currentRadius) > 0.0001f) {
-                keyDef.CurrentBorderWidth = currentBorderWidth;
-                keyDef.CurrentCornerRadius = currentRadius;
+            if (Vector4.Distance(keyDef.CurrentBorderWidths, currentBorders) > 0.00001f || Vector4.Distance(keyDef.CurrentCornerRadii, currentCorners) > 0.0001f) {
+                keyDef.CurrentBorderWidths = currentBorders;
+                keyDef.CurrentCornerRadii = currentCorners;
 
                 if (keyDef.BodyMesh != null) {
-                    VirtualKeyMeshBuilder.UpdateRoundedRectVertices(keyDef.BodyMesh, size.x, size.y, absoluteRadius);
+                    VirtualKeyMeshBuilder.UpdateRoundedRectVertices(keyDef.BodyMesh, size.x, size.y, absoluteCorners);
                 }
                 if (keyDef.FrameMesh != null) {
-                    VirtualKeyMeshBuilder.UpdateRoundedRectFrameVertices(keyDef.FrameMesh, size.x, size.y, absoluteRadius, currentBorderWidth);
+                    VirtualKeyMeshBuilder.UpdateRoundedRectFrameVertices(keyDef.FrameMesh, size.x, size.y, absoluteCorners, currentBorders);
                 }
             }
 
@@ -566,14 +582,25 @@ namespace FlameStream
 
             // Calculate dimensions
             Vector2 size = (keyDef.UseCustomSize && keyDef.Size.x > 0f && keyDef.Size.y > 0f) ? keyDef.Size : DefaultKeySize;
-            float cornerRadius = keyDef.UseCustomSize ? keyDef.CornerRadius : DefaultCornerRadius;
-            float borderWidth = keyDef.UseCustomSize ? keyDef.BorderWidth : DefaultBorderWidth;
+
+            var customApp = (keyDef.UseCustomAppearance && keyDef.CustomAppearance != null) ? keyDef.CustomAppearance : null;
+            var baseApp = DefaultAppearance;
+            var borderNormal = (customApp?.Border?.Normal != null && customApp.Border.Normal.Enabled)
+                ? customApp.Border.Normal
+                : baseApp?.Border?.Normal;
+
+            Vector4 initialBorders = keyDef.UseCustomSize
+                ? keyDef.GetBorderWidths()
+                : (borderNormal != null ? borderNormal.GetBorderWidths() : BorderVector4Extensions.Uniform(0.0025f));
+            Vector4 initialCorners = keyDef.UseCustomSize
+                ? keyDef.GetCornerRadii()
+                : (borderNormal != null ? borderNormal.GetCornerRadii() : BorderVector4Extensions.Uniform(0.25f));
 
             float maxRadius = Mathf.Min(size.x, size.y) * 0.5f;
-            float absoluteRadius = cornerRadius * maxRadius;
+            Vector4 absoluteCorners = initialCorners * maxRadius;
 
             // 1. Inner Body Mesh & Material
-            var bodyMesh = VirtualKeyMeshBuilder.CreateRoundedRectMesh(size.x, size.y, absoluteRadius);
+            var bodyMesh = VirtualKeyMeshBuilder.CreateRoundedRectMesh(size.x, size.y, absoluteCorners);
             bodyMesh.MarkDynamic();
             var bodyGo = new GameObject("Body");
             bodyGo.transform.SetParent(keyGo.transform, false);
@@ -588,7 +615,7 @@ namespace FlameStream
             bodyMr.material = bodyMat;
 
             // 2. Hollow Border Frame Mesh & Material
-            var frameMesh = VirtualKeyMeshBuilder.CreateRoundedRectFrameMesh(size.x, size.y, absoluteRadius, borderWidth);
+            var frameMesh = VirtualKeyMeshBuilder.CreateRoundedRectFrameMesh(size.x, size.y, absoluteCorners, initialBorders);
             frameMesh.MarkDynamic();
             var frameGo = new GameObject("Border");
             frameGo.transform.SetParent(keyGo.transform, false);

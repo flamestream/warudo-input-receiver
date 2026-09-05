@@ -1,4 +1,5 @@
 using System;
+using DG.Tweening;
 using UnityEngine;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
@@ -30,20 +31,51 @@ namespace FlameStream
         public float GlowIntensity = 0f;
 
         [DataInput(35)]
+        [FloatSlider(0f, 1f, 0.01f)]
+        [Label("CORNER_ROUNDNESS")]
+        public float CornerRadius = 0.25f;
+
+        [DataInput(36)]
+        [Label("USE_INDIVIDUAL_CORNERS")]
+        public bool UseIndividualCorners = false;
+
+        [DataInput(37)]
+        [Label("INDIVIDUAL_CORNER_RADII")]
+        public Vector4 IndividualCornerRadii = new Vector4(0.25f, 0.25f, 0.25f, 0.25f);
+
+        [DataInput(40)]
         [FloatSlider(0.0005f, 0.015f, 0.0002f)]
         [Label("BORDER_WIDTH")]
         public float BorderWidth = 0.0025f;
 
+        [DataInput(41)]
+        [Label("USE_INDIVIDUAL_BORDERS")]
+        public bool UseIndividualBorders = false;
+
+        [DataInput(42)]
+        [Label("INDIVIDUAL_BORDER_WIDTHS")]
+        public Vector4 IndividualBorderWidths = new Vector4(0.0025f, 0.0025f, 0.0025f, 0.0025f);
+
         // Whether to display the "Enabled" toggle port in the Warudo inspector
         public bool ShowEnabledToggle = true;
 
-        // Whether to display the BorderWidth slider (true only for Border styles)
-        public bool ShowBorderWidth = false;
+        // Whether to display geometry properties (true only for Border styles)
+        public bool ShowGeometry = false;
 
         protected override void OnCreate() {
             base.OnCreate();
             SyncUI();
             Watch(nameof(Enabled), delegate { SyncUI(); });
+            Watch(nameof(UseIndividualCorners), delegate { SyncUI(); });
+            Watch(nameof(UseIndividualBorders), delegate { SyncUI(); });
+        }
+
+        public Vector4 GetBorderWidths() {
+            return UseIndividualBorders ? IndividualBorderWidths : BorderVector4Extensions.Uniform(BorderWidth);
+        }
+
+        public Vector4 GetCornerRadii() {
+            return UseIndividualCorners ? IndividualCornerRadii : BorderVector4Extensions.Uniform(CornerRadius);
         }
 
         public void SyncUI() {
@@ -55,35 +87,29 @@ namespace FlameStream
                 }
 
                 bool hideFields = ShowEnabledToggle && !Enabled;
-                var colorPort = GetDataInputPort(nameof(Color));
-                if (colorPort != null) {
-                    colorPort.Properties.hidden = hideFields;
-                    BroadcastDataInputProperties(nameof(Color));
+
+                void SetHidden(string portName, bool hidden) {
+                    var port = GetDataInputPort(portName);
+                    if (port != null) {
+                        port.Properties.hidden = hidden;
+                        BroadcastDataInputProperties(portName);
+                    }
                 }
 
-                var selfIllumPort = GetDataInputPort(nameof(SelfIllumination));
-                if (selfIllumPort != null) {
-                    selfIllumPort.Properties.hidden = hideFields;
-                    BroadcastDataInputProperties(nameof(SelfIllumination));
-                }
+                SetHidden(nameof(Color), hideFields);
+                SetHidden(nameof(SelfIllumination), hideFields);
+                SetHidden(nameof(GlowColor), hideFields);
+                SetHidden(nameof(GlowIntensity), hideFields);
 
-                var glowColorPort = GetDataInputPort(nameof(GlowColor));
-                if (glowColorPort != null) {
-                    glowColorPort.Properties.hidden = hideFields;
-                    BroadcastDataInputProperties(nameof(GlowColor));
-                }
+                // Geometry controls (only visible for Border styles)
+                bool hideGeometry = !ShowGeometry || hideFields;
+                SetHidden(nameof(CornerRadius), hideGeometry || UseIndividualCorners);
+                SetHidden(nameof(UseIndividualCorners), hideGeometry);
+                SetHidden(nameof(IndividualCornerRadii), hideGeometry || !UseIndividualCorners);
 
-                var glowIntensityPort = GetDataInputPort(nameof(GlowIntensity));
-                if (glowIntensityPort != null) {
-                    glowIntensityPort.Properties.hidden = hideFields;
-                    BroadcastDataInputProperties(nameof(GlowIntensity));
-                }
-
-                var bwPort = GetDataInputPort(nameof(BorderWidth));
-                if (bwPort != null) {
-                    bwPort.Properties.hidden = !ShowBorderWidth || hideFields;
-                    BroadcastDataInputProperties(nameof(BorderWidth));
-                }
+                SetHidden(nameof(BorderWidth), hideGeometry || UseIndividualBorders);
+                SetHidden(nameof(UseIndividualBorders), hideGeometry);
+                SetHidden(nameof(IndividualBorderWidths), hideGeometry || !UseIndividualBorders);
             } catch { }
         }
 
@@ -94,7 +120,12 @@ namespace FlameStream
                 BroadcastDataInput(nameof(SelfIllumination));
                 BroadcastDataInput(nameof(GlowColor));
                 BroadcastDataInput(nameof(GlowIntensity));
+                BroadcastDataInput(nameof(CornerRadius));
+                BroadcastDataInput(nameof(UseIndividualCorners));
+                BroadcastDataInput(nameof(IndividualCornerRadii));
                 BroadcastDataInput(nameof(BorderWidth));
+                BroadcastDataInput(nameof(UseIndividualBorders));
+                BroadcastDataInput(nameof(IndividualBorderWidths));
                 SyncUI();
             } catch { }
         }
@@ -102,8 +133,8 @@ namespace FlameStream
         public virtual string GetHeader() {
             if (ShowEnabledToggle && !Enabled) return "(Default / Inherited)";
             var hex = ColorUtility.ToHtmlStringRGBA(Color);
-            if (ShowBorderWidth) {
-                return $"#{hex} | Border: {BorderWidth * 1000f:F1}mm | Glow: {GlowIntensity:F1}x";
+            if (ShowGeometry) {
+                return $"#{hex} | Border: {BorderWidth * 1000f:F1}mm | Round: {CornerRadius:F2} | Glow: {GlowIntensity:F1}x";
             }
             return $"#{hex} (Alpha: {Color.a:F2}) | Illum: {SelfIllumination:F2} | Glow: {GlowIntensity:F1}x";
         }
@@ -115,8 +146,13 @@ namespace FlameStream
             SelfIllumination = other.SelfIllumination;
             GlowColor = other.GlowColor;
             GlowIntensity = other.GlowIntensity;
+            CornerRadius = other.CornerRadius;
+            UseIndividualCorners = other.UseIndividualCorners;
+            IndividualCornerRadii = other.IndividualCornerRadii;
             BorderWidth = other.BorderWidth;
-            ShowBorderWidth = other.ShowBorderWidth;
+            UseIndividualBorders = other.UseIndividualBorders;
+            IndividualBorderWidths = other.IndividualBorderWidths;
+            ShowGeometry = other.ShowGeometry;
         }
 
         public VirtualKeyStateStyle Clone() {
@@ -164,13 +200,13 @@ namespace FlameStream
             IsBorder = isBorder;
             if (Normal != null) {
                 Normal.ShowEnabledToggle = !IsBaseAppearance;
-                Normal.ShowBorderWidth = isBorder;
+                Normal.ShowGeometry = isBorder;
                 Normal.SyncUI();
             }
             if (Pressed != null) {
-                // Pressed state toggle is controlled by EnablePressedState on the parent, so hide redundant nested toggle
+                // Pressed state toggle is controlled by EnablePressedState on the parent
                 Pressed.ShowEnabledToggle = false;
-                Pressed.ShowBorderWidth = isBorder;
+                Pressed.ShowGeometry = isBorder;
                 Pressed.SyncUI();
             }
         }
@@ -231,20 +267,13 @@ namespace FlameStream
         [Label("BORDER_STYLE")]
         public VirtualKeyElementStyle Border;
 
-        [DataInput(25)]
-        [FloatSlider(0f, 1f, 0.01f)]
-        [Label("CORNER_ROUNDNESS")]
-        public float CornerRadius = 0.25f;
-
-        [DataInput(26)]
-        [FloatSlider(0f, 1f, 0.01f)]
-        [Label("PRESSED_CORNER_ROUNDNESS")]
-        public float PressedCornerRadius = 0.25f;
-
         [DataInput(30)]
-        [FloatSlider(0f, 0.5f, 0.005f)]
-        [Label("TRANSITION_DURATION")]
-        public float TransitionDuration = 0.05f;
+        [Label("PRESS_IN_TRANSITION")]
+        public Transition PressInTransition;
+
+        [DataInput(35)]
+        [Label("PRESS_OUT_TRANSITION")]
+        public Transition PressOutTransition;
 
         [Trigger(40)]
         [Label("RESET_TO_DEFAULTS")]
@@ -258,14 +287,13 @@ namespace FlameStream
 
         protected override void OnCreate() {
             base.OnCreate();
-            if (Body == null || Border == null) {
+            if (Body == null || Border == null || PressInTransition == null || PressOutTransition == null) {
                 ResetToDefaultTheme();
             }
             ConfigureElements();
 
-            Watch(nameof(CornerRadius), delegate { OnAppearanceChanged?.Invoke(); });
-            Watch(nameof(PressedCornerRadius), delegate { OnAppearanceChanged?.Invoke(); });
-            Watch(nameof(TransitionDuration), delegate { OnAppearanceChanged?.Invoke(); });
+            Watch(nameof(PressInTransition), delegate { OnAppearanceChanged?.Invoke(); });
+            Watch(nameof(PressOutTransition), delegate { OnAppearanceChanged?.Invoke(); });
         }
 
         public void ConfigureElements() {
@@ -287,9 +315,8 @@ namespace FlameStream
                 Border?.BroadcastAll();
                 BroadcastDataInput(nameof(Body));
                 BroadcastDataInput(nameof(Border));
-                BroadcastDataInput(nameof(CornerRadius));
-                BroadcastDataInput(nameof(PressedCornerRadius));
-                BroadcastDataInput(nameof(TransitionDuration));
+                BroadcastDataInput(nameof(PressInTransition));
+                BroadcastDataInput(nameof(PressOutTransition));
                 ConfigureElements();
                 OnAppearanceChanged?.Invoke();
             } catch { }
@@ -329,6 +356,11 @@ namespace FlameStream
             Border.Normal.GlowColor = new Color(0.3373f, 1.0000f, 1.0000f, 1.0000f);
             Border.Normal.GlowIntensity = 0.0f;
             Border.Normal.BorderWidth = 0.0025f;
+            Border.Normal.UseIndividualBorders = false;
+            Border.Normal.IndividualBorderWidths = new Vector4(0.0025f, 0.0025f, 0.0025f, 0.0025f);
+            Border.Normal.CornerRadius = 0.25f;
+            Border.Normal.UseIndividualCorners = false;
+            Border.Normal.IndividualCornerRadii = new Vector4(0.25f, 0.25f, 0.25f, 0.25f);
 
             if (Border.Pressed == null) Border.Pressed = StructuredData.Create<VirtualKeyStateStyle>();
             Border.Pressed.Enabled = true;
@@ -338,15 +370,27 @@ namespace FlameStream
             Border.Pressed.GlowColor = new Color(1.0f, 1.0f, 1.0f, 1.0f);
             Border.Pressed.GlowIntensity = 2.5f;
             Border.Pressed.BorderWidth = 0.0035f;
+            Border.Pressed.UseIndividualBorders = false;
+            Border.Pressed.IndividualBorderWidths = new Vector4(0.0035f, 0.0035f, 0.0035f, 0.0035f);
+            Border.Pressed.CornerRadius = 0.25f;
+            Border.Pressed.UseIndividualCorners = false;
+            Border.Pressed.IndividualCornerRadii = new Vector4(0.25f, 0.25f, 0.25f, 0.25f);
 
-            CornerRadius = 0.25f;
-            PressedCornerRadius = 0.25f;
-            TransitionDuration = 0.05f;
+            if (PressInTransition == null) PressInTransition = StructuredData.Create<Transition>();
+            PressInTransition.Time = 0.02f;
+            PressInTransition.Ease = Ease.Linear;
+
+            if (PressOutTransition == null) PressOutTransition = StructuredData.Create<Transition>();
+            PressOutTransition.Time = 0.12f;
+            PressOutTransition.Ease = Ease.OutCubic;
+
             ConfigureElements();
         }
 
         public virtual string GetHeader() {
-            return $"Key Appearance (Transition: {TransitionDuration:F3}s)";
+            float inT = PressInTransition?.Time ?? 0.02f;
+            float outT = PressOutTransition?.Time ?? 0.12f;
+            return $"Key Appearance (PressIn: {inT:F2}s, PressOut: {outT:F2}s)";
         }
 
         public void CopyFrom(VirtualKeyAppearance other) {
@@ -355,9 +399,16 @@ namespace FlameStream
             if (Border == null) Border = StructuredData.Create<VirtualKeyElementStyle>();
             Body.CopyFrom(other.Body);
             Border.CopyFrom(other.Border);
-            CornerRadius = other.CornerRadius;
-            PressedCornerRadius = other.PressedCornerRadius;
-            TransitionDuration = other.TransitionDuration;
+            if (other.PressInTransition != null) {
+                if (PressInTransition == null) PressInTransition = StructuredData.Create<Transition>();
+                PressInTransition.Time = other.PressInTransition.Time;
+                PressInTransition.Ease = other.PressInTransition.Ease;
+            }
+            if (other.PressOutTransition != null) {
+                if (PressOutTransition == null) PressOutTransition = StructuredData.Create<Transition>();
+                PressOutTransition.Time = other.PressOutTransition.Time;
+                PressOutTransition.Ease = other.PressOutTransition.Ease;
+            }
             ConfigureElements();
         }
 

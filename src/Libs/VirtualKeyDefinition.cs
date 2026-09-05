@@ -39,16 +39,32 @@ namespace FlameStream
         public float CornerRadius = 0.28f;
 
         [DataInput(53)]
+        [Label("USE_INDIVIDUAL_CORNERS")]
+        public bool UseIndividualCorners = false;
+
+        [DataInput(54)]
+        [Label("INDIVIDUAL_CORNER_RADII")]
+        public Vector4 IndividualCornerRadii = new Vector4(0.28f, 0.28f, 0.28f, 0.28f);
+
+        [DataInput(55)]
         [FloatSlider(0f, 0.5f, 0.01f)]
         [Label("PRESSED_CORNER_ROUNDNESS")]
         public float PressedCornerRadius = 0.28f;
 
-        [DataInput(54)]
+        [DataInput(56)]
         [FloatSlider(0.0005f, 0.015f, 0.0002f)]
         [Label("BORDER_WIDTH")]
         public float BorderWidth = 0.0025f;
 
-        [DataInput(55)]
+        [DataInput(57)]
+        [Label("USE_INDIVIDUAL_BORDERS")]
+        public bool UseIndividualBorders = false;
+
+        [DataInput(58)]
+        [Label("INDIVIDUAL_BORDER_WIDTHS")]
+        public Vector4 IndividualBorderWidths = new Vector4(0.0025f, 0.0025f, 0.0025f, 0.0025f);
+
+        [DataInput(59)]
         [FloatSlider(0.0005f, 0.015f, 0.0002f)]
         [Label("PRESSED_BORDER_WIDTH")]
         public float PressedBorderWidth = 0.0035f;
@@ -76,8 +92,11 @@ namespace FlameStream
 
         public float IdentifyGlowTimer { get; internal set; } = 0f;
         public float CurrentPressProgress { get; internal set; } = 0f;
-        public float CurrentBorderWidth { get; internal set; } = -1f;
-        public float CurrentCornerRadius { get; internal set; } = -1f;
+        public Vector4 CurrentBorderWidths { get; internal set; } = new Vector4(-1f, -1f, -1f, -1f);
+        public Vector4 CurrentCornerRadii { get; internal set; } = new Vector4(-1f, -1f, -1f, -1f);
+
+        public Vector4 GetBorderWidths() => UseIndividualBorders ? IndividualBorderWidths : BorderVector4Extensions.Uniform(BorderWidth);
+        public Vector4 GetCornerRadii() => UseIndividualCorners ? IndividualCornerRadii : BorderVector4Extensions.Uniform(CornerRadius);
 
         public void Identify(float duration = 2.5f) {
             IdentifyGlowTimer = duration;
@@ -140,6 +159,14 @@ namespace FlameStream
                 SyncUI();
                 if (Parent != null) Parent.RebuildVirtualKeyMesh(this);
             });
+            Watch(nameof(UseIndividualCorners), delegate {
+                SyncUI();
+                if (Parent != null) Parent.RebuildVirtualKeyMesh(this);
+            });
+            Watch(nameof(UseIndividualBorders), delegate {
+                SyncUI();
+                if (Parent != null) Parent.RebuildVirtualKeyMesh(this);
+            });
             Watch(nameof(UseCustomAppearance), delegate {
                 SyncUI();
                 if (Parent != null) Parent.UpdateVirtualKeyColors(this);
@@ -154,28 +181,34 @@ namespace FlameStream
             });
             Watch(nameof(Size), delegate { if (Parent != null) Parent.RebuildVirtualKeyMesh(this); });
             Watch(nameof(CornerRadius), delegate { if (Parent != null) Parent.RebuildVirtualKeyMesh(this); });
+            Watch(nameof(IndividualCornerRadii), delegate { if (Parent != null) Parent.RebuildVirtualKeyMesh(this); });
             Watch(nameof(PressedCornerRadius), delegate { if (Parent != null) Parent.UpdateVirtualKeyColors(this); });
             Watch(nameof(BorderWidth), delegate { if (Parent != null) Parent.RebuildVirtualKeyMesh(this); });
+            Watch(nameof(IndividualBorderWidths), delegate { if (Parent != null) Parent.RebuildVirtualKeyMesh(this); });
             Watch(nameof(PressedBorderWidth), delegate { if (Parent != null) Parent.UpdateVirtualKeyColors(this); });
         }
 
         public void SyncUI() {
             try {
                 bool hideSize = !UseCustomSize;
-                var sizePort = GetDataInputPort(nameof(Size));
-                if (sizePort != null) { sizePort.Properties.hidden = hideSize; BroadcastDataInputProperties(nameof(Size)); }
-                var crPort = GetDataInputPort(nameof(CornerRadius));
-                if (crPort != null) { crPort.Properties.hidden = hideSize; BroadcastDataInputProperties(nameof(CornerRadius)); }
-                var pcrPort = GetDataInputPort(nameof(PressedCornerRadius));
-                if (pcrPort != null) { pcrPort.Properties.hidden = hideSize; BroadcastDataInputProperties(nameof(PressedCornerRadius)); }
-                var bwPort = GetDataInputPort(nameof(BorderWidth));
-                if (bwPort != null) { bwPort.Properties.hidden = hideSize; BroadcastDataInputProperties(nameof(BorderWidth)); }
-                var pbwPort = GetDataInputPort(nameof(PressedBorderWidth));
-                if (pbwPort != null) { pbwPort.Properties.hidden = hideSize; BroadcastDataInputProperties(nameof(PressedBorderWidth)); }
+                void SetHidden(string portName, bool hidden) {
+                    var port = GetDataInputPort(portName);
+                    if (port != null) { port.Properties.hidden = hidden; BroadcastDataInputProperties(portName); }
+                }
+
+                SetHidden(nameof(Size), hideSize);
+                SetHidden(nameof(CornerRadius), hideSize || UseIndividualCorners);
+                SetHidden(nameof(UseIndividualCorners), hideSize);
+                SetHidden(nameof(IndividualCornerRadii), hideSize || !UseIndividualCorners);
+                SetHidden(nameof(PressedCornerRadius), hideSize);
+
+                SetHidden(nameof(BorderWidth), hideSize || UseIndividualBorders);
+                SetHidden(nameof(UseIndividualBorders), hideSize);
+                SetHidden(nameof(IndividualBorderWidths), hideSize || !UseIndividualBorders);
+                SetHidden(nameof(PressedBorderWidth), hideSize);
 
                 bool hideApp = !UseCustomAppearance;
-                var appPort = GetDataInputPort(nameof(CustomAppearance));
-                if (appPort != null) { appPort.Properties.hidden = hideApp; BroadcastDataInputProperties(nameof(CustomAppearance)); }
+                SetHidden(nameof(CustomAppearance), hideApp);
             } catch { }
         }
 
@@ -198,27 +231,17 @@ namespace FlameStream
 
             Transform.OnCreateAnchor = (tr, setupAnchor) => {
                 if (Parent == null) return;
-
-                var parentAnchor = Parent.GetAnchorForVirtualKey(AttachmentAnchor);
-                if (parentAnchor != null) {
-                    setupAnchor.Attachable.Parent = parentAnchor;
-                    if (parentAnchor.GameObject != null) {
-                        setupAnchor.GameObject.transform.SetParent(parentAnchor.GameObject.transform, false);
-                    }
+                var group = Parent.GetGroupGameObject(AttachmentAnchor);
+                if (group != null) {
+                    setupAnchor.GameObject.transform.SetParent(group.transform, false);
                 }
-
                 setupAnchor.Transform.Position = tr.Position;
                 setupAnchor.Transform.Rotation = tr.Rotation;
                 setupAnchor.Transform.Scale = tr.Scale;
-                var keyLabel = string.IsNullOrEmpty(DisplayLabel) ? Key.ToString() : DisplayLabel;
-                setupAnchor.Name = $"⌛⚓-Key [{keyLabel}]";
-                setupAnchor.Instructions = $@"
-### Virtual Key Setup: {keyLabel}
 
-Position, rotate, and scale this anchor where the virtual key **[{keyLabel}]** should float.
-The key will follow this anchor in real-time.
-Click **[Apply Transform]** when finished.
-";
+                var label = string.IsNullOrEmpty(DisplayLabel) ? Key.ToString() : DisplayLabel;
+                setupAnchor.Name = $"⌛⚓-VKey {label}";
+                setupAnchor.Instructions = $"Position, rotate, and scale virtual key **{label}**.\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
 
@@ -234,11 +257,6 @@ Click **[Apply Transform]** when finished.
             };
 
             Transform.OnExitVisualSetup = (isApplied) => {
-                if (KeyGameObject != null && Transform != null) {
-                    KeyGameObject.transform.localPosition = Transform.Position;
-                    KeyGameObject.transform.localRotation = Quaternion.Euler(Transform.Rotation);
-                    KeyGameObject.transform.localScale = Transform.Scale;
-                }
                 if (Parent != null) {
                     Parent.ActiveVirtualKeyInVisualSetup = null;
                     Context.Service.NavigateToAsset(Parent.Id);
@@ -268,8 +286,8 @@ Click **[Apply Transform]** when finished.
                 UnityEngine.Object.Destroy(BorderMaterial);
                 BorderMaterial = null;
             }
-            CurrentBorderWidth = -1f;
-            CurrentCornerRadius = -1f;
+            CurrentBorderWidths = new Vector4(-1f, -1f, -1f, -1f);
+            CurrentCornerRadii = new Vector4(-1f, -1f, -1f, -1f);
         }
     }
 }
