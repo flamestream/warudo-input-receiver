@@ -379,6 +379,8 @@
         "ZR_BUTTON": "ZR",
         "APPLY_BASIC_SETUP": "⚡ Apply Basic Setup",
         "CLEAR_ANCHORS": "💣 Clear Anchors",
+        "RESET_ANCHORS": "🔄 Reset Anchors",
+        "RESET_ANCHORS_DESC": "Deletes all generated keyboard and hand anchors from the scene and disconnects character IK. Fresh anchors will automatically regenerate when re-enabled.",
         "ENABLE_HANDS": "Enable Hand Tracking",
         "KEYBOARD_ORIGIN": "Keyboard Origin",
         "ROOT_INITIAL_TRANSFORM": "Keyboard Origin",

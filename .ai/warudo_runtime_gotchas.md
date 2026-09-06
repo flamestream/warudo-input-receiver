@@ -1031,4 +1031,23 @@ However, during active pre-release development branches (such as `version-5.5` b
 - **Post-Release Versioning**:
   Only bump `CURRENT_ASSET_VERSION` and implement two-phase auto-migration when a breaking schema change occurs **after** a version has been officially packaged and released to users in production.
 
+---
+
+## 30. Duplicate `[Section]` Attributes Cause Duplicate Section UI Banners
+
+### The Phenomenon
+In Warudo's inspector, the user suddenly sees multiple sections with the identical title appearing in sequence (e.g. three separate "FLOATING_KEYS" header banners).
+
+### Root Cause Analysis
+Warudo generates inspector UI by sequentially scanning class members. When reflection encounters a member decorated with `[Section("SECTION_NAME")]`:
+- Warudo closes the previous section container and begins a **new** `<Section>` block with that header title.
+- It continues placing all subsequent ports into that section until another `[Section]` attribute is found.
+- If a subsequent port or trigger method in the same section is *also* decorated with `[Section("SECTION_NAME")]` (e.g. when developers copy-paste attributes or explicitly specify the section name on triggers):
+  Warudo interprets each instance as a command to start another section container. This fragments the UI and duplicates the section banner for every member annotated with `[Section]`.
+
+### The Rule
+**Only annotate the FIRST member of a section with `[Section("SECTION_NAME")]`.**
+Never repeat `[Section]` on subsequent fields, ports, or trigger methods within the same section. All following members automatically inherit the active section until a different `[Section]` attribute is declared.
+
+
 

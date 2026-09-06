@@ -41,28 +41,6 @@ namespace FlameStream
             UnityEngine.Debug.Log($"[FlameStream.Asset.KeyboardReceiver] {msg}");
         }
 
-        bool IsWaitingForButtonPress = false;
-
-        [Trigger]
-        [Label("IDENTIFY_BUTTON")]
-        public void TriggerIdentifyButton() {
-            IsWaitingForButtonPress = true;
-            GetTriggerPort(nameof(TriggerIdentifyButton)).Properties.hidden = IsWaitingForButtonPress;
-            GetTriggerPort(nameof(TriggerCancelIdentifyButton)).Properties.hidden = !IsWaitingForButtonPress;
-            BroadcastTriggerProperties(nameof(TriggerIdentifyButton));
-            BroadcastTriggerProperties(nameof(TriggerCancelIdentifyButton));
-        }
-
-        [Trigger]
-        [Label("IDENTIFYING_BUTTON")]
-        [Hidden]
-        public void TriggerCancelIdentifyButton() {
-            IsWaitingForButtonPress = false;
-            GetTriggerPort(nameof(TriggerIdentifyButton)).Properties.hidden = IsWaitingForButtonPress;
-            GetTriggerPort(nameof(TriggerCancelIdentifyButton)).Properties.hidden = !IsWaitingForButtonPress;
-            BroadcastTriggerProperties(nameof(TriggerIdentifyButton));
-            BroadcastTriggerProperties(nameof(TriggerCancelIdentifyButton));
-        }
 
         protected override void OnCreate() {
             base.OnCreate();

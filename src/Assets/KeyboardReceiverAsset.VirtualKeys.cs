@@ -31,6 +31,29 @@ namespace FlameStream
         [Label("FLOATING_KEY_LAYOUT")]
         public VirtualKeyCollection VirtualKeysCollection;
 
+        public bool IsWaitingForButtonPress = false;
+
+        [Trigger(525)]
+        [Label("IDENTIFY_BUTTON")]
+        public void TriggerIdentifyButton() {
+            IsWaitingForButtonPress = true;
+            GetTriggerPort(nameof(TriggerIdentifyButton)).Properties.hidden = IsWaitingForButtonPress;
+            GetTriggerPort(nameof(TriggerCancelIdentifyButton)).Properties.hidden = !IsWaitingForButtonPress;
+            BroadcastTriggerProperties(nameof(TriggerIdentifyButton));
+            BroadcastTriggerProperties(nameof(TriggerCancelIdentifyButton));
+        }
+
+        [Trigger(525)]
+        [Label("IDENTIFYING_BUTTON")]
+        [Hidden]
+        public void TriggerCancelIdentifyButton() {
+            IsWaitingForButtonPress = false;
+            GetTriggerPort(nameof(TriggerIdentifyButton)).Properties.hidden = IsWaitingForButtonPress;
+            GetTriggerPort(nameof(TriggerCancelIdentifyButton)).Properties.hidden = !IsWaitingForButtonPress;
+            BroadcastTriggerProperties(nameof(TriggerIdentifyButton));
+            BroadcastTriggerProperties(nameof(TriggerCancelIdentifyButton));
+        }
+
         // Key Origins (Collapsible StructuredData)
         [DataInput(530)]
         [Label("KEY_ORIGINS")]

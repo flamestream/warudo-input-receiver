@@ -344,5 +344,18 @@ Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** 
         [HiddenIf(nameof(IsHandTrackerEnabled), Is.False)]
         [Label("UNTRACKED_RIGHT_HAND_MOTION")]
         public UntrackedHandMotionSet UntrackedRightHandMotion;
+
+        [Section("ADVANCED")]
+        [DataInput(1000)]
+        [Label("RECEIVER_ASSET_DEBUG_TOAST_WANTED")]
+        public bool IsDebugToastWanted;
+
+        public void ShowToast(
+            string message,
+            Warudo.Core.Server.ToastSeverity severity = Warudo.Core.Server.ToastSeverity.Info
+        ) {
+            if (!IsDebugToastWanted) return;
+            Warudo.Core.Context.Service?.Toast(severity, Name, message);
+        }
     }
 }

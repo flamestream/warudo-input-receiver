@@ -49,4 +49,5 @@ This directory contains key architecture notes, integration patterns, build pipe
    - `ICollapsibleStructuredData`, default collapsed state (`CollapsedSelf`), and avoiding accordion recursion.
    - Visual setup reference origin visualization (red sphere indicator) & prop occlusion (`AlwaysOnTop`).
    - Asset versioning lifecycle policy: active development branches vs. production releases.
+   - Duplicate `[Section]` attributes cause duplicate section UI banners.
 

@@ -43,11 +43,6 @@ namespace FlameStream {
         [Label("PORT")]
         public int Port;
 
-        [Section("ADVANCED")]
-        [DataInput(1000)]
-        [Label("RECEIVER_ASSET_DEBUG_TOAST_WANTED")]
-        public bool IsDebugToastWanted;
-
         public bool IsReceiving {
             get {
                 return lastState != null;
@@ -236,13 +231,6 @@ namespace FlameStream {
             BroadcastDataInputProperties(portName);
         }
 
-        protected void ShowToast(
-            string message,
-            Warudo.Core.Server.ToastSeverity severity = Warudo.Core.Server.ToastSeverity.Info
-        ) {
-            if (!IsDebugToastWanted) return;
-            Warudo.Core.Context.Service.Toast(severity, Name, message);
-        }
 
         abstract protected void Log(string msg);
 

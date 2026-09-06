@@ -143,16 +143,13 @@ namespace FlameStream
             }
         }
 
-        [Trigger(70)]
-        [Label("APPLY_BASIC_SETUP")]
-        public void TriggerApplyBasicSetup() {
-            ApplyBasicSetup();
-        }
-
-        [Trigger(75)]
-        [Label("CLEAR_ANCHORS")]
-        public void TriggerClearAnchors() {
+        [Section("ADVANCED")]
+        [Trigger(1010)]
+        [Label("RESET_ANCHORS")]
+        [Description("RESET_ANCHORS_DESC")]
+        public void TriggerResetAnchors() {
             ClearAnchors();
+            Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Info, Name, "Anchors reset and character IK detached. Fresh anchors will regenerate when enabled.");
         }
 
         [DataInput]

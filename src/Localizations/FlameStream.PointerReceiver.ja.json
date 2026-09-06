@@ -338,6 +338,8 @@
         "ZR_BUTTON": "ZR",
         "APPLY_BASIC_SETUP": "⚡ 基本設定を適用",
         "CLEAR_ANCHORS": "💣 アンカーをクリア",
+        "RESET_ANCHORS": "🔄 アンカーをリセット",
+        "RESET_ANCHORS_DESC": "シーンから生成されたキーボードと手のアンカーを削除し、アバターのIKを切断します。再度有効化すると自動的に新しいアンカーが再生成されます。",
         "ENABLE_HANDS": "手のトラッキングを有効化",
         "KEYBOARD_ORIGIN": "キーボードの原点",
         "ROOT_INITIAL_TRANSFORM": "キーボードの原点",

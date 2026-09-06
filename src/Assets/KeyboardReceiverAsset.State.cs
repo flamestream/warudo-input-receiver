@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Warudo.Core;
 
 namespace FlameStream {
@@ -51,10 +52,15 @@ namespace FlameStream {
                         }
 
                         if (IsWaitingForButtonPress) {
+                            var vk = (VKCode)currentVkCode;
+                            var matchingKey = VirtualKeys?.FirstOrDefault(k => k.Key == vk);
+                            if (matchingKey != null) {
+                                SetIdentifiedVirtualKey(matchingKey);
+                            }
                             Context.Service?.Toast(
                                 Warudo.Core.Server.ToastSeverity.Info,
                                 Name,
-                                $"Button identified with code [{currentVkCode}]"
+                                $"Button identified: [{vk}] (Code {currentVkCode})"
                             );
                             TriggerCancelIdentifyButton();
                         }
