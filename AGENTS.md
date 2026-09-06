@@ -154,6 +154,10 @@ All input receivers inherit from `ReceiverAsset`:
   - **`OnPostMigrateAsset(fromVersion, toVersion)`**: Runs on typed C# objects after deserialization. Use to heal uninitialized fields or migrate data structures via `SetDataInput(..., true)`.
 - **Automatic Clean Persistence**: Once auto-migrated, `AssetVersion` updates to `CURRENT_ASSET_VERSION` and broadcasts. Saving the scene (`Ctrl+S`) writes the clean modern schema to disk, permanently retiring legacy data.
 
+### 4.14 Collapsible StructuredData, Default States (`CollapsedSelf`), & Avoiding Accordion Recursion
+- **Default Collapsed State**: Classes implementing `ICollapsibleStructuredData` default to expanded (`CollapsedSelf == false`). Always set `CollapsedSelf = true;` inside `OnCreate()` or after `StructuredData.Create<T>()` if the card should be collapsed by default.
+- **Preventing Accordion Recursion**: Never implement `ICollapsibleStructuredData` on basic data primitives (like `VisualSetupTransform`) if they are meant to be embedded inside a parent collapsible structured data. Instead, keep the base primitive non-collapsible (so it renders inline) and subclass it (e.g. `CollapsibleVisualSetupTransform : VisualSetupTransform, ICollapsibleStructuredData`) for standalone top-level ports.
+
 
 ---
 

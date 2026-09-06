@@ -892,3 +892,58 @@ public abstract class ReceiverAsset : Asset {
    - Once migrated, `AssetVersion` is updated to `CURRENT_ASSET_VERSION`.
    - When the user saves the scene (`Ctrl+S`), Warudo serializes the clean, upgraded state, permanently retiring the old schema with zero legacy crutches in code.
 
+---
+
+## 27. `ICollapsibleStructuredData`, Default Collapsed State (`CollapsedSelf`), & Avoiding Accordion Recursion
+
+### The Phenomenon
+1. **Unwanted Expanded Accordions by Default**: When creating structured data implementing `ICollapsibleStructuredData` to keep complex inspector panels clean, newly added or loaded cards appear completely expanded by default. Users must manually collapse multiple cards every time they inspect the asset.
+2. **Nested Accordion Recursion**: When a parent structured data card (e.g. `KEYSET_TRANSFORMS`) contains child structured data fields (e.g. `Left`, `Right`, `Root`), if the child types also implement `ICollapsibleStructuredData`, Warudo wraps each child in its own collapsible accordion card. This forces the user to navigate a "Russian nesting doll" hierarchy (expanding the parent card, then expanding each child card individually) just to adjust basic properties like displacement or scale.
+
+### Root Cause Analysis
+In `Warudo.Core.dll`:
+- `ICollapsibleStructuredData` requires `string GetHeader()` and `Guid Id { get; }`. When implemented, Warudo's frontend renders the structured data inside a `<CollapsibleCard>` accordion component with fold arrow and header text.
+- `StructuredData` defines a property `public bool CollapsedSelf { get; set; }` backed by `<CollapsedSelf>k__BackingField`.
+- In standard C#, auto-initialized booleans default to `false`. Therefore, newly instantiated structured data has `CollapsedSelf == false` (expanded).
+- During serialization, `StructuredData.Serialize()` writes `public bool collapsed;` directly from `CollapsedSelf` into `SerializedStructuredData`.
+- If a child structured data implements `ICollapsibleStructuredData`, Warudo recursively renders collapsible card wrappers for each child level.
+
+### Architectural Patterns & Rules
+1. **Collapsing by Default (`CollapsedSelf = true`)**:
+   Always set `CollapsedSelf = true;` inside `OnCreate()` or immediately after factory instantiation (`StructuredData.Create<T>()`):
+   ```csharp
+   public class VirtualKeyPresetConfig : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData
+   {
+       ...
+       protected override void OnCreate() {
+           base.OnCreate();
+           CollapsedSelf = true; // Collapsed by default upon creation and scene load
+       }
+   }
+   ```
+2. **Decoupling Inline vs. Collapsible Transforms (Preventing Accordion Recursion)**:
+   Never make core data primitives (like `VisualSetupTransform`) implement `ICollapsibleStructuredData` globally if they are meant to be embedded inside parent structures.
+   Instead, use a two-tier type hierarchy:
+   ```csharp
+   // Tier 1: Core non-collapsible structured data (renders inline inside parent cards)
+   public class VisualSetupTransform : StructuredData {
+       [DataInput] public Vector3 Position;
+       [DataInput] public Vector3 Rotation;
+       [DataInput] public Vector3 Scale;
+       ...
+   }
+
+   // Tier 2: Collapsible subclass for standalone top-level ports on the asset root
+   public class CollapsibleVisualSetupTransform : VisualSetupTransform, ICollapsibleStructuredData {
+       public virtual string GetHeader() {
+           var title = !string.IsNullOrEmpty(LocalizationKey) ? LocalizationKey.Localized() : "TRANSFORM".Localized();
+           return $"{title} Pos({Position.x:F3}, {Position.y:F3}, {Position.z:F3})";
+       }
+   }
+   ```
+3. **Compound Container Hierarchy**:
+   When grouping secondary setup controls (such as presets and cluster offsets) with main items (such as key definitions):
+   - Wrap secondary controls in their own collapsible sub-structs with `CollapsedSelf = true`.
+   - Embed them at the top of the main container (e.g. `Floating Key Layout`), keeping the primary workflow immediately accessible while keeping setup utilities neatly tucked away.
+
+
