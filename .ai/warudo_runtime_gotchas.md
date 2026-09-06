@@ -1165,6 +1165,23 @@ In Warudo's frontend (`warudo-client-electron`):
    - Call `RequestUiRefresh()`.
 3. Warudo serializes the asset with the incremented `version`. The Vue client detects `entity.value.version` changing and re-runs `build()`, instantly updating all section titles and schema containers in-place without reloading the scene or showing any "Waiting..." overlay.
 
+---
+
+## 34. Warudo Trigger Button Label Reactivity in Vue (`TriggerInterfaceComponent`)
+
+### The Phenomenon
+When dynamically modifying `port.Properties.label` on a `TriggerPort` (e.g. toggling button text between `"Force Key"` and `"Release Key"`) and calling `BroadcastTriggerProperties`, the button's `description` updates immediately on screen, but the button text itself does not update until the user interacts with another element or forces a component re-mount.
+
+### Root Cause Analysis
+In Warudo's web client (`warudo-client-electron`):
+1. In `TriggerInterfaceComponent.vue`:
+   - The button text is rendered as `toDisplayString(_ctx.intf.name)`.
+   - The description is rendered as `toDisplayString(_ctx.intf.portModel.properties.description)`.
+2. When receiving `BroadcastTriggerProperties`, Vue updates `portModel.properties`, so `description` reactively re-renders immediately.
+3. However, `intf.name` is a plain string field on `TriggerInterface` initialized only once inside `build()` (`new TriggerInterface(port)`).
+4. Because `intf.name` is not a reactive getter pointing to `portModel.properties.label`, changing the label in C# does not trigger a Vue text node re-evaluation on the button until the interface is re-created.
+
+
 
 
 
