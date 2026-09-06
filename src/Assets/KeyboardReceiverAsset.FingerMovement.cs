@@ -19,7 +19,9 @@ namespace FlameStream
         [Label("LAYOUT_PRESET_60PERCENT")]
         Standard60Percent,
         [Label("LAYOUT_PRESET_SPLIT_ERGO")]
-        SplitErgonomic
+        SplitErgonomic,
+        [Label("LAYOUT_PRESET_KEYCHRON_Q11")]
+        KeychronQ11
     }
 
     public partial class KeyboardReceiverAsset : ReceiverAsset {
@@ -688,36 +690,66 @@ namespace FlameStream
             AddKey(VKCode.RSHIFT, KeyboardFinger.RightPinky, 0.038f, -0.019f);
             AddKey(VKCode.RCONTROL, KeyboardFinger.RightPinky, 0.048f, -0.038f);
 
-            // Function Keys (for Full / TKL presets)
-            if (preset == KeyboardLayoutPreset.StandardQWERTY || preset == KeyboardLayoutPreset.StandardTKL) {
+            // Function Keys (for Full / TKL / Keychron Q11 presets)
+            if (preset == KeyboardLayoutPreset.StandardQWERTY || preset == KeyboardLayoutPreset.StandardTKL || preset == KeyboardLayoutPreset.KeychronQ11) {
                 AddKey(VKCode.F1, KeyboardFinger.LeftPinky, -0.019f, 0.057f);
                 AddKey(VKCode.F2, KeyboardFinger.LeftRing, -0.005f, 0.057f);
                 AddKey(VKCode.F3, KeyboardFinger.LeftMiddle, -0.005f, 0.057f);
                 AddKey(VKCode.F4, KeyboardFinger.LeftIndex, -0.010f, 0.057f);
                 AddKey(VKCode.F5, KeyboardFinger.LeftIndex, 0.014f, 0.057f);
-                AddKey(VKCode.F6, KeyboardFinger.RightIndex, -0.024f, 0.057f);
-                AddKey(VKCode.F7, KeyboardFinger.RightIndex, -0.005f, 0.057f);
-                AddKey(VKCode.F8, KeyboardFinger.RightMiddle, -0.005f, 0.057f);
-                AddKey(VKCode.F9, KeyboardFinger.RightRing, -0.005f, 0.057f);
-                AddKey(VKCode.F10, KeyboardFinger.RightPinky, -0.005f, 0.057f);
-                AddKey(VKCode.F11, KeyboardFinger.RightPinky, 0.014f, 0.057f);
-                AddKey(VKCode.F12, KeyboardFinger.RightPinky, 0.033f, 0.057f);
+                AddKey(VKCode.F6, KeyboardFinger.LeftIndex, 0.033f, 0.057f);
+                AddKey(VKCode.F7, KeyboardFinger.RightIndex, -0.024f, 0.057f);
+                AddKey(VKCode.F8, KeyboardFinger.RightIndex, -0.005f, 0.057f);
+                AddKey(VKCode.F9, KeyboardFinger.RightMiddle, -0.005f, 0.057f);
+                AddKey(VKCode.F10, KeyboardFinger.RightRing, -0.005f, 0.057f);
+                AddKey(VKCode.F11, KeyboardFinger.RightPinky, -0.005f, 0.057f);
+                AddKey(VKCode.F12, KeyboardFinger.RightPinky, 0.014f, 0.057f);
 
                 // Navigation Cluster (Right Pinky)
-                AddKey(VKCode.INSERT, KeyboardFinger.RightPinky, 0.075f, 0.038f);
-                AddKey(VKCode.HOME, KeyboardFinger.RightPinky, 0.094f, 0.038f);
-                AddKey(VKCode.PRIOR, KeyboardFinger.RightPinky, 0.113f, 0.038f); // PageUp
-                AddKey(VKCode.DELETE, KeyboardFinger.RightPinky, 0.075f, 0.019f);
-                AddKey(VKCode.END, KeyboardFinger.RightPinky, 0.094f, 0.019f);
-                AddKey(VKCode.NEXT, KeyboardFinger.RightPinky, 0.113f, 0.019f); // PageDown
-                AddKey(VKCode.UP, KeyboardFinger.RightPinky, 0.094f, -0.019f);
-                AddKey(VKCode.LEFT, KeyboardFinger.RightPinky, 0.075f, -0.038f);
-                AddKey(VKCode.DOWN, KeyboardFinger.RightPinky, 0.094f, -0.038f);
-                AddKey(VKCode.RIGHT, KeyboardFinger.RightPinky, 0.113f, -0.038f);
+                if (preset == KeyboardLayoutPreset.KeychronQ11) {
+                    AddKey(VKCode.SNAPSHOT, KeyboardFinger.RightPinky, 0.033f, 0.057f); // PrtSc
+                    AddKey(VKCode.DELETE, KeyboardFinger.RightPinky, 0.052f, 0.038f);
+                    AddKey(VKCode.PRIOR, KeyboardFinger.RightPinky, 0.052f, 0.019f); // PageUp
+                    AddKey(VKCode.NEXT, KeyboardFinger.RightPinky, 0.052f, 0.0f);   // PageDown
+                    AddKey(VKCode.END, KeyboardFinger.RightPinky, 0.052f, -0.019f);  // End
+
+                    // Keychron Q11 Left Macro Column (M1-M5 via F13-F17)
+                    AddKey(VKCode.F13, KeyboardFinger.LeftPinky, -0.048f, 0.038f); // M1
+                    AddKey(VKCode.F14, KeyboardFinger.LeftPinky, -0.048f, 0.019f); // M2
+                    AddKey(VKCode.F15, KeyboardFinger.LeftPinky, -0.048f, 0.0f);   // M3
+                    AddKey(VKCode.F16, KeyboardFinger.LeftPinky, -0.048f, -0.019f); // M4
+                    AddKey(VKCode.F17, KeyboardFinger.LeftPinky, -0.048f, -0.038f); // M5
+
+                    // Arrow Cluster (compact 75%)
+                    AddKey(VKCode.UP, KeyboardFinger.RightPinky, 0.033f, -0.019f);
+                    AddKey(VKCode.LEFT, KeyboardFinger.RightPinky, 0.014f, -0.038f);
+                    AddKey(VKCode.DOWN, KeyboardFinger.RightPinky, 0.033f, -0.038f);
+                    AddKey(VKCode.RIGHT, KeyboardFinger.RightPinky, 0.052f, -0.038f);
+                } else {
+                    AddKey(VKCode.INSERT, KeyboardFinger.RightPinky, 0.075f, 0.038f);
+                    AddKey(VKCode.HOME, KeyboardFinger.RightPinky, 0.094f, 0.038f);
+                    AddKey(VKCode.PRIOR, KeyboardFinger.RightPinky, 0.113f, 0.038f); // PageUp
+                    AddKey(VKCode.DELETE, KeyboardFinger.RightPinky, 0.075f, 0.019f);
+                    AddKey(VKCode.END, KeyboardFinger.RightPinky, 0.094f, 0.019f);
+                    AddKey(VKCode.NEXT, KeyboardFinger.RightPinky, 0.113f, 0.019f); // PageDown
+                    AddKey(VKCode.UP, KeyboardFinger.RightPinky, 0.094f, -0.019f);
+                    AddKey(VKCode.LEFT, KeyboardFinger.RightPinky, 0.075f, -0.038f);
+                    AddKey(VKCode.DOWN, KeyboardFinger.RightPinky, 0.094f, -0.038f);
+                    AddKey(VKCode.RIGHT, KeyboardFinger.RightPinky, 0.113f, -0.038f);
+                }
             }
 
-            // Adjustments for Split Ergonomic preset
-            if (preset == KeyboardLayoutPreset.SplitErgonomic) {
+            // Adjustments for Split presets
+            if (preset == KeyboardLayoutPreset.KeychronQ11) {
+                LeftHandRestPosition = new Vector3(-0.11f, 0.02f, 0f);
+                LeftHandRestRotation = new Vector3(0f, -10f, 0f);
+                RightHandRestPosition = new Vector3(0.11f, 0.02f, 0f);
+                RightHandRestRotation = new Vector3(0f, 10f, 0f);
+
+                foreach (var b in list) {
+                    b.DeltaRotation = Vector3.zero;
+                }
+            } else if (preset == KeyboardLayoutPreset.SplitErgonomic) {
                 LeftHandRestPosition = new Vector3(-0.09f, 0.02f, 0f);
                 LeftHandRestRotation = new Vector3(0f, -12f, 0f);
                 RightHandRestPosition = new Vector3(0.09f, 0.02f, 0f);

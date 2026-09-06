@@ -29,6 +29,8 @@ namespace FlameStream
         [Label("VIRTUAL_KEY_PRESET_NUMPAD")]
         Numpad,
         [Label("VIRTUAL_KEY_PRESET_STANDARD_60PERCENT")]
-        Standard60Percent
+        Standard60Percent,
+        [Label("VIRTUAL_KEY_PRESET_KEYCHRON_Q11")]
+        KeychronQ11
     }
 }
