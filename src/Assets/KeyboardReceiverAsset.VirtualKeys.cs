@@ -19,48 +19,74 @@ namespace FlameStream
         [Label("ENABLE_FLOATING_KEYS")]
         public bool EnableFloatingKeys = false;
 
-        [DataInput(510)]
-        [Label("KEYS_LAYOUT_PRESET")]
-        public VirtualKeyLayoutPreset KeysLayoutPreset = VirtualKeyLayoutPreset.GamingWASDExtended;
-
-        [Trigger(520)]
-        [Label("APPLY_KEYS_LAYOUT_PRESET")]
-        public void TriggerApplyKeysLayoutPreset() {
-            ApplyVirtualKeyPreset(KeysLayoutPreset);
-        }
-
-        // Keyset Group Locations & Scale
-        [DataInput(530)]
-        [Label("LEFT_KEYSET_TRANSFORM")]
-        public VisualSetupTransform LeftKeysetTransform;
-
-        [DataInput(540)]
-        [Label("RIGHT_KEYSET_TRANSFORM")]
-        public VisualSetupTransform RightKeysetTransform;
-
-        [DataInput(550)]
-        [Label("ROOT_KEYSET_TRANSFORM")]
-        public VisualSetupTransform RootKeysetTransform;
-
         // Base Look & Feel
-        [DataInput(570)]
+        [DataInput(510)]
         [Label("DEFAULT_KEY_APPEARANCE")]
         public VirtualKeyAppearance DefaultAppearance;
 
         public Vector2 BaseKeySize => DefaultAppearance?.Shape?.Normal?.Size ?? new Vector2(0.032f, 0.032f);
 
-        [DataInput(610)]
-        [Label("VIRTUAL_KEYS")]
-        public VirtualKeyDefinition[] VirtualKeys = new VirtualKeyDefinition[0];
+        // Floating Key Layout (Collapsible StructuredData)
+        [DataInput(520)]
+        [Label("FLOATING_KEY_LAYOUT")]
+        public VirtualKeyCollection VirtualKeysCollection;
+
+        public VirtualKeysetTransforms KeysetTransforms => VirtualKeysCollection?.KeysetTransforms;
+
+        public CollapsibleVisualSetupTransform LeftKeysetTransform => KeysetTransforms?.Left;
+        public CollapsibleVisualSetupTransform RightKeysetTransform => KeysetTransforms?.Right;
+        public CollapsibleVisualSetupTransform RootKeysetTransform => KeysetTransforms?.Root;
+
+        public VirtualKeyDefinition[] VirtualKeys {
+            get => VirtualKeysCollection?.Keys ?? new VirtualKeyDefinition[0];
+            set {
+                if (VirtualKeysCollection == null) {
+                    VirtualKeysCollection = StructuredData.Create<VirtualKeyCollection>();
+                    VirtualKeysCollection.Parent = this;
+                }
+                VirtualKeysCollection.Keys = value;
+            }
+        }
+
+        public VirtualKeyLayoutPreset KeysLayoutPreset {
+            get => VirtualKeysCollection?.Preset ?? VirtualKeyLayoutPreset.GamingWASDExtended;
+            set {
+                if (VirtualKeysCollection != null) {
+                    VirtualKeysCollection.Preset = value;
+                }
+            }
+        }
+
+        public void TriggerApplyKeysLayoutPreset() {
+            ApplyVirtualKeyPreset(KeysLayoutPreset);
+        }
+
+        public void TriggerClearIdentifiedKey() {
+            ClearIdentifiedKey();
+        }
 
         // Runtime objects
         public VirtualKeyDefinition ActiveVirtualKeyInVisualSetup;
+        public VirtualKeyDefinition IdentifiedVirtualKey;
 
         GameObject leftKeysGroupGo;
         GameObject rightKeysGroupGo;
         GameObject rootKeysGroupGo;
 
+        GameObject identifyPulseGo;
+        MeshFilter identifyPulseBodyMf;
+        MeshRenderer identifyPulseBodyMr;
+        Material identifyPulseBodyMat;
+        MeshFilter identifyPulseFrameMf;
+        MeshRenderer identifyPulseFrameMr;
+        Material identifyPulseFrameMat;
+
         void OnCreateVirtualKeys() {
+            if (VirtualKeysCollection == null) {
+                VirtualKeysCollection = StructuredData.Create<VirtualKeyCollection>();
+                VirtualKeysCollection.CollapsedSelf = true;
+            }
+            VirtualKeysCollection.Parent = this;
             SetupKeysetTransforms();
 
             if (DefaultAppearance == null) {
@@ -76,15 +102,14 @@ namespace FlameStream
             Watch(nameof(IsEnabled), delegate {
                 UpdateFloatingKeysState();
             });
-            Watch(nameof(KeysLayoutPreset), delegate { });
-            Watch(nameof(VirtualKeys), delegate {
+            Watch(nameof(VirtualKeysCollection), delegate {
+                if (VirtualKeysCollection != null) {
+                    VirtualKeysCollection.Parent = this;
+                }
+                SetupKeysetTransforms();
                 RefreshVirtualKeysParent();
                 RebuildAllVirtualKeyMeshes();
             });
-
-            Watch(nameof(LeftKeysetTransform), delegate { SetupLeftKeysetTransform(); });
-            Watch(nameof(RightKeysetTransform), delegate { SetupRightKeysetTransform(); });
-            Watch(nameof(RootKeysetTransform), delegate { SetupRootKeysetTransform(); });
 
             Watch(nameof(DefaultAppearance), delegate {
                 if (DefaultAppearance != null) {
@@ -103,24 +128,43 @@ namespace FlameStream
             }
         }
 
+        public void OnVirtualKeysChanged() {
+            RefreshVirtualKeysParent();
+            RebuildAllVirtualKeyMeshes();
+        }
+
         void OnDestroyVirtualKeys() {
             ActiveVirtualKeyInVisualSetup = null;
             DestroyAllVirtualKeyVisuals();
         }
 
-        void SetupKeysetTransforms() {
+        public void SetupKeysetTransforms() {
+            if (VirtualKeysCollection == null) {
+                VirtualKeysCollection = StructuredData.Create<VirtualKeyCollection>();
+                VirtualKeysCollection.Parent = this;
+                VirtualKeysCollection.CollapsedSelf = true;
+            }
+            if (VirtualKeysCollection.KeysetTransforms == null) {
+                VirtualKeysCollection.KeysetTransforms = StructuredData.Create<VirtualKeysetTransforms>();
+                VirtualKeysCollection.KeysetTransforms.Parent = this;
+            }
+            VirtualKeysCollection.KeysetTransforms.CollapsedSelf = true;
             SetupLeftKeysetTransform();
             SetupRightKeysetTransform();
             SetupRootKeysetTransform();
         }
 
         void SetupLeftKeysetTransform() {
-            if (LeftKeysetTransform == null) {
-                LeftKeysetTransform = StructuredData.Create<VisualSetupTransform>();
-                LeftKeysetTransform.Position = Vector3.zero;
-                LeftKeysetTransform.Rotation = Vector3.zero;
-                LeftKeysetTransform.Scale = Vector3.one;
+            var transforms = KeysetTransforms;
+            if (transforms == null) return;
+            transforms.CollapsedSelf = true;
+            if (transforms.Left == null) {
+                transforms.Left = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                transforms.Left.Position = Vector3.zero;
+                transforms.Left.Rotation = Vector3.zero;
+                transforms.Left.Scale = Vector3.one;
             }
+            transforms.Left.CollapsedSelf = true;
             LeftKeysetTransform.LocalizationKey = "LEFT_KEYSET_CLUSTER";
             LeftKeysetTransform.OnEnterVisualSetup = (tr) => { EnsureAnchors(); };
             LeftKeysetTransform.OnCreateAnchor = (tr, setupAnchor) => {
@@ -152,12 +196,16 @@ namespace FlameStream
         }
 
         void SetupRightKeysetTransform() {
-            if (RightKeysetTransform == null) {
-                RightKeysetTransform = StructuredData.Create<VisualSetupTransform>();
-                RightKeysetTransform.Position = Vector3.zero;
-                RightKeysetTransform.Rotation = Vector3.zero;
-                RightKeysetTransform.Scale = Vector3.one;
+            var transforms = KeysetTransforms;
+            if (transforms == null) return;
+            transforms.CollapsedSelf = true;
+            if (transforms.Right == null) {
+                transforms.Right = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                transforms.Right.Position = Vector3.zero;
+                transforms.Right.Rotation = Vector3.zero;
+                transforms.Right.Scale = Vector3.one;
             }
+            transforms.Right.CollapsedSelf = true;
             RightKeysetTransform.LocalizationKey = "RIGHT_KEYSET_CLUSTER";
             RightKeysetTransform.OnEnterVisualSetup = (tr) => { EnsureAnchors(); };
             RightKeysetTransform.OnCreateAnchor = (tr, setupAnchor) => {
@@ -189,12 +237,16 @@ namespace FlameStream
         }
 
         void SetupRootKeysetTransform() {
-            if (RootKeysetTransform == null) {
-                RootKeysetTransform = StructuredData.Create<VisualSetupTransform>();
-                RootKeysetTransform.Position = Vector3.zero;
-                RootKeysetTransform.Rotation = Vector3.zero;
-                RootKeysetTransform.Scale = Vector3.one;
+            var transforms = KeysetTransforms;
+            if (transforms == null) return;
+            transforms.CollapsedSelf = true;
+            if (transforms.Root == null) {
+                transforms.Root = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                transforms.Root.Position = Vector3.zero;
+                transforms.Root.Rotation = Vector3.zero;
+                transforms.Root.Scale = Vector3.one;
             }
+            transforms.Root.CollapsedSelf = true;
             RootKeysetTransform.LocalizationKey = "ROOT_KEYSET_CLUSTER";
             RootKeysetTransform.OnEnterVisualSetup = (tr) => { EnsureAnchors(); };
             RootKeysetTransform.OnCreateAnchor = (tr, setupAnchor) => {
@@ -226,12 +278,161 @@ namespace FlameStream
         }
 
         public void RefreshVirtualKeysParent() {
+            if (VirtualKeysCollection != null) {
+                VirtualKeysCollection.Parent = this;
+            }
             if (VirtualKeys == null) return;
             for (int i = 0; i < VirtualKeys.Length; i++) {
                 if (VirtualKeys[i] != null) {
                     VirtualKeys[i].Parent = this;
                     VirtualKeys[i].SetupTransformCallbacks();
                 }
+            }
+        }
+
+        public void ToggleIdentifyVirtualKey(VirtualKeyDefinition keyDef) {
+            if (keyDef == null) return;
+            if (IdentifiedVirtualKey == keyDef) {
+                ClearIdentifiedKey();
+            } else {
+                SetIdentifiedVirtualKey(keyDef);
+            }
+        }
+
+        public void SetIdentifiedVirtualKey(VirtualKeyDefinition keyDef) {
+            var previous = IdentifiedVirtualKey;
+            IdentifiedVirtualKey = keyDef;
+            if (previous != null && previous != keyDef) {
+                previous.UpdateIdentifyButtonLabel(false);
+                UpdateVirtualKeyColors(previous);
+            }
+            if (keyDef != null) {
+                keyDef.UpdateIdentifyButtonLabel(true);
+            }
+            UpdateIdentifyVisuals();
+            if (keyDef != null) {
+                var label = string.IsNullOrEmpty(keyDef.DisplayLabel) ? keyDef.Key.ToString() : keyDef.DisplayLabel;
+                Context.Service?.Toast(
+                    Warudo.Core.Server.ToastSeverity.Info,
+                    Name,
+                    $"Identifying Virtual Key: [{label}] ({keyDef.AttachmentAnchor})"
+                );
+            }
+        }
+
+        public void ClearIdentifiedKey() {
+            var previous = IdentifiedVirtualKey;
+            IdentifiedVirtualKey = null;
+            if (identifyPulseGo != null) {
+                identifyPulseGo.SetActive(false);
+            }
+            if (previous != null) {
+                previous.UpdateIdentifyButtonLabel(false);
+                UpdateVirtualKeyColors(previous);
+            }
+        }
+
+        public void DetachIdentifyPulseIfParentedTo(VirtualKeyDefinition keyDef) {
+            if (identifyPulseGo != null && keyDef != null && keyDef.KeyGameObject != null) {
+                if (identifyPulseGo.transform.parent == keyDef.KeyGameObject.transform) {
+                    identifyPulseGo.transform.SetParent(null, false);
+                    identifyPulseGo.SetActive(false);
+                }
+            }
+        }
+
+        void EnsureIdentifyPulseObjects() {
+            if (identifyPulseGo != null) return;
+
+            identifyPulseGo = new GameObject("IdentifyPulse");
+
+            var bodyGo = new GameObject("PulseBody");
+            bodyGo.transform.SetParent(identifyPulseGo.transform, false);
+            bodyGo.transform.localPosition = new Vector3(0f, 0.0012f, 0f);
+            identifyPulseBodyMf = bodyGo.AddComponent<MeshFilter>();
+            identifyPulseBodyMr = bodyGo.AddComponent<MeshRenderer>();
+            identifyPulseBodyMat = CreateKeyMaterial();
+            identifyPulseBodyMat.renderQueue = 3050;
+            identifyPulseBodyMr.material = identifyPulseBodyMat;
+
+            var frameGo = new GameObject("PulseFrame");
+            frameGo.transform.SetParent(identifyPulseGo.transform, false);
+            frameGo.transform.localPosition = new Vector3(0f, 0.0015f, 0f);
+            identifyPulseFrameMf = frameGo.AddComponent<MeshFilter>();
+            identifyPulseFrameMr = frameGo.AddComponent<MeshRenderer>();
+            identifyPulseFrameMat = CreateKeyMaterial();
+            identifyPulseFrameMat.renderQueue = 3051;
+            identifyPulseFrameMr.material = identifyPulseFrameMat;
+        }
+
+        public void UpdateIdentifyVisuals() {
+            if (IdentifiedVirtualKey == null || IdentifiedVirtualKey.KeyGameObject == null || !EnableFloatingKeys || !IsEnabled) {
+                if (identifyPulseGo != null) {
+                    identifyPulseGo.SetActive(false);
+                }
+                return;
+            }
+
+            EnsureIdentifyPulseObjects();
+            identifyPulseGo.transform.SetParent(IdentifiedVirtualKey.KeyGameObject.transform, false);
+            identifyPulseGo.transform.localPosition = Vector3.zero;
+            identifyPulseGo.transform.localRotation = Quaternion.identity;
+            identifyPulseGo.transform.localScale = Vector3.one;
+
+            identifyPulseBodyMf.sharedMesh = IdentifiedVirtualKey.BodyMesh;
+            identifyPulseFrameMf.sharedMesh = IdentifiedVirtualKey.FrameMesh;
+
+            identifyPulseGo.SetActive(true);
+        }
+
+        void UpdateIdentifyPulseAnimation() {
+            if (IdentifiedVirtualKey == null || IdentifiedVirtualKey.KeyGameObject == null) {
+                if (identifyPulseGo != null && identifyPulseGo.activeSelf) {
+                    identifyPulseGo.SetActive(false);
+                }
+                return;
+            }
+
+            if (identifyPulseGo == null || !identifyPulseGo.activeSelf) {
+                UpdateIdentifyVisuals();
+                if (identifyPulseGo == null || !identifyPulseGo.activeSelf) return;
+            }
+
+            // Sync shared meshes in case the identified key's shape changed/morphed
+            if (identifyPulseBodyMf != null && identifyPulseBodyMf.sharedMesh != IdentifiedVirtualKey.BodyMesh) {
+                identifyPulseBodyMf.sharedMesh = IdentifiedVirtualKey.BodyMesh;
+            }
+            if (identifyPulseFrameMf != null && identifyPulseFrameMf.sharedMesh != IdentifiedVirtualKey.FrameMesh) {
+                identifyPulseFrameMf.sharedMesh = IdentifiedVirtualKey.FrameMesh;
+            }
+
+            // Pulse cycle: 0.85 seconds
+            float cycle = 0.85f;
+            float t = (Time.time % cycle) / cycle;
+
+            // Ease out expansion for shockwave effect (scale from 1.0x to 1.85x on X and Z)
+            float easedT = DOVirtual.EasedValue(0f, 1f, t, Ease.OutQuad);
+            float scale = Mathf.Lerp(1.0f, 1.85f, easedT);
+            identifyPulseGo.transform.localScale = new Vector3(scale, 1.0f, scale);
+
+            // Ease in fade out (fades smoothly to transparent)
+            float alphaProgress = DOVirtual.EasedValue(0f, 1f, t, Ease.InQuad);
+            float alpha = Mathf.Lerp(0.9f, 0.0f, alphaProgress);
+
+            // Electric cyan/blue coloring ensures extreme contrast on pure white, dark, or colored keys
+            Color cyanFrame = new Color(0f, 0.85f, 1.0f, alpha);
+            Color cyanFrameEmission = new Color(0f, 0.85f, 1.0f) * (alpha * 3.5f);
+
+            Color cyanBody = new Color(0.1f, 0.75f, 1.0f, alpha * 0.35f);
+            Color cyanBodyEmission = new Color(0.1f, 0.75f, 1.0f) * (alpha * 0.35f * 1.5f);
+
+            if (identifyPulseFrameMat != null) {
+                identifyPulseFrameMat.color = cyanFrame;
+                identifyPulseFrameMat.SetColor("_EmissionColor", cyanFrameEmission);
+            }
+            if (identifyPulseBodyMat != null) {
+                identifyPulseBodyMat.color = cyanBody;
+                identifyPulseBodyMat.SetColor("_EmissionColor", cyanBodyEmission);
             }
         }
 
@@ -377,18 +578,16 @@ namespace FlameStream
                 // Input evaluation & glow
                 bool isDown = Down((int)keyDef.Key);
 
-                if (keyDef.IdentifyGlowTimer > 0f) {
-                    keyDef.IdentifyGlowTimer = Mathf.Max(0f, keyDef.IdentifyGlowTimer - dt);
-                }
-
                 ApplyKeyGlowState(keyDef, isDown, dt);
             }
+
+            UpdateIdentifyPulseAnimation();
         }
 
         void ApplyKeyGlowState(VirtualKeyDefinition keyDef, bool isDown, float dt = 0f) {
             if (keyDef.BorderMaterial == null || keyDef.BodyMaterial == null) return;
 
-            bool isIdentifying = keyDef.IdentifyGlowTimer > 0f;
+            bool isIdentifying = (keyDef == IdentifiedVirtualKey);
             var customApp = (keyDef.UseCustomAppearance && keyDef.CustomAppearance != null) ? keyDef.CustomAppearance : null;
             var baseApp = DefaultAppearance;
 
@@ -675,6 +874,10 @@ namespace FlameStream
             keyDef.BodyMaterial = bodyMat;
             keyDef.BorderMaterial = borderMat;
 
+            if (keyDef == IdentifiedVirtualKey) {
+                UpdateIdentifyVisuals();
+            }
+
             bool isDown = Down((int)keyDef.Key);
             ApplyKeyGlowState(keyDef, isDown, 0f);
         }
@@ -729,6 +932,17 @@ namespace FlameStream
         }
 
         public void DestroyAllVirtualKeyVisuals() {
+            if (identifyPulseGo != null) {
+                UnityEngine.Object.Destroy(identifyPulseGo);
+                identifyPulseGo = null;
+                identifyPulseBodyMf = null;
+                identifyPulseBodyMr = null;
+                identifyPulseBodyMat = null;
+                identifyPulseFrameMf = null;
+                identifyPulseFrameMr = null;
+                identifyPulseFrameMat = null;
+            }
+
             if (VirtualKeys != null) {
                 for (int i = 0; i < VirtualKeys.Length; i++) {
                     VirtualKeys[i]?.DestroyVisuals();
@@ -750,6 +964,7 @@ namespace FlameStream
         }
 
         public void ApplyVirtualKeyPreset(VirtualKeyLayoutPreset preset, bool showToast = true) {
+            ClearIdentifiedKey();
             var list = new List<VirtualKeyDefinition>();
 
             float pitch = 0.036f; // Standard key spacing (32mm key + 4mm gap)
@@ -1075,7 +1290,8 @@ namespace FlameStream
 
             DestroyAllVirtualKeyVisuals();
             VirtualKeys = list.ToArray();
-            BroadcastDataInput(nameof(VirtualKeys));
+            VirtualKeysCollection?.BroadcastDataInput(nameof(VirtualKeysCollection.Keys));
+            BroadcastDataInput(nameof(VirtualKeysCollection));
 
             if (EnableFloatingKeys && IsEnabled) {
                 UpdateFloatingKeysState();

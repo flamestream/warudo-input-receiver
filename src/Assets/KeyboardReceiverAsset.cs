@@ -34,7 +34,7 @@ namespace FlameStream
             }
         }
 
-        protected override int CURRENT_ASSET_VERSION => 1;
+        protected override int CURRENT_ASSET_VERSION => 2;
 
         protected override void OnPreMigrateAsset(int fromVersion, int toVersion, Warudo.Core.Serializations.SerializedAsset rawSerialized) {
             base.OnPreMigrateAsset(fromVersion, toVersion, rawSerialized);
@@ -43,6 +43,13 @@ namespace FlameStream
                 MigrateRemovePort(rawSerialized, "MovementFactor");
                 MigrateRemovePort(rawSerialized, "DefaultCornerRadius");
                 MigrateRemovePort(rawSerialized, "DefaultBorderWidth");
+            }
+            if (fromVersion < 2) {
+                MigrateRemovePort(rawSerialized, "LeftKeysetTransform");
+                MigrateRemovePort(rawSerialized, "RightKeysetTransform");
+                MigrateRemovePort(rawSerialized, "RootKeysetTransform");
+                MigrateRemovePort(rawSerialized, "VirtualKeys");
+                MigrateRemovePort(rawSerialized, "KeysLayoutPreset");
             }
         }
 

@@ -159,7 +159,19 @@ namespace FlameStream {
         }
     }
 
-    public class NaturalPositionVisualSetupTransform : VisualSetupTransform {
+    public class CollapsibleVisualSetupTransform : VisualSetupTransform, ICollapsibleStructuredData {
+        public virtual string GetHeader() {
+            var title = !string.IsNullOrEmpty(LocalizationKey) ? LocalizationKey.Localized() : "TRANSFORM".Localized();
+            return $"{title} Pos({Position.x:F3}, {Position.y:F3}, {Position.z:F3})";
+        }
+    }
+
+    public class NaturalPositionVisualSetupTransform : CollapsibleVisualSetupTransform {
+        public override string GetHeader() {
+            var title = !string.IsNullOrEmpty(LocalizationKey) ? LocalizationKey.Localized() : "COORDINATES".Localized();
+            return $"{title} ({Position.x:F3}, {Position.y:F3})";
+        }
+
         protected override void OnCreate() {
             base.OnCreate();
             Watch(nameof(Position), delegate {

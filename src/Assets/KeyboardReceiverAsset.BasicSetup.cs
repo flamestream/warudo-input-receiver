@@ -28,7 +28,7 @@ namespace FlameStream
 
         [DataInput(30)]
         [Label("ROOT_INITIAL_TRANSFORM")]
-        public VisualSetupTransform RootTransform;
+        public CollapsibleVisualSetupTransform RootTransform;
 
         public Vector3 GetLeftHandMovementScale() {
             return (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode && LeftHandRestTransform.setupAnchor != null)
@@ -54,11 +54,11 @@ namespace FlameStream
 
         [DataInput(50)]
         [Label("LEFT_HAND_REST_TRANSFORM")]
-        public VisualSetupTransform LeftHandRestTransform;
+        public CollapsibleVisualSetupTransform LeftHandRestTransform;
 
         [DataInput(60)]
         [Label("RIGHT_HAND_REST_TRANSFORM")]
-        public VisualSetupTransform RightHandRestTransform;
+        public CollapsibleVisualSetupTransform RightHandRestTransform;
 
         public Vector3 KeyboardRootPosition {
             get => RootTransform?.Position ?? new Vector3(0f, 0.6218f, 0.1484f);
@@ -296,7 +296,7 @@ namespace FlameStream
 
         void SetupRootTransform() {
             if (RootTransform == null) {
-                RootTransform = StructuredData.Create<VisualSetupTransform>();
+                RootTransform = StructuredData.Create<CollapsibleVisualSetupTransform>();
                 RootTransform.Position = new Vector3(0f, 0.6218f, 0.1484f);
                 RootTransform.Rotation = Vector3.zero;
             }
@@ -330,7 +330,7 @@ namespace FlameStream
 
         void SetupLeftHandRestTransform() {
             if (LeftHandRestTransform == null) {
-                LeftHandRestTransform = StructuredData.Create<VisualSetupTransform>();
+                LeftHandRestTransform = StructuredData.Create<CollapsibleVisualSetupTransform>();
                 LeftHandRestTransform.Position = new Vector3(-0.07f, 0.02f, 0f);
                 LeftHandRestTransform.Rotation = new Vector3(0f, 90f, 0f);
                 LeftHandRestTransform.Scale = Vector3.one;
@@ -369,7 +369,7 @@ namespace FlameStream
 
         void SetupRightHandRestTransform() {
             if (RightHandRestTransform == null) {
-                RightHandRestTransform = StructuredData.Create<VisualSetupTransform>();
+                RightHandRestTransform = StructuredData.Create<CollapsibleVisualSetupTransform>();
                 RightHandRestTransform.Position = new Vector3(0.07f, 0.02f, 0f);
                 RightHandRestTransform.Rotation = new Vector3(0f, -90f, 0f);
                 RightHandRestTransform.Scale = Vector3.one;

@@ -36,7 +36,19 @@ namespace FlameStream
         [Trigger(120)]
         [Label("IDENTIFY_KEY")]
         public void TriggerIdentifyKey() {
-            Identify();
+            if (Parent != null) {
+                Parent.ToggleIdentifyVirtualKey(this);
+            }
+        }
+
+        public bool IsIdentifying => Parent != null && Parent.IdentifiedVirtualKey == this;
+
+        public void UpdateIdentifyButtonLabel(bool isIdentifying) {
+            var port = GetTriggerPort(nameof(TriggerIdentifyKey));
+            if (port != null && port.Properties != null) {
+                port.Properties.label = isIdentifying ? "STOP_IDENTIFY_KEY" : "IDENTIFY_KEY";
+                BroadcastTriggerProperties(nameof(TriggerIdentifyKey));
+            }
         }
 
         // Runtime rendering components
@@ -46,7 +58,6 @@ namespace FlameStream
         public Material BodyMaterial { get; internal set; }
         public Material BorderMaterial { get; internal set; }
 
-        public float IdentifyGlowTimer { get; internal set; } = 0f;
         public float CurrentPressProgress { get; internal set; } = 0f;
         public Vector2 CurrentSize { get; internal set; } = new Vector2(-1f, -1f);
         public Vector4 CurrentBorderWidths { get; internal set; } = new Vector4(-1f, -1f, -1f, -1f);
@@ -66,24 +77,13 @@ namespace FlameStream
             return Parent?.DefaultAppearance?.Shape?.Normal?.GetCornerRadii() ?? BorderVector4Extensions.Uniform(0.25f);
         }
 
-        public void Identify(float duration = 2.5f) {
-            IdentifyGlowTimer = duration;
-            if (Parent != null) {
-                var label = string.IsNullOrEmpty(DisplayLabel) ? Key.ToString() : DisplayLabel;
-                Context.Service?.Toast(
-                    Warudo.Core.Server.ToastSeverity.Info,
-                    Parent.Name,
-                    $"Identifying Virtual Key: [{label}] ({AttachmentAnchor})"
-                );
-            }
-        }
-
         public string GetHeader() {
             var label = string.IsNullOrEmpty(DisplayLabel) ? Key.ToString() : $"{Key} (\"{DisplayLabel}\")";
             var anchorTag = AttachmentAnchor == VirtualKeyAnchor.LeftHand ? "🫲 L" :
                             AttachmentAnchor == VirtualKeyAnchor.RightHand ? "🫱 R" : "⌨️ Root";
             var pos = Transform != null ? Transform.Position : Vector3.zero;
-            return $"[{label}] ➔ [{anchorTag}] Pos({pos.x:F3}, {pos.y:F3}, {pos.z:F3})";
+            var identifyTag = IsIdentifying ? " 🔍[IDENTIFYING]" : "";
+            return $"[{label}] ➔ [{anchorTag}] Pos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}){identifyTag}";
         }
 
         protected override void OnCreate() {
@@ -208,6 +208,7 @@ namespace FlameStream
         }
 
         public void DestroyVisuals() {
+            Parent?.DetachIdentifyPulseIfParentedTo(this);
             if (KeyGameObject != null) {
                 UnityEngine.Object.Destroy(KeyGameObject);
                 KeyGameObject = null;

@@ -1,10 +1,11 @@
 using DG.Tweening;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
+using Warudo.Core.Localization;
 
 namespace FlameStream
 {
-    public class Transition : StructuredData {
+    public class Transition : StructuredData, ICollapsibleStructuredData {
         [DataInput]
         [Label("TRANSITION_TIME")]
         [FloatSlider(0f, 3f, 0.01f)]
@@ -18,6 +19,10 @@ namespace FlameStream
             get {
                 return $"{Time}s";
             }
+        }
+
+        public virtual string GetHeader() {
+            return $"{Time:0.##}s ({Ease})";
         }
     }
 
