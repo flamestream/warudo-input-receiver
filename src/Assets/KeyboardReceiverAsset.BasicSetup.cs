@@ -147,13 +147,6 @@ namespace FlameStream
             }
         }
 
-        [Trigger(1005)]
-        [Label("DEACTIVATE_ALL_DEBUG_KEYS")]
-        [Hidden]
-        public void TriggerDeactivateAllDebugKeys() {
-            DeactivateAllDebugKeys();
-        }
-
         [Section("ADVANCED")]
         [Trigger(1010)]
         [Label("RESET_ANCHORS")]
@@ -163,14 +156,27 @@ namespace FlameStream
             Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Info, Name, "Anchors reset and character IK detached. Fresh anchors will regenerate when enabled.");
         }
 
+        [Trigger(1015)]
+        [Label("DEACTIVATE_ALL_DEBUG_KEYS")]
+        [Hidden]
+        public void TriggerDeactivateAllDebugKeys() {
+            DeactivateAllDebugKeys();
+        }
+
         public void UpdateAdvancedSectionDebugState() {
             bool isDebug = IsDebugKeyModeActive;
             string sectionTitle = isDebug ? "ADVANCED_DEBUG_MODE".Localized() : "ADVANCED".Localized();
 
+            var resetPort = GetTriggerPort(nameof(TriggerResetAnchors));
+            if (resetPort != null && resetPort.Properties != null) {
+                resetPort.Properties.sectionTitle = sectionTitle;
+                BroadcastTriggerProperties(nameof(TriggerResetAnchors));
+            }
+
             var deactPort = GetTriggerPort(nameof(TriggerDeactivateAllDebugKeys));
             if (deactPort != null && deactPort.Properties != null) {
                 deactPort.Properties.hidden = !isDebug;
-                deactPort.Properties.sectionTitle = isDebug ? sectionTitle : "";
+                deactPort.Properties.sectionTitle = "";
                 if (isDebug) {
                     var keyList = string.Join(", ", DebugForcedKeys.Select(k => k.ToString()));
                     deactPort.Properties.description = string.Format("DEACTIVATE_ALL_DEBUG_KEYS_DESC".Localized(), keyList);
@@ -178,12 +184,6 @@ namespace FlameStream
                     deactPort.Properties.description = "";
                 }
                 BroadcastTriggerProperties(nameof(TriggerDeactivateAllDebugKeys));
-            }
-
-            var resetPort = GetTriggerPort(nameof(TriggerResetAnchors));
-            if (resetPort != null && resetPort.Properties != null) {
-                resetPort.Properties.sectionTitle = isDebug ? "" : sectionTitle;
-                BroadcastTriggerProperties(nameof(TriggerResetAnchors));
             }
         }
 
