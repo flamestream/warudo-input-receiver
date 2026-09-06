@@ -1180,6 +1180,39 @@ In Warudo's web client (`warudo-client-electron`):
 2. When receiving `BroadcastTriggerProperties`, Vue updates `portModel.properties`, so `description` reactively re-renders immediately.
 3. However, `intf.name` is a plain string field on `TriggerInterface` initialized only once inside `build()` (`new TriggerInterface(port)`).
 4. Because `intf.name` is not a reactive getter pointing to `portModel.properties.label`, changing the label in C# does not trigger a Vue text node re-evaluation on the button until the interface is re-created.
+5. In addition, base `StructuredData.Serialize()` omits assigning `serialized.version = GetVersion()`, so `entity.version` is always 0 on `StructuredData` unless explicitly overridden.
+
+### Architectural Solution: Async `RequestUiRefresh()` & `Serialize()` Override on StructuredData
+1. Override `Serialize()` and `GetVersion()` on the `StructuredData`:
+   ```csharp
+   protected long uiVersion = 0;
+
+   public override long GetVersion() {
+       return base.GetVersion() + uiVersion;
+   }
+
+   public override SerializedStructuredData Serialize() {
+       var serialized = base.Serialize();
+       serialized.version = GetVersion();
+       return serialized;
+   }
+   ```
+2. Implement an **async dual-broadcast** `RequestUiRefresh()` using `UniTask.Yield()`:
+   ```csharp
+   public async void RequestUiRefresh() {
+       uiVersion++;
+       Broadcast();
+       await UniTask.Yield();
+       uiVersion++;
+       Broadcast();
+   }
+   ```
+3. Whenever changing `port.Properties.label`:
+   - Use `.Localized()` (e.g. `"DEBUG_RELEASE_KEY".Localized()`).
+   - Call `BroadcastTriggerProperties(...)`.
+   - Call `RequestUiRefresh()`.
+4. The immediate broadcast handles synchronous consumers, while the post-yield next-frame broadcast guarantees that Vue has completely finished processing the click event before receiving the second version increment, forcing `watch(() => entity.value?.version, build)` to recreate `inputs` with the updated button label.
+
 
 
 

@@ -4,6 +4,8 @@ using Warudo.Core;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
 using Warudo.Core.Localization;
+using Warudo.Core.Serializations;
+using Cysharp.Threading.Tasks;
 
 namespace FlameStream
 {
@@ -77,13 +79,39 @@ namespace FlameStream
 
         public bool IsDebugForced => Parent != null && Parent.IsKeyDebugForced(Key);
 
+        protected long uiVersion = 0;
+
+        public override long GetVersion() {
+            return base.GetVersion() + uiVersion;
+        }
+
+        public override SerializedStructuredData Serialize() {
+            var serialized = base.Serialize();
+            serialized.version = GetVersion();
+            return serialized;
+        }
+
+        public async void RequestUiRefresh() {
+            uiVersion++;
+            Broadcast();
+            await UniTask.Yield();
+            uiVersion++;
+            Broadcast();
+        }
+
         public void UpdateDebugButtonState() {
             var port = GetTriggerPort(nameof(TriggerDebugForceKey));
             if (port == null || port.Properties == null) return;
             bool forced = IsDebugForced;
-            port.Properties.label = forced ? "DEBUG_RELEASE_KEY" : "DEBUG_FORCE_KEY";
-            port.Properties.description = forced ? "DEBUG_RELEASE_KEY_DESC".Localized() : "DEBUG_FORCE_KEY_DESC".Localized();
+            string newLabel = forced ? "DEBUG_RELEASE_KEY".Localized() : "DEBUG_FORCE_KEY".Localized();
+            string newDesc = forced ? "DEBUG_RELEASE_KEY_DESC".Localized() : "DEBUG_FORCE_KEY_DESC".Localized();
+            bool changed = port.Properties.label != newLabel;
+            port.Properties.label = newLabel;
+            port.Properties.description = newDesc;
             BroadcastTriggerProperties(nameof(TriggerDebugForceKey));
+            if (changed) {
+                RequestUiRefresh();
+            }
             BroadcastDataInput(nameof(Transform));
         }
 
@@ -92,8 +120,13 @@ namespace FlameStream
         public void UpdateLocateButtonLabel(bool isLocating) {
             var port = GetTriggerPort(nameof(TriggerLocateKey));
             if (port != null && port.Properties != null) {
-                port.Properties.label = isLocating ? "STOP_LOCATING_KEY" : "LOCATE_KEY";
+                string newLabel = isLocating ? "STOP_LOCATING_KEY".Localized() : "LOCATE_KEY".Localized();
+                bool changed = port.Properties.label != newLabel;
+                port.Properties.label = newLabel;
                 BroadcastTriggerProperties(nameof(TriggerLocateKey));
+                if (changed) {
+                    RequestUiRefresh();
+                }
             }
         }
 

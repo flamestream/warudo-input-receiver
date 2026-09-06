@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Warudo.Core.Attributes;
 using Warudo.Core.Localization;
 using Warudo.Core.Scenes;
@@ -25,7 +26,10 @@ namespace FlameStream {
             return base.GetVersion() + uiVersion;
         }
 
-        public void RequestUiRefresh() {
+        public async void RequestUiRefresh() {
+            uiVersion++;
+            Broadcast();
+            await UniTask.Yield();
             uiVersion++;
             Broadcast();
         }

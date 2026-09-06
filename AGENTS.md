@@ -171,9 +171,12 @@ All input receivers inherit from `ReceiverAsset`:
 - **Dynamic `port.Properties.sectionTitle` Rule**: Setting `sectionTitle` dynamically on a port and broadcasting it does **not** group items by tag; it designates that specific port as the **start boundary** of a section container. Never broadcast `sectionTitle` on multiple sibling ports in the same section. The section title must always be owned by a **permanent, visible port** in that section (e.g. `TriggerResetAnchors`). Never transfer `sectionTitle` to a port that can become hidden, as hiding it leaves the section container stranded with the previous title in Warudo's Vue UI. Dynamically hide/show child ports without assigning them a `sectionTitle`.
 
 ### 4.18 Dynamic Section Header Updating & Inspector Re-rendering via `GetVersion()`
-- **The Issue**: When changing `port.Properties.sectionTitle` dynamically in C#, neither `BroadcastTriggerProperties` nor `Broadcast()` will update the section header on the screen unless the user navigates away and back to the asset. Conversely, calling `BroadcastOpenedScene()` causes a disruptive modal "Waiting..." loading overlay.
-- **Root Cause**: In Warudo's web client (`warudo-client-electron`), `createSections` only runs when `props.entityId` changes or when `entity.value?.version` changes. Because `Entity.GetVersion()` returns a constant `0L`, Vue never sees the version change.
-- **Rule**: In `ReceiverAsset`, `GetVersion()` is overridden to return `base.GetVersion() + uiVersion`. To refresh section headers and schema layout in-place without any "Waiting..." overlay, call `RequestUiRefresh()` (which increments `uiVersion` and calls `Broadcast()`).
+- **The Issue**: When changing `port.Properties.sectionTitle` or trigger button `port.Properties.label` dynamically in C#, neither `BroadcastTriggerProperties` nor `Broadcast()` will update the section header or button text on the screen unless the user navigates away and back or clicks another control. Conversely, calling `BroadcastOpenedScene()` causes a disruptive modal "Waiting..." loading overlay.
+- **Root Cause**: In Warudo's web client (`warudo-client-electron`), `createSections` and `TriggerInterface` instantiation only run when `props.entityId` changes or when `entity.value?.version` changes. Because `Entity.GetVersion()` returns a constant `0L` (and `StructuredData.Serialize()` omits assigning `version`), Vue never sees the version change.
+- **Rule**:
+  - In `ReceiverAsset`, `GetVersion()` is overridden to return `base.GetVersion() + uiVersion`.
+  - In `StructuredData` classes (e.g. `KeyboardKeyBinding`, `VirtualKeyDefinition`), override both `GetVersion()` and `Serialize()` to assign `serialized.version = GetVersion()`.
+  - Implement an async `RequestUiRefresh()` (`uiVersion++; Broadcast(); await UniTask.Yield(); uiVersion++; Broadcast();`). The dual broadcast guarantees Vue has concluded the click event before receiving the second version bump, smoothly re-rendering section titles and button labels in-place without any "Waiting..." overlay.
 
 ---
 

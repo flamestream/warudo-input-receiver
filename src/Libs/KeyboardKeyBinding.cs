@@ -4,6 +4,8 @@ using Warudo.Core;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
 using Warudo.Core.Localization;
+using Warudo.Core.Serializations;
+using Cysharp.Threading.Tasks;
 
 namespace FlameStream {
     public class KeyboardKeyBinding : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData, IKeyListeningTarget {
@@ -24,8 +26,9 @@ namespace FlameStream {
             IsListeningForKey = listening;
             var port = GetTriggerPort(nameof(TriggerIdentifyKey));
             if (port != null && port.Properties != null) {
-                port.Properties.label = listening ? "IDENTIFYING_KEY" : "IDENTIFY_KEY";
+                port.Properties.label = listening ? "IDENTIFYING_KEY".Localized() : "IDENTIFY_KEY".Localized();
                 BroadcastTriggerProperties(nameof(TriggerIdentifyKey));
+                RequestUiRefresh();
             }
         }
 
@@ -57,13 +60,39 @@ namespace FlameStream {
 
         public bool IsDebugForced => Parent != null && Parent.IsKeyDebugForced(Key);
 
+        protected long uiVersion = 0;
+
+        public override long GetVersion() {
+            return base.GetVersion() + uiVersion;
+        }
+
+        public override SerializedStructuredData Serialize() {
+            var serialized = base.Serialize();
+            serialized.version = GetVersion();
+            return serialized;
+        }
+
+        public async void RequestUiRefresh() {
+            uiVersion++;
+            Broadcast();
+            await UniTask.Yield();
+            uiVersion++;
+            Broadcast();
+        }
+
         public void UpdateDebugButtonState() {
             var port = GetTriggerPort(nameof(TriggerDebugForceKey));
             if (port == null || port.Properties == null) return;
             bool forced = IsDebugForced;
-            port.Properties.label = forced ? "DEBUG_RELEASE_KEY" : "DEBUG_FORCE_KEY";
-            port.Properties.description = forced ? "DEBUG_RELEASE_KEY_DESC".Localized() : "DEBUG_FORCE_KEY_DESC".Localized();
+            string newLabel = forced ? "DEBUG_RELEASE_KEY".Localized() : "DEBUG_FORCE_KEY".Localized();
+            string newDesc = forced ? "DEBUG_RELEASE_KEY_DESC".Localized() : "DEBUG_FORCE_KEY_DESC".Localized();
+            bool changed = port.Properties.label != newLabel;
+            port.Properties.label = newLabel;
+            port.Properties.description = newDesc;
             BroadcastTriggerProperties(nameof(TriggerDebugForceKey));
+            if (changed) {
+                RequestUiRefresh();
+            }
             BroadcastDataInput(nameof(Transform));
         }
 
