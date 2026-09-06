@@ -73,8 +73,6 @@ namespace FlameStream {
         }
 
         public async void RequestUiRefresh() {
-            uiVersion++;
-            Broadcast();
             await UniTask.Yield();
             uiVersion++;
             Broadcast();

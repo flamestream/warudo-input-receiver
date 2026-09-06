@@ -176,7 +176,7 @@ All input receivers inherit from `ReceiverAsset`:
 - **Rule**:
   - In `ReceiverAsset`, `GetVersion()` is overridden to return `base.GetVersion() + uiVersion`.
   - In `StructuredData` classes (e.g. `KeyboardKeyBinding`, `VirtualKeyDefinition`), override both `GetVersion()` and `Serialize()` to assign `serialized.version = GetVersion()`.
-  - Implement an async `RequestUiRefresh()` (`uiVersion++; Broadcast(); await UniTask.Yield(); uiVersion++; Broadcast();`). The dual broadcast guarantees Vue has concluded the click event before receiving the second version bump, smoothly re-rendering section titles and button labels in-place without any "Waiting..." overlay.
+  - Implement an async `RequestUiRefresh()` (`await UniTask.Yield(); uiVersion++; Broadcast();`). Yielding before broadcasting ensures Vue has completed processing the active click event before receiving the version bump, smoothly re-rendering section titles and button labels in-place without any "Waiting..." overlay.
 
 ---
 

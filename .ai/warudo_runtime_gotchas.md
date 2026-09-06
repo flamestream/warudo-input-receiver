@@ -1197,11 +1197,9 @@ In Warudo's web client (`warudo-client-electron`):
        return serialized;
    }
    ```
-2. Implement an **async dual-broadcast** `RequestUiRefresh()` using `UniTask.Yield()`:
+2. Implement an **async yield-first** `RequestUiRefresh()` using `UniTask.Yield()`:
    ```csharp
    public async void RequestUiRefresh() {
-       uiVersion++;
-       Broadcast();
        await UniTask.Yield();
        uiVersion++;
        Broadcast();
@@ -1211,7 +1209,7 @@ In Warudo's web client (`warudo-client-electron`):
    - Use `.Localized()` (e.g. `"DEBUG_RELEASE_KEY".Localized()`).
    - Call `BroadcastTriggerProperties(...)`.
    - Call `RequestUiRefresh()`.
-4. The immediate broadcast handles synchronous consumers, while the post-yield next-frame broadcast guarantees that Vue has completely finished processing the click event before receiving the second version increment, forcing `watch(() => entity.value?.version, build)` to recreate `inputs` with the updated button label.
+4. Yielding first (`await UniTask.Yield()`) waits for the next frame so Vue finishes processing the active click event and clears its callstack before receiving the version increment. On the next tick, `watch(() => entity.value?.version, build)` cleanly fires to recreate `inputs` with the updated button label.
 
 
 
