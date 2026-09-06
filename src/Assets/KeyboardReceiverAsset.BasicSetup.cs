@@ -185,6 +185,8 @@ namespace FlameStream
                 }
                 BroadcastTriggerProperties(nameof(TriggerDeactivateAllDebugKeys));
             }
+
+            Broadcast();
         }
 
         public void UpdateAllDebugButtonStates() {
@@ -199,6 +201,9 @@ namespace FlameStream
                 }
             }
             UpdateAdvancedSectionDebugState();
+            BroadcastDataInput(nameof(KeyBindingsCollection));
+            BroadcastDataInput(nameof(VirtualKeysCollection));
+            Broadcast();
         }
 
         [DataInput]
