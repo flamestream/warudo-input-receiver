@@ -8,7 +8,7 @@ namespace FlameStream
         LeftHand,
         [Label("VIRTUAL_KEY_ANCHOR_RIGHT_HAND")]
         RightHand,
-        [Label("VIRTUAL_KEY_ANCHOR_KEYBOARD_ROOT")]
+        [Label("VIRTUAL_KEY_ANCHOR_CENTER")]
         KeyboardRoot
     }
 

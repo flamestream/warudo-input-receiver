@@ -220,10 +220,22 @@ namespace FlameStream
                 setupAnchor.Transform.Scale = tr.Scale;
 
                 var label = string.IsNullOrEmpty(DisplayLabel) ? Key.ToString() : DisplayLabel;
-                string originName = AttachmentAnchor == VirtualKeyAnchor.LeftHand ? "Left Key Origin" : (AttachmentAnchor == VirtualKeyAnchor.RightHand ? "Right Key Origin" : "Root Key Origin");
+                string originName = AttachmentAnchor == VirtualKeyAnchor.LeftHand ? "Left Key Origin" : (AttachmentAnchor == VirtualKeyAnchor.RightHand ? "Right Key Origin" : "Center Key Origin");
                 setupAnchor.Name = $"⌛⚓-VKey {label}";
                 setupAnchor.Instructions = $"Position, rotate, and scale virtual key **{label}**, relative to the **{originName}**.\nThe red sphere indicates the origin location ({originName}).\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
+            };
+
+            Transform.OnResetAnchor = (tr, setupAnchor) => {
+                setupAnchor.Transform.Position = Vector3.zero;
+                setupAnchor.Transform.Rotation = Vector3.zero;
+                setupAnchor.Transform.Scale = Vector3.one;
+                setupAnchor.Transform.Broadcast();
+                if (KeyGameObject != null) {
+                    KeyGameObject.transform.localPosition = Vector3.zero;
+                    KeyGameObject.transform.localRotation = Quaternion.identity;
+                    KeyGameObject.transform.localScale = Vector3.one;
+                }
             };
 
             Transform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -238,6 +250,11 @@ namespace FlameStream
             };
 
             Transform.OnExitVisualSetup = (isApplied) => {
+                if (!isApplied && KeyGameObject != null) {
+                    KeyGameObject.transform.localPosition = Transform.Position;
+                    KeyGameObject.transform.localRotation = Quaternion.Euler(Transform.Rotation);
+                    KeyGameObject.transform.localScale = Transform.Scale;
+                }
                 if (Parent != null) {
                     Parent.ActiveVirtualKeyInVisualSetup = null;
                     Context.Service.NavigateToAsset(Parent.Id);

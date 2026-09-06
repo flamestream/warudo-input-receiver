@@ -12,27 +12,38 @@ namespace FlameStream {
         public VisualSetupTransform Parent;
         public Action ApplyTriggerAction;
         public Action CancelTriggerAction;
+        public Action ResetTriggerAction;
 
         [Markdown(0)]
         public string Instructions;
 
-        [Trigger(0)]
-        [Label("CANCEL_TRANSFORM")]
-        public void CancelTrigger() {
-            if (CancelTriggerAction != null) {
-                CancelTriggerAction.Invoke();
-            } else {
-                Parent?.ExitVisualSetup(false);
-            }
-        }
-
-        [Trigger(0)]
+        [Trigger(1)]
         [Label("APPLY_TRANSFORM")]
         public void ApplyTrigger() {
             if (ApplyTriggerAction != null) {
                 ApplyTriggerAction.Invoke();
             } else {
                 Parent?.Apply(this);
+            }
+        }
+
+        [Trigger(2)]
+        [Label("RESET_TO_ORIGIN")]
+        public void ResetTrigger() {
+            if (ResetTriggerAction != null) {
+                ResetTriggerAction.Invoke();
+            } else {
+                Parent?.ResetAnchorToOrigin();
+            }
+        }
+
+        [Trigger(3)]
+        [Label("CANCEL_TRANSFORM")]
+        public void CancelTrigger() {
+            if (CancelTriggerAction != null) {
+                CancelTriggerAction.Invoke();
+            } else {
+                Parent?.ExitVisualSetup(false);
             }
         }
 

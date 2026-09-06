@@ -50,14 +50,17 @@ namespace FlameStream {
         public VisualSetupAnchorAsset setupAnchor;
         public Action<VisualSetupTransform, VisualSetupAnchorAsset> OnCreateAnchor;
         public Action<VisualSetupTransform, VisualSetupAnchorAsset> OnApplyAnchor;
+        public Action<VisualSetupTransform, VisualSetupAnchorAsset> OnResetAnchor;
         public Action<VisualSetupTransform> OnEnterVisualSetup;
         public Action<bool> OnExitVisualSetup;
+        public Action OnReset;
         public Action OnCopy;
         public Action<string> OnAnimationChange;
 
         public bool ShowOriginIndicator = true;
         public bool OriginAlwaysOnTop = false;
         public float OriginIndicatorSize = 0.035f;
+        public Vector3 OriginIndicatorOffset = Vector3.zero;
         public GameObject originIndicatorGo;
         public Material originIndicatorMat;
         public bool ShowAnimation = false;
@@ -67,7 +70,7 @@ namespace FlameStream {
             if (originIndicatorGo != null) {
                 originIndicatorGo.SetActive(visible);
             } else if (visible && setupAnchor != null && setupAnchor.GameObject != null && setupAnchor.GameObject.transform.parent != null) {
-                CreateOriginIndicator(setupAnchor.GameObject.transform.parent);
+                CreateOriginIndicator(setupAnchor.GameObject.transform.parent, OriginIndicatorOffset);
             }
         }
 
@@ -98,7 +101,7 @@ namespace FlameStream {
                 originIndicatorMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Overlay + 1000;
             } else {
                 originIndicatorMat = new Material(Shader.Find("Standard"));
-                originIndicatorMat.color = new Color(1f, 0f, 0f, 0.9f);
+                originIndicatorMat.color = new Color(1f, 0f, 0f, 0.85f);
                 originIndicatorMat.EnableKeyword("_EMISSION");
                 originIndicatorMat.SetColor("_EmissionColor", new Color(0.85f, 0.05f, 0.05f));
             }
@@ -117,7 +120,7 @@ namespace FlameStream {
             if (col != null) UnityEngine.Object.Destroy(col);
 
             originIndicatorGo.transform.SetParent(parentTransform, false);
-            originIndicatorGo.transform.localPosition = localPos ?? Vector3.zero;
+            originIndicatorGo.transform.localPosition = localPos ?? OriginIndicatorOffset;
             originIndicatorGo.transform.localRotation = Quaternion.identity;
             originIndicatorGo.transform.localScale = Vector3.one * OriginIndicatorSize;
 
@@ -258,6 +261,22 @@ namespace FlameStream {
 
         public void NormalizeRotationAngles() {
             SetDataInput(nameof(Rotation), Helper.NormalizeRotationAngles(Rotation), true);
+        }
+
+        public void ResetAnchorToOrigin() {
+            if (!InVisualSetupMode || setupAnchor == null) return;
+            if (OnResetAnchor != null) {
+                OnResetAnchor.Invoke(this, setupAnchor);
+            } else {
+                setupAnchor.Transform.Position = Vector3.zero;
+                setupAnchor.Transform.Rotation = Vector3.zero;
+                setupAnchor.Transform.Scale = Vector3.one;
+                setupAnchor.Transform.Broadcast();
+            }
+        }
+
+        public void ResetToOrigin() {
+            ResetAnchorToOrigin();
         }
     }
 

@@ -188,6 +188,17 @@ Click **[Apply Transform]** when finished.
                 };
             };
 
+            Transform.OnResetAnchor = (tr, setupAnchor) => {
+                if (Parent == null) return;
+                bool isLeft = Finger.IsLeftHand();
+                Vector3 restPos = isLeft ? Parent.LeftHandRestPosition : Parent.RightHandRestPosition;
+                Vector3 restRot = isLeft ? Parent.LeftHandRestRotation : Parent.RightHandRestRotation;
+                setupAnchor.Transform.Position = restPos;
+                setupAnchor.Transform.Rotation = restRot;
+                setupAnchor.Transform.Scale = Vector3.one;
+                setupAnchor.Transform.Broadcast();
+            };
+
             Transform.OnApplyAnchor = (tr, setupAnchor) => {
                 if (Parent == null) return;
 

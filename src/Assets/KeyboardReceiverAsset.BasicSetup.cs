@@ -27,8 +27,8 @@ namespace FlameStream
         public CharacterAsset Character;
 
         [DataInput(30)]
-        [Label("KEYBOARD_ORIGIN")]
-        [Description("KEYBOARD_ORIGIN_DESC")]
+        [Label("KEYBOARD_RIG_ORIGIN")]
+        [Description("KEYBOARD_RIG_ORIGIN_DESC")]
         public CollapsibleVisualSetupTransform RootTransform;
 
         public Vector3 GetLeftHandMovementScale() {
@@ -263,7 +263,7 @@ namespace FlameStream
                 RootTransform.Position = new Vector3(0f, 0.6218f, 0.1484f);
                 RootTransform.Rotation = Vector3.zero;
             }
-            RootTransform.LocalizationKey = "KEYBOARD_ORIGIN";
+            RootTransform.LocalizationKey = "KEYBOARD_RIG_ORIGIN";
             RootTransform.HideScale();
             RootTransform.OnEnterVisualSetup = (tr) => {
                 EnsureAnchors();
@@ -277,8 +277,14 @@ namespace FlameStream
                 }
                 setupAnchor.Transform.Position = tr.Position;
                 setupAnchor.Transform.Rotation = tr.Rotation;
-                setupAnchor.Name = "⌛⚓-Keyboard Origin";
-                setupAnchor.Instructions = "Position and rotate the **Keyboard Origin** reference anchor, relative to the **Character** (Avatar Root).\nThe red sphere indicates the origin location (character root).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Name = "⌛⚓-Keyboard Rig Origin";
+                setupAnchor.Instructions = "Position and rotate the **Keyboard Rig Origin** reference anchor, relative to the **Character** (Avatar Root).\nThe red sphere indicates the origin location (character root).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Transform.Broadcast();
+            };
+            RootTransform.OnResetAnchor = (tr, setupAnchor) => {
+                setupAnchor.Transform.Position = Vector3.zero;
+                setupAnchor.Transform.Rotation = Vector3.zero;
+                setupAnchor.Transform.Scale = Vector3.one;
                 setupAnchor.Transform.Broadcast();
             };
             RootTransform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -321,7 +327,13 @@ namespace FlameStream
                 setupAnchor.Transform.Rotation = tr.Rotation;
                 setupAnchor.Transform.Scale = tr.Scale;
                 setupAnchor.Name = "⌛⚓-Left Hand Rest Pose";
-                setupAnchor.Instructions = "Position, rotate, and scale the **Left Hand Rest Pose** (resting over ASDF), relative to the **Keyboard Origin**.\nThe red sphere indicates the origin location (Keyboard Origin).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Instructions = "Position, rotate, and scale the **Left Hand Rest Pose** (resting over ASDF), relative to the **Keyboard Rig Origin**.\nThe red sphere indicates the origin location (Keyboard Rig Origin).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Transform.Broadcast();
+            };
+            LeftHandRestTransform.OnResetAnchor = (tr, setupAnchor) => {
+                setupAnchor.Transform.Position = Vector3.zero;
+                setupAnchor.Transform.Rotation = Vector3.zero;
+                setupAnchor.Transform.Scale = Vector3.one;
                 setupAnchor.Transform.Broadcast();
             };
             LeftHandRestTransform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -366,7 +378,13 @@ namespace FlameStream
                 setupAnchor.Transform.Rotation = tr.Rotation;
                 setupAnchor.Transform.Scale = tr.Scale;
                 setupAnchor.Name = "⌛⚓-Right Hand Rest Pose";
-                setupAnchor.Instructions = "Position, rotate, and scale the **Right Hand Rest Pose** (resting over JKL;), relative to the **Keyboard Origin**.\nThe red sphere indicates the origin location (Keyboard Origin).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Instructions = "Position, rotate, and scale the **Right Hand Rest Pose** (resting over JKL;), relative to the **Keyboard Rig Origin**.\nThe red sphere indicates the origin location (Keyboard Rig Origin).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Transform.Broadcast();
+            };
+            RightHandRestTransform.OnResetAnchor = (tr, setupAnchor) => {
+                setupAnchor.Transform.Position = Vector3.zero;
+                setupAnchor.Transform.Rotation = Vector3.zero;
+                setupAnchor.Transform.Scale = Vector3.one;
                 setupAnchor.Transform.Broadcast();
             };
             RightHandRestTransform.OnApplyAnchor = (tr, setupAnchor) => {
