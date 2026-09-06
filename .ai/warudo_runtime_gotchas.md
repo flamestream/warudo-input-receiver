@@ -212,6 +212,43 @@ To orient humanoid hands facing flat and straight forward in front of the avatar
 
 All relative rotation offsets (key press tilt, mouse grip angle, pen tilt) should be added to or composed with these base forward rotations.
 
+### The Intermediate Transform Pattern (Decoupling User Space from IK Space)
+While Warudo humanoid IK targets require `(0, 90, 0)` (left hand) and `(0, -90, 0)` (right hand) to orient the avatar's palms down and fingers forward, forcing user-facing ports or serialized data to store `90°` / `-90°` causes significant usability and animation issues:
+1. **Euler Axis Transposition**: In a 90° rotated frame, Pitch (X) tilts the hand sideways like roll, and Roll (Z) tilts fingers up/down like pitch. Users adjusting rotational sliders in the inspector experience unintuitive behavior.
+2. **Visual Edit Gizmo Orientation**: In visual setup mode, a gizmo at `Rotation = (0, 0, 0)` points sideways (T-pose rest axis) rather than forward toward the keyboard or prop.
+3. **Key Reach Offset Trigonometry**: Typing reach offsets $\vec{\Delta}_{\text{Rot}}$ become mathematically coupled to the 90° yaw offset.
+
+#### The Solution: Dedicated Intermediate Transform Functions
+Define static conversion helpers on the receiver asset to translate between clean user coordinates (where `(0, 0, 0)` = straight forward) and Warudo's internal limb IK orientation:
+
+```csharp
+public static readonly Vector3 HAND_IK_INTERMEDIATE_ROTATION_LEFT = new Vector3(0f, 90f, 0f);
+public static readonly Vector3 HAND_IK_INTERMEDIATE_ROTATION_RIGHT = new Vector3(0f, -90f, 0f);
+
+public static Vector3 ApplyHandIKIntermediateRotation(bool isLeft, Vector3 userRotation) {
+    var intermediateQ = isLeft 
+        ? Quaternion.Euler(HAND_IK_INTERMEDIATE_ROTATION_LEFT) 
+        : Quaternion.Euler(HAND_IK_INTERMEDIATE_ROTATION_RIGHT);
+    var userQ = Quaternion.Euler(userRotation);
+    return Helper.NormalizeRotationAngles((userQ * intermediateQ).eulerAngles);
+}
+
+public static Vector3 RemoveHandIKIntermediateRotation(bool isLeft, Vector3 ikRotation) {
+    var intermediateQ = isLeft 
+        ? Quaternion.Euler(HAND_IK_INTERMEDIATE_ROTATION_LEFT) 
+        : Quaternion.Euler(HAND_IK_INTERMEDIATE_ROTATION_RIGHT);
+    var ikQ = Quaternion.Euler(ikRotation);
+    return Helper.NormalizeRotationAngles((ikQ * Quaternion.Inverse(intermediateQ)).eulerAngles);
+}
+```
+
+- **In the Inspector & Gizmo**: `RestRotation` and `KeyBinding.DeltaRotation` are stored and displayed in user space `(0, 0, 0)`. The visual setup gizmo anchor is positioned and rotated in user space so its blue Z-axis points straight forward.
+- **In the Runtime Update Loop**: Right when writing to the Warudo `AnchorAsset` driving the limb IK target:
+  ```csharp
+  leftAnchor.Transform.Rotation = ApplyHandIKIntermediateRotation(true, currentLeftHandRot);
+  ```
+  The avatar's wrist turns forward naturally while the user's data remains clean and decoupled.
+
 ---
 
 ## 7. UDP Receiver Thread Safety Boundary (`ReceiverAsset`)
@@ -945,5 +982,53 @@ In `Warudo.Core.dll`:
    When grouping secondary setup controls (such as presets and cluster offsets) with main items (such as key definitions):
    - Wrap secondary controls in their own collapsible sub-structs with `CollapsedSelf = true`.
    - Embed them at the top of the main container (e.g. `Floating Key Layout`), keeping the primary workflow immediately accessible while keeping setup utilities neatly tucked away.
+
+---
+
+## 28. Visual Setup Reference Origin Visualization & Prop Occlusion (`AlwaysOnTop`)
+
+### The Phenomenon
+When positioning anchors in 3D visual setup mode (such as `VisualSetupTransform`), the user manipulates a temporary gizmo anchor in the viewport. However:
+1. **Ambiguous Reference Origin**: The user often does not know what coordinate space the anchor is moving relative to (e.g. Is this relative to the Character avatar root, the Keyboard Origin, or the Hand Rest Pose?).
+2. **Prop Occlusion**: In typical VTuber setups, 3D props (desks, computer monitors, mechanical keyboards) occupy the space where hands and anchors rest. An origin marker placed at the parent transform's position is completely occluded inside the 3D desk mesh and invisible to the user.
+
+### Architectural Patterns & Solutions
+1. **Explicit Origin Text in Gizmo Instructions**:
+   In `OnCreateAnchor`, include an explicit description of the parent anchor in `setupAnchor.Instructions`, which renders as an on-screen guide in the Warudo viewport:
+   ```csharp
+   setupAnchor.Instructions = "Position, rotate, and scale the **Left Hand Rest Pose**, relative to the **Keyboard Origin**.\nThe red sphere indicates the origin location (Keyboard Origin).\nClick **[Apply Transform]** when finished.";
+   ```
+2. **Procedural Origin Marker (Red Sphere Indicator)**:
+   Instantiate a temporary unlit or emissive red sphere (`GameObject.CreatePrimitive(PrimitiveType.Sphere)`) placed at `Vector3.zero` of the parent transform (or the reference origin):
+   ```csharp
+   debugRestSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+   debugRestSphere.transform.SetParent(parentTransform, false);
+   debugRestSphere.transform.localPosition = originPos;
+   debugRestSphere.transform.localScale = Vector3.one * 0.015f; // 1.5cm sphere
+   ```
+   Always strip the `Collider` component (`Destroy(sphere.GetComponent<Collider>())`) so it does not interfere with scene picking or physics.
+3. **Always-On-Top Depth Rendering Through Props**:
+   To prevent 3D prop geometry from hiding the reference marker, provide an **Always On Top** toggle in the transform's **ADVANCED** section:
+   - When enabled, assign a material with an overlay render queue (`renderQueue = 4000` or higher) and `ZTest Always` / unlit shader.
+   - When disabled, restore standard Z-buffering (`renderQueue = 2000`, `ZTest LEqual`).
+   - Clean up debug markers immediately in `OnExitVisualSetup()` or asset destruction.
+
+---
+
+## 29. Asset Versioning Lifecycle Policy: Active Development vs. Production Releases
+
+### The Dilemma
+When an asset schema is refactored (e.g. ports renamed, default rotations changed, structures modularized into child classes), developers often rush to increment `CURRENT_ASSET_VERSION` (e.g. from 1 to 2, 3, 4) and write elaborate `OnPreMigrateAsset` and `OnPostMigrateAsset` migration routines.
+
+However, during active pre-release development branches (such as `version-5.5` before public distribution):
+1. **Schema Instability**: Ports and structures may be reorganized multiple times within the same week. Chaining migrations for unreleased intermediate schemas creates fragile, untested dead code.
+2. **Unnecessary Code Bloat**: Migration routines for schemas that no real user ever possessed waste maintenance time and add startup overhead.
+
+### The Rule
+- **During Active Pre-Release Feature Branches**:
+  Keep `CURRENT_ASSET_VERSION => 1;` throughout the feature development cycle.
+  Do not write migration code for unreleased assets. Standard default values, sane fallbacks, and preset applicators should handle initial state cleanly.
+- **Post-Release Versioning**:
+  Only bump `CURRENT_ASSET_VERSION` and implement two-phase auto-migration when a breaking schema change occurs **after** a version has been officially packaged and released to users in production.
 
 

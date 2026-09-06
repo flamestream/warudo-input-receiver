@@ -32,7 +32,7 @@ This directory contains key architecture notes, integration patterns, build pipe
    - Fatal avatar masking crash in `SetupOverlappingAnimations()`.
    - Playground mode vs. packaged Plugin (uMod) mode execution duality.
    - Top-level enum declaration rule for reflection.
-   - Humanoid limb IK target orientation conventions (90° / -90°).
+   - Humanoid limb IK target orientation conventions (90° / -90°) & intermediate transform decoupling.
    - Thread safety boundary for UDP background receivers (`ReceiverAsset`).
    - Visual setup anchor lifecycle and localization key token traps.
    - Dynamic rotation spherical pivot geometry and interactive drag feedback.
@@ -46,4 +46,7 @@ This directory contains key architecture notes, integration patterns, build pipe
    - `StructuredData` port assignment: C# field assignment vs. `SetDataInput`.
    - Ergonomic neutral home-row keys vs. reach displacement in keyboard tracking.
    - Scene deserialization interception & two-phase asset version auto-migration (`OnPreMigrateAsset` / `OnPostMigrateAsset`).
+   - `ICollapsibleStructuredData`, default collapsed state (`CollapsedSelf`), and avoiding accordion recursion.
+   - Visual setup reference origin visualization (red sphere indicator) & prop occlusion (`AlwaysOnTop`).
+   - Asset versioning lifecycle policy: active development branches vs. production releases.
 
