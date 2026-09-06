@@ -100,5 +100,17 @@ namespace FlameStream {
         public void HideAnimation() {
             HidePortIfExists(nameof(Animation));
         }
+
+        public void SetHideScale(bool hide) {
+            if (Transform != null) {
+                Transform.HideScale = hide;
+                var port = Transform.GetDataInputPort(nameof(Transform.Scale));
+                if (port != null && port.Properties != null) {
+                    port.Properties.hidden = hide;
+                    port.Properties.alwaysHidden = hide;
+                    Transform.BroadcastDataInputProperties(nameof(Transform.Scale));
+                }
+            }
+        }
     }
 }

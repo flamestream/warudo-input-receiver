@@ -40,14 +40,14 @@ namespace FlameStream {
         [Label("ASSIGNED_FINGER")]
         public KeyboardFinger Finger;
 
+        [DataInput(25)]
+        [Label("ENABLE_HAND_MOVEMENT")]
+        public bool EnableHandMovement = true;
+
         [DataInput(30)]
         [Label("TRANSFORM")]
         [Description("KEYBOARD_KEY_BINDING_TRANSFORM_DESC")]
         public VisualSetupTransform Transform;
-
-        [DataInput(40)]
-        [Label("ENABLE_HAND_MOVEMENT")]
-        public bool EnableHandMovement = true;
 
         public Vector3 DeltaPosition {
             get => Transform != null ? Transform.Position : deltaPosition;
@@ -83,6 +83,16 @@ namespace FlameStream {
             return $"[{Key}] ➔ [{handSide}] {Finger} ΔPos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}){handMovementTag}{listeningTag}";
         }
 
+        public void SyncUI() {
+            try {
+                var port = GetDataInputPort(nameof(Transform));
+                if (port != null && port.Properties != null) {
+                    port.Properties.hidden = !EnableHandMovement;
+                    BroadcastDataInputProperties(nameof(Transform));
+                }
+            } catch { }
+        }
+
         protected override void OnCreate() {
             base.OnCreate();
             if (Transform == null) {
@@ -92,6 +102,7 @@ namespace FlameStream {
             }
             Transform.HideScale();
             SetupTransformCallbacks();
+            SyncUI();
 
             Watch(nameof(Transform), delegate {
                 SetupTransformCallbacks();
@@ -100,6 +111,10 @@ namespace FlameStream {
                 BroadcastDataInput(nameof(Transform));
             });
             Watch(nameof(Finger), delegate {
+                BroadcastDataInput(nameof(Transform));
+            });
+            Watch(nameof(EnableHandMovement), delegate {
+                SyncUI();
                 BroadcastDataInput(nameof(Transform));
             });
         }

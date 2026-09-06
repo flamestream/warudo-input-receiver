@@ -62,8 +62,13 @@ namespace FlameStream
             ApplyPreset(LayoutPreset);
         }
 
-        public Transition KeyPressTransition => Transitions?.Press;
-        public Transition KeyReleaseTransition => Transitions?.Release;
+        public Transition FingerPressTransition => Transitions?.FingerPress ?? Transitions?.Press;
+        public Transition FingerReleaseTransition => Transitions?.FingerRelease ?? Transitions?.Release;
+        public Transition HandMovementTransition => Transitions?.HandMovement;
+        public Transition HandReturnTransition => Transitions?.HandReturn;
+
+        public Transition KeyPressTransition => FingerPressTransition;
+        public Transition KeyReleaseTransition => FingerReleaseTransition;
 
         // Runtime animation and movement state
         Tween[] fingerTweens = new Tween[10];
@@ -72,6 +77,16 @@ namespace FlameStream
         Vector3 currentLeftHandRot;
         Vector3 currentRightHandPos;
         Vector3 currentRightHandRot;
+
+        Vector3 targetLeftHandPos;
+        Vector3 targetLeftHandRot;
+        Vector3 targetRightHandPos;
+        Vector3 targetRightHandRot;
+
+        Tween leftHandPosTween;
+        Tween leftHandRotTween;
+        Tween rightHandPosTween;
+        Tween rightHandRotTween;
 
         Vector3 lastLeftKeyPos;
         Vector3 lastLeftKeyRot;
@@ -139,13 +154,23 @@ namespace FlameStream
         }
 
         void OnDestroyFingerMovement() {
+            leftHandPosTween?.Kill(false);
+            leftHandRotTween?.Kill(false);
+            rightHandPosTween?.Kill(false);
+            rightHandRotTween?.Kill(false);
+
             for (int i = 0; i < fingerTweens.Length; i++) {
-                fingerTweens[i]?.Kill();
+                fingerTweens[i]?.Kill(false);
             }
             ResetActiveKeyValues();
         }
 
         public void ResetActiveKeyValues() {
+            leftHandPosTween?.Kill(false);
+            leftHandRotTween?.Kill(false);
+            rightHandPosTween?.Kill(false);
+            rightHandRotTween?.Kill(false);
+
             hasLeftKeyBeenPressed = false;
             hasRightKeyBeenPressed = false;
             leftKeyReleaseTime = -1f;
@@ -158,6 +183,10 @@ namespace FlameStream
             currentLeftHandRot = LeftHandRestRotation;
             currentRightHandPos = RightHandRestPosition;
             currentRightHandRot = RightHandRestRotation;
+            targetLeftHandPos = LeftHandRestPosition;
+            targetLeftHandRot = LeftHandRestRotation;
+            targetRightHandPos = RightHandRestPosition;
+            targetRightHandRot = RightHandRestRotation;
             LastVkCode = 0;
         }
 
@@ -350,15 +379,36 @@ namespace FlameStream
             // 4. Drive Left Hand Anchor
             var leftAnchor = LeftHandAnchor;
             if (leftAnchor != null) {
-                var isPress = activeLeftKey != null;
-                var trans = isPress ? KeyPressTransition : KeyReleaseTransition;
-
-                if (!isLeftInVisualSetup && trans != null && trans.Time > 0f) {
-                    currentLeftHandPos = Vector3.Lerp(currentLeftHandPos, targetLeftPos, Time.deltaTime / trans.Time);
-                    currentLeftHandRot = Vector3.Lerp(currentLeftHandRot, targetLeftRot, Time.deltaTime / trans.Time);
-                } else {
+                if (isLeftInVisualSetup) {
+                    leftHandPosTween?.Kill(false);
+                    leftHandRotTween?.Kill(false);
                     currentLeftHandPos = targetLeftPos;
                     currentLeftHandRot = targetLeftRot;
+                    targetLeftHandPos = targetLeftPos;
+                    targetLeftHandRot = targetLeftRot;
+                } else {
+                    bool isLeftReturningToRest = (activeLeftKey == null && !hasLeftKeyBeenPressed);
+                    var leftTrans = isLeftReturningToRest ? HandReturnTransition : HandMovementTransition;
+
+                    if (targetLeftHandPos != targetLeftPos) {
+                        targetLeftHandPos = targetLeftPos;
+                        leftHandPosTween?.Kill(false);
+                        if (leftTrans != null && leftTrans.Time > 0f) {
+                            leftHandPosTween = DOTween.To(() => currentLeftHandPos, v => currentLeftHandPos = v, targetLeftPos, leftTrans.Time).SetEase(leftTrans.Ease);
+                        } else {
+                            currentLeftHandPos = targetLeftPos;
+                        }
+                    }
+
+                    if (targetLeftHandRot != targetLeftRot) {
+                        targetLeftHandRot = targetLeftRot;
+                        leftHandRotTween?.Kill(false);
+                        if (leftTrans != null && leftTrans.Time > 0f) {
+                            leftHandRotTween = DOTween.To(() => currentLeftHandRot, v => currentLeftHandRot = v, targetLeftRot, leftTrans.Time).SetEase(leftTrans.Ease);
+                        } else {
+                            currentLeftHandRot = targetLeftRot;
+                        }
+                    }
                 }
 
                 leftAnchor.Transform.Position = currentLeftHandPos;
@@ -369,15 +419,36 @@ namespace FlameStream
             // 5. Drive Right Hand Anchor
             var rightAnchor = RightHandAnchor;
             if (rightAnchor != null) {
-                var isPress = activeRightKey != null;
-                var trans = isPress ? KeyPressTransition : KeyReleaseTransition;
-
-                if (!isRightInVisualSetup && trans != null && trans.Time > 0f) {
-                    currentRightHandPos = Vector3.Lerp(currentRightHandPos, targetRightPos, Time.deltaTime / trans.Time);
-                    currentRightHandRot = Vector3.Lerp(currentRightHandRot, targetRightRot, Time.deltaTime / trans.Time);
-                } else {
+                if (isRightInVisualSetup) {
+                    rightHandPosTween?.Kill(false);
+                    rightHandRotTween?.Kill(false);
                     currentRightHandPos = targetRightPos;
                     currentRightHandRot = targetRightRot;
+                    targetRightHandPos = targetRightPos;
+                    targetRightHandRot = targetRightRot;
+                } else {
+                    bool isRightReturningToRest = (activeRightKey == null && !hasRightKeyBeenPressed);
+                    var rightTrans = isRightReturningToRest ? HandReturnTransition : HandMovementTransition;
+
+                    if (targetRightHandPos != targetRightPos) {
+                        targetRightHandPos = targetRightPos;
+                        rightHandPosTween?.Kill(false);
+                        if (rightTrans != null && rightTrans.Time > 0f) {
+                            rightHandPosTween = DOTween.To(() => currentRightHandPos, v => currentRightHandPos = v, targetRightPos, rightTrans.Time).SetEase(rightTrans.Ease);
+                        } else {
+                            currentRightHandPos = targetRightPos;
+                        }
+                    }
+
+                    if (targetRightHandRot != targetRightRot) {
+                        targetRightHandRot = targetRightRot;
+                        rightHandRotTween?.Kill(false);
+                        if (rightTrans != null && rightTrans.Time > 0f) {
+                            rightHandRotTween = DOTween.To(() => currentRightHandRot, v => currentRightHandRot = v, targetRightRot, rightTrans.Time).SetEase(rightTrans.Ease);
+                        } else {
+                            currentRightHandRot = targetRightRot;
+                        }
+                    }
                 }
 
                 rightAnchor.Transform.Position = currentRightHandPos;
@@ -470,10 +541,12 @@ namespace FlameStream
             var currentWeight = layer.Weight;
             if (Mathf.Abs(currentWeight - targetWeight) < 0.001f) return;
 
-            var trans = targetWeight > 0.01f ? KeyPressTransition : KeyReleaseTransition;
+            var trans = targetWeight > 0.01f ? FingerPressTransition : FingerReleaseTransition;
 
             if (trans != null && trans.Time > 0f) {
                 fingerTweens[fingerIndex]?.Kill(false);
+                float weightDelta = Mathf.Abs(targetWeight - currentWeight);
+                float duration = trans.Time * Mathf.Max(0.2f, weightDelta);
                 fingerTweens[fingerIndex] = DOTween.To(
                     () => {
                         if (animancer != null && animancer.Layers != null && animancerLayerIdx < animancer.Layers.Count) {
@@ -485,7 +558,7 @@ namespace FlameStream
                         SetAnimancerLayerWeight(animancerLayerIdx, v);
                     },
                     targetWeight,
-                    trans.Time
+                    duration
                 ).SetEase(trans.Ease);
             } else {
                 fingerTweens[fingerIndex]?.Kill(false);

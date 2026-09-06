@@ -156,6 +156,8 @@ namespace FlameStream {
             setupAnchor.Transform.Position = Position;
             setupAnchor.Transform.Rotation = Rotation;
             setupAnchor.Transform.Scale = Scale;
+            bool isScaleHidden = GetDataInputPort(nameof(Scale))?.Properties?.hidden ?? false;
+            setupAnchor.SetHideScale(isScaleHidden);
             setupAnchor.ShowOrigin = ShowOriginIndicator;
             setupAnchor.AlwaysOnTop = OriginAlwaysOnTop;
             setupAnchor.OnShowOriginChange = (show) => {

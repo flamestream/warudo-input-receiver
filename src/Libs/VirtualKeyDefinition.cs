@@ -9,6 +9,10 @@ namespace FlameStream
 {
     public class VirtualKeyDefinition : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData, IKeyListeningTarget
     {
+        [DataInput(5)]
+        [Label("DISPLAY_LABEL")]
+        public string DisplayLabel = "";
+
         [DataInput(10)]
         [Label("KEY")]
         public VKCode Key = VKCode.A;
@@ -36,14 +40,9 @@ namespace FlameStream
             BroadcastDataInput(nameof(Key));
             BroadcastDataInput(nameof(Transform));
             if (Parent != null) {
-                Parent.SetIdentifiedVirtualKey(this);
                 Parent.RebuildVirtualKeyMesh(this);
             }
         }
-
-        [DataInput(20)]
-        [Label("DISPLAY_LABEL")]
-        public string DisplayLabel = "";
 
         [DataInput(30)]
         [Label("ATTACHMENT_ANCHOR")]
@@ -139,6 +138,7 @@ namespace FlameStream
                 if (Parent != null) Parent.RebuildVirtualKeyMesh(this);
             };
 
+            Transform.HideScale();
             SetupTransformCallbacks();
             SyncUI();
 
@@ -199,6 +199,7 @@ namespace FlameStream
 
         public void SetupTransformCallbacks() {
             if (Transform == null) return;
+            Transform.HideScale();
             Transform.LocalizationKey = "VIRTUAL_KEY";
 
             Transform.OnEnterVisualSetup = (tr) => {
