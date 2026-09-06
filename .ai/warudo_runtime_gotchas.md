@@ -1049,13 +1049,19 @@ Warudo generates inspector UI by sequentially scanning ports:
 
 ### The Rule
 1. **Static Members**: **Only annotate the FIRST member of a section with `[Section("SECTION_NAME")]`.** All subsequent members in that section must omit `[Section]` so they fold into the active container.
-2. **Dynamic Section Title Updates**: When updating section titles at runtime, **only the single leading active port** of the section must have `Properties.sectionTitle` set. All other sibling ports in that section must set `Properties.sectionTitle = ""`. If the leading port can be dynamically hidden, dynamically transfer `sectionTitle` to the visible leading port and clear it on the other:
-   ```csharp
-   // Correct dynamic section title management:
-   deactPort.Properties.hidden = !isDebug;
-   deactPort.Properties.sectionTitle = isDebug ? sectionTitle : "";
-   resetPort.Properties.sectionTitle = isDebug ? "" : sectionTitle;
-   ```
+2. **Dynamic Section Title Updates**:
+   - **Never transfer `sectionTitle` to a port that can become hidden**: When a port that was assigned a section title becomes `hidden: true`, Warudo's Vue UI keeps the existing section container (because sibling ports are still in it) but will **not** rename it when another port later claims the title.
+   - **Always let a permanent, visible port own the section title**:
+     ```csharp
+     // TriggerResetAnchors is permanent (always visible) and owns [Section("ADVANCED")]:
+     resetPort.Properties.sectionTitle = isDebug ? "ADVANCED_DEBUG_MODE".Localized() : "ADVANCED".Localized();
+     BroadcastTriggerProperties(nameof(TriggerResetAnchors));
+
+     // Child port toggles hidden only, keeping sectionTitle = "":
+     deactPort.Properties.hidden = !isDebug;
+     deactPort.Properties.sectionTitle = "";
+     BroadcastTriggerProperties(nameof(TriggerDeactivateAllDebugKeys));
+     ```
 
 ---
 
