@@ -779,10 +779,10 @@ namespace FlameStream
             Shape.Pressed.Corners.BottomCorners = new Vector2(0.25f, 0.25f);
 
             if (Shape.Pressed.Borders == null) Shape.Pressed.Borders = StructuredData.Create<BorderThicknessData>();
-            Shape.Pressed.Borders.Width = 0.0035f; // Slightly thicker border on press
+            Shape.Pressed.Borders.Width = 0.0025f; // Same border width as normal by default (2.5mm)
             Shape.Pressed.Borders.UseIndividualBorders = false;
-            Shape.Pressed.Borders.TopBottomBorders = new Vector2(0.0035f, 0.0035f);
-            Shape.Pressed.Borders.LeftRightBorders = new Vector2(0.0035f, 0.0035f);
+            Shape.Pressed.Borders.TopBottomBorders = new Vector2(0.0025f, 0.0025f);
+            Shape.Pressed.Borders.LeftRightBorders = new Vector2(0.0025f, 0.0025f);
 
             // 2. Body: Surface Fill Material
             if (Body == null) Body = StructuredData.Create<VirtualKeyMaterialStyle>();
