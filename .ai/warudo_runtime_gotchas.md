@@ -1061,6 +1061,10 @@ Warudo generates inspector UI by sequentially scanning ports:
      deactPort.Properties.hidden = !isDebug;
      deactPort.Properties.sectionTitle = "";
      BroadcastTriggerProperties(nameof(TriggerDeactivateAllDebugKeys));
+
+     // CRITICAL: BroadcastTriggerProperties only updates individual button state.
+     // Call Broadcast() on the asset to force Warudo's UI to re-render the section container in place:
+     Broadcast();
      ```
 
 ---
