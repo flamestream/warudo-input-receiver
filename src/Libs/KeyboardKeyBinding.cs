@@ -6,11 +6,35 @@ using Warudo.Core.Data;
 using Warudo.Core.Localization;
 
 namespace FlameStream {
-    public class KeyboardKeyBinding : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData {
+    public class KeyboardKeyBinding : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData, IKeyListeningTarget {
 
         [DataInput(10)]
         [Label("KEY")]
         public VKCode Key;
+
+        [Trigger(15)]
+        [Label("IDENTIFY_KEY")]
+        public void TriggerIdentifyKey() {
+            Parent?.ToggleKeyListening(this);
+        }
+
+        public bool IsListeningForKey { get; private set; }
+
+        public void SetListeningForKey(bool listening) {
+            IsListeningForKey = listening;
+            var port = GetTriggerPort(nameof(TriggerIdentifyKey));
+            if (port != null && port.Properties != null) {
+                port.Properties.label = listening ? "IDENTIFYING_KEY" : "IDENTIFY_KEY";
+                BroadcastTriggerProperties(nameof(TriggerIdentifyKey));
+            }
+        }
+
+        public void OnKeyCaptured(VKCode newKey) {
+            Key = newKey;
+            SetDataInput(nameof(Key), newKey, true);
+            BroadcastDataInput(nameof(Key));
+            BroadcastDataInput(nameof(Transform));
+        }
 
         [DataInput(20)]
         [Label("ASSIGNED_FINGER")]
@@ -55,7 +79,8 @@ namespace FlameStream {
             var handSide = Finger.IsLeftHand() ? "L" : "R";
             var handMovementTag = EnableHandMovement ? "" : " (No Hand Move)";
             var pos = Transform != null ? Transform.Position : DeltaPosition;
-            return $"[{Key}] ➔ [{handSide}] {Finger} ΔPos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}){handMovementTag}";
+            var listeningTag = IsListeningForKey ? " ⏳[LISTENING]" : "";
+            return $"[{Key}] ➔ [{handSide}] {Finger} ΔPos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}){handMovementTag}{listeningTag}";
         }
 
         protected override void OnCreate() {
@@ -81,6 +106,9 @@ namespace FlameStream {
 
         protected override void OnDestroy() {
             base.OnDestroy();
+            if (Parent != null && Parent.ActiveKeyListeningTarget == (IKeyListeningTarget)this) {
+                Parent.CancelKeyListening();
+            }
             DestroyDebugVisuals();
             Transform?.DestroyAnchor();
         }

@@ -51,18 +51,17 @@ namespace FlameStream {
                             KeyPressTimestamp[currentVkCode] = ++currentFrameCounter;
                         }
 
-                        if (IsWaitingForButtonPress) {
+                        if (!wasDown && ActiveKeyListeningTarget != null) {
                             var vk = (VKCode)currentVkCode;
-                            var matchingKey = VirtualKeys?.FirstOrDefault(k => k.Key == vk);
-                            if (matchingKey != null) {
-                                SetIdentifiedVirtualKey(matchingKey);
-                            }
+                            var target = ActiveKeyListeningTarget;
+                            ActiveKeyListeningTarget = null;
+                            target.OnKeyCaptured(vk);
+                            target.SetListeningForKey(false);
                             Context.Service?.Toast(
-                                Warudo.Core.Server.ToastSeverity.Info,
+                                Warudo.Core.Server.ToastSeverity.Success,
                                 Name,
-                                $"Button identified: [{vk}] (Code {currentVkCode})"
+                                $"Key assigned: [{vk}]"
                             );
-                            TriggerCancelIdentifyButton();
                         }
                     } else {
                         KeyPressTimestamp[currentVkCode] = 0;

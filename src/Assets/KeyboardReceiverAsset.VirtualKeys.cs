@@ -31,27 +31,26 @@ namespace FlameStream
         [Label("FLOATING_KEY_LAYOUT")]
         public VirtualKeyCollection VirtualKeysCollection;
 
-        public bool IsWaitingForButtonPress = false;
+        public IKeyListeningTarget ActiveKeyListeningTarget { get; private set; }
 
-        [Trigger(525)]
-        [Label("IDENTIFY_BUTTON")]
-        public void TriggerIdentifyButton() {
-            IsWaitingForButtonPress = true;
-            GetTriggerPort(nameof(TriggerIdentifyButton)).Properties.hidden = IsWaitingForButtonPress;
-            GetTriggerPort(nameof(TriggerCancelIdentifyButton)).Properties.hidden = !IsWaitingForButtonPress;
-            BroadcastTriggerProperties(nameof(TriggerIdentifyButton));
-            BroadcastTriggerProperties(nameof(TriggerCancelIdentifyButton));
+        public void ToggleKeyListening(IKeyListeningTarget target) {
+            if (target == null) return;
+            if (ActiveKeyListeningTarget == target) {
+                CancelKeyListening();
+                return;
+            }
+            if (ActiveKeyListeningTarget != null) {
+                ActiveKeyListeningTarget.SetListeningForKey(false);
+            }
+            ActiveKeyListeningTarget = target;
+            ActiveKeyListeningTarget.SetListeningForKey(true);
         }
 
-        [Trigger(525)]
-        [Label("IDENTIFYING_BUTTON")]
-        [Hidden]
-        public void TriggerCancelIdentifyButton() {
-            IsWaitingForButtonPress = false;
-            GetTriggerPort(nameof(TriggerIdentifyButton)).Properties.hidden = IsWaitingForButtonPress;
-            GetTriggerPort(nameof(TriggerCancelIdentifyButton)).Properties.hidden = !IsWaitingForButtonPress;
-            BroadcastTriggerProperties(nameof(TriggerIdentifyButton));
-            BroadcastTriggerProperties(nameof(TriggerCancelIdentifyButton));
+        public void CancelKeyListening() {
+            if (ActiveKeyListeningTarget != null) {
+                ActiveKeyListeningTarget.SetListeningForKey(false);
+                ActiveKeyListeningTarget = null;
+            }
         }
 
         // Key Origins (Collapsible StructuredData)
@@ -171,6 +170,7 @@ namespace FlameStream
         }
 
         void OnDestroyVirtualKeys() {
+            CancelKeyListening();
             ActiveVirtualKeyInVisualSetup = null;
             DestroyAllVirtualKeyVisuals();
         }
@@ -321,6 +321,8 @@ namespace FlameStream
                 }
             }
         }
+
+        public void ToggleLocateVirtualKey(VirtualKeyDefinition keyDef) => ToggleIdentifyVirtualKey(keyDef);
 
         public void ToggleIdentifyVirtualKey(VirtualKeyDefinition keyDef) {
             if (keyDef == null) return;

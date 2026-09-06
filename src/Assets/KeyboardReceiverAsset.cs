@@ -51,6 +51,7 @@ namespace FlameStream
 
         protected override void OnDestroy() {
             base.OnDestroy();
+            CancelKeyListening();
             OnDestroyBasicSetup();
             OnDestroyFingerMovement();
             OnDestroyVirtualKeys();
@@ -58,6 +59,9 @@ namespace FlameStream
 
         public override void OnUpdate() {
             base.OnUpdate();
+            if (!IsSelected && ActiveKeyListeningTarget != null) {
+                CancelKeyListening();
+            }
             OnUpdateState();
             OnUpdateBasicSetup();
             OnUpdateFingerMovement();

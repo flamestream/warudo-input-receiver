@@ -7,11 +7,39 @@ using Warudo.Core.Localization;
 
 namespace FlameStream
 {
-    public class VirtualKeyDefinition : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData
+    public class VirtualKeyDefinition : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData, IKeyListeningTarget
     {
         [DataInput(10)]
         [Label("KEY")]
         public VKCode Key = VKCode.A;
+
+        [Trigger(15)]
+        [Label("IDENTIFY_KEY")]
+        public void TriggerIdentifyKey() {
+            Parent?.ToggleKeyListening(this);
+        }
+
+        public bool IsListeningForKey { get; private set; }
+
+        public void SetListeningForKey(bool listening) {
+            IsListeningForKey = listening;
+            var port = GetTriggerPort(nameof(TriggerIdentifyKey));
+            if (port != null && port.Properties != null) {
+                port.Properties.label = listening ? "IDENTIFYING_KEY" : "IDENTIFY_KEY";
+                BroadcastTriggerProperties(nameof(TriggerIdentifyKey));
+            }
+        }
+
+        public void OnKeyCaptured(VKCode newKey) {
+            Key = newKey;
+            SetDataInput(nameof(Key), newKey, true);
+            BroadcastDataInput(nameof(Key));
+            BroadcastDataInput(nameof(Transform));
+            if (Parent != null) {
+                Parent.SetIdentifiedVirtualKey(this);
+                Parent.RebuildVirtualKeyMesh(this);
+            }
+        }
 
         [DataInput(20)]
         [Label("DISPLAY_LABEL")]
@@ -35,22 +63,26 @@ namespace FlameStream
         public VirtualKeyAppearance CustomAppearance;
 
         [Trigger(120)]
-        [Label("IDENTIFY_KEY")]
-        public void TriggerIdentifyKey() {
+        [Label("LOCATE_KEY")]
+        public void TriggerLocateKey() {
             if (Parent != null) {
                 Parent.ToggleIdentifyVirtualKey(this);
             }
         }
 
-        public bool IsIdentifying => Parent != null && Parent.IdentifiedVirtualKey == this;
+        public bool IsLocating => Parent != null && Parent.IdentifiedVirtualKey == this;
 
-        public void UpdateIdentifyButtonLabel(bool isIdentifying) {
-            var port = GetTriggerPort(nameof(TriggerIdentifyKey));
+        public void UpdateLocateButtonLabel(bool isLocating) {
+            var port = GetTriggerPort(nameof(TriggerLocateKey));
             if (port != null && port.Properties != null) {
-                port.Properties.label = isIdentifying ? "STOP_IDENTIFY_KEY" : "IDENTIFY_KEY";
-                BroadcastTriggerProperties(nameof(TriggerIdentifyKey));
+                port.Properties.label = isLocating ? "STOP_LOCATING_KEY" : "LOCATE_KEY";
+                BroadcastTriggerProperties(nameof(TriggerLocateKey));
             }
         }
+
+        // Backward compatibility for internal callers
+        public bool IsIdentifying => IsLocating;
+        public void UpdateIdentifyButtonLabel(bool isIdentifying) => UpdateLocateButtonLabel(isIdentifying);
 
         // Runtime rendering components
         public GameObject KeyGameObject { get; internal set; }
@@ -83,8 +115,9 @@ namespace FlameStream
             var anchorTag = AttachmentAnchor == VirtualKeyAnchor.LeftHand ? "🫲 L" :
                             AttachmentAnchor == VirtualKeyAnchor.RightHand ? "🫱 R" : "⌨️ Root";
             var pos = Transform != null ? Transform.Position : Vector3.zero;
-            var identifyTag = IsIdentifying ? " 🔍[IDENTIFYING]" : "";
-            return $"[{label}] ➔ [{anchorTag}] Pos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}){identifyTag}";
+            var listeningTag = IsListeningForKey ? " ⏳[LISTENING]" : "";
+            var locateTag = IsLocating ? " ✨[LOCATING]" : "";
+            return $"[{label}] ➔ [{anchorTag}] Pos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}){listeningTag}{locateTag}";
         }
 
         protected override void OnCreate() {
@@ -157,6 +190,9 @@ namespace FlameStream
 
         protected override void OnDestroy() {
             base.OnDestroy();
+            if (Parent != null && Parent.ActiveKeyListeningTarget == (IKeyListeningTarget)this) {
+                Parent.CancelKeyListening();
+            }
             Transform?.DestroyAnchor();
             DestroyVisuals();
         }
