@@ -188,7 +188,7 @@ namespace FlameStream
                 setupAnchor.Transform.Rotation = tr.Rotation;
                 setupAnchor.Transform.Scale = tr.Scale;
                 setupAnchor.Name = "⌛⚓-Left Key Origin";
-                setupAnchor.Instructions = "Position, rotate, and scale the entire **Left Hand Key Origin**.\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Instructions = "Position, rotate, and scale the entire **Left Key Origin**, relative to the **Left Hand Rest Pose**.\nThe red sphere indicates the origin location (Left Hand Rest Pose).\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             LeftKeysetTransform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -229,7 +229,7 @@ namespace FlameStream
                 setupAnchor.Transform.Rotation = tr.Rotation;
                 setupAnchor.Transform.Scale = tr.Scale;
                 setupAnchor.Name = "⌛⚓-Right Key Origin";
-                setupAnchor.Instructions = "Position, rotate, and scale the entire **Right Hand Key Origin**.\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Instructions = "Position, rotate, and scale the entire **Right Key Origin**, relative to the **Right Hand Rest Pose**.\nThe red sphere indicates the origin location (Right Hand Rest Pose).\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             RightKeysetTransform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -270,7 +270,7 @@ namespace FlameStream
                 setupAnchor.Transform.Rotation = tr.Rotation;
                 setupAnchor.Transform.Scale = tr.Scale;
                 setupAnchor.Name = "⌛⚓-Root Key Origin";
-                setupAnchor.Instructions = "Position, rotate, and scale the entire **Root Key Origin**.\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Instructions = "Position, rotate, and scale the entire **Root Key Origin**, relative to the **Keyboard Origin**.\nThe red sphere indicates the origin location (Keyboard Origin).\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             RootKeysetTransform.OnApplyAnchor = (tr, setupAnchor) => {

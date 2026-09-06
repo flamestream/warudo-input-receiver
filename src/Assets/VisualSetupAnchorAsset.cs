@@ -44,10 +44,33 @@ namespace FlameStream {
 
         public Action<string> OnAnimationChange;
 
+        [Section("ADVANCED")]
+
+        [DataInput(100)]
+        [Label("SHOW_ORIGIN")]
+        [Description("SHOW_ORIGIN_DESC")]
+        public bool ShowOrigin = true;
+
+        [DataInput(110)]
+        [Label("ALWAYS_ON_TOP")]
+        [Description("ALWAYS_ON_TOP_DESC")]
+        public bool AlwaysOnTop = false;
+
+        public Action<bool> OnShowOriginChange;
+        public Action<bool> OnAlwaysOnTopChange;
+
         protected override void OnCreate() {
             base.OnCreate();
             Watch(nameof(Animation), delegate {
                 OnAnimationChange?.Invoke(Animation);
+            });
+            Watch(nameof(ShowOrigin), delegate {
+                GetDataInputPort(nameof(AlwaysOnTop)).Properties.disabled = !ShowOrigin;
+                BroadcastDataInputProperties(nameof(AlwaysOnTop));
+                OnShowOriginChange?.Invoke(ShowOrigin);
+            });
+            Watch(nameof(AlwaysOnTop), delegate {
+                OnAlwaysOnTopChange?.Invoke(AlwaysOnTop);
             });
             GetDataInputPort(nameof(Enabled)).Properties.alwaysHidden = true;
             GetDataInputPort(nameof(Enabled)).Properties.hidden = true;
@@ -55,6 +78,27 @@ namespace FlameStream {
             GetDataInputPort(nameof(Attachable.Parent)).Properties.disabled = true;
             GetTriggerPort(nameof(TeleportToActiveCamera)).Properties.alwaysHidden = true;
             GetTriggerPort(nameof(TeleportToActiveCamera)).Properties.hidden = true;
-       }
+
+            // Hide UseElasticity and spring/lag settings from visual calibration anchor
+            HidePortIfExists(nameof(Attachable.UseElasticity));
+            HidePortIfExists(nameof(Attachable.StartElasticityDistance));
+            HidePortIfExists(nameof(Attachable.StopElasticityDistance));
+            HidePortIfExists(nameof(Attachable.ElasticityStiffness));
+            HidePortIfExists(nameof(Attachable.ElasticityDamping));
+            HidePortIfExists(nameof(Attachable.ElasticityMaxSpeed));
+        }
+
+        public void HidePortIfExists(string portName) {
+            var port = GetDataInputPort(portName);
+            if (port != null && port.Properties != null) {
+                port.Properties.alwaysHidden = true;
+                port.Properties.hidden = true;
+                BroadcastDataInputProperties(portName);
+            }
+        }
+
+        public void HideAnimation() {
+            HidePortIfExists(nameof(Animation));
+        }
     }
 }

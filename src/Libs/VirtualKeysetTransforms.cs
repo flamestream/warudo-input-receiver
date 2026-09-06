@@ -9,14 +9,17 @@ namespace FlameStream
     {
         [DataInput(10)]
         [Label("LEFT_KEY_ORIGIN")]
+        [Description("LEFT_KEY_ORIGIN_DESC")]
         public CollapsibleVisualSetupTransform Left;
 
         [DataInput(20)]
         [Label("RIGHT_KEY_ORIGIN")]
+        [Description("RIGHT_KEY_ORIGIN_DESC")]
         public CollapsibleVisualSetupTransform Right;
 
         [DataInput(30)]
         [Label("ROOT_KEY_ORIGIN")]
+        [Description("ROOT_KEY_ORIGIN_DESC")]
         public CollapsibleVisualSetupTransform Root;
 
         public string GetHeader() => "KEY_ORIGINS".Localized();

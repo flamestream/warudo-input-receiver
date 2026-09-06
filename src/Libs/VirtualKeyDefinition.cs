@@ -23,6 +23,7 @@ namespace FlameStream
 
         [DataInput(40)]
         [Label("TRANSFORM")]
+        [Description("VIRTUAL_KEY_TRANSFORM_DESC")]
         public VisualSetupTransform Transform;
 
         [DataInput(60)]
@@ -182,8 +183,9 @@ namespace FlameStream
                 setupAnchor.Transform.Scale = tr.Scale;
 
                 var label = string.IsNullOrEmpty(DisplayLabel) ? Key.ToString() : DisplayLabel;
+                string originName = AttachmentAnchor == VirtualKeyAnchor.LeftHand ? "Left Key Origin" : (AttachmentAnchor == VirtualKeyAnchor.RightHand ? "Right Key Origin" : "Root Key Origin");
                 setupAnchor.Name = $"⌛⚓-VKey {label}";
-                setupAnchor.Instructions = $"Position, rotate, and scale virtual key **{label}**.\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Instructions = $"Position, rotate, and scale virtual key **{label}**, relative to the **{originName}**.\nThe red sphere indicates the origin location ({originName}).\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
 

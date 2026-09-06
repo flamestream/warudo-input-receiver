@@ -55,8 +55,90 @@ namespace FlameStream {
         public Action OnCopy;
         public Action<string> OnAnimationChange;
 
+        public bool ShowOriginIndicator = true;
+        public bool OriginAlwaysOnTop = false;
+        public float OriginIndicatorSize = 0.035f;
+        public GameObject originIndicatorGo;
+        public Material originIndicatorMat;
+        public bool ShowAnimation = false;
+
+        public void SetOriginIndicatorVisible(bool visible) {
+            ShowOriginIndicator = visible;
+            if (originIndicatorGo != null) {
+                originIndicatorGo.SetActive(visible);
+            } else if (visible && setupAnchor != null && setupAnchor.GameObject != null && setupAnchor.GameObject.transform.parent != null) {
+                CreateOriginIndicator(setupAnchor.GameObject.transform.parent);
+            }
+        }
+
+        public void SetOriginAlwaysOnTop(bool alwaysOnTop) {
+            OriginAlwaysOnTop = alwaysOnTop;
+            UpdateOriginIndicatorMaterial();
+        }
+
+        public void UpdateOriginIndicatorMaterial() {
+            if (originIndicatorGo == null) return;
+            if (originIndicatorMat != null) {
+                UnityEngine.Object.Destroy(originIndicatorMat);
+                originIndicatorMat = null;
+            }
+
+            if (OriginAlwaysOnTop) {
+                var overlayShader = Shader.Find("GUI/Text Shader") ?? Shader.Find("Hidden/Internal-Colored");
+                if (overlayShader != null) {
+                    originIndicatorMat = new Material(overlayShader);
+                    originIndicatorMat.color = new Color(1f, 0.1f, 0.1f, 0.95f);
+                } else {
+                    originIndicatorMat = new Material(Shader.Find("Standard"));
+                    originIndicatorMat.color = new Color(1f, 0f, 0f, 0.95f);
+                    originIndicatorMat.EnableKeyword("_EMISSION");
+                    originIndicatorMat.SetColor("_EmissionColor", new Color(0.85f, 0.05f, 0.05f));
+                    originIndicatorMat.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
+                }
+                originIndicatorMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Overlay + 1000;
+            } else {
+                originIndicatorMat = new Material(Shader.Find("Standard"));
+                originIndicatorMat.color = new Color(1f, 0f, 0f, 0.9f);
+                originIndicatorMat.EnableKeyword("_EMISSION");
+                originIndicatorMat.SetColor("_EmissionColor", new Color(0.85f, 0.05f, 0.05f));
+            }
+
+            var rend = originIndicatorGo.GetComponent<Renderer>();
+            if (rend != null) rend.material = originIndicatorMat;
+        }
+
+        public void CreateOriginIndicator(Transform parentTransform, Vector3? localPos = null) {
+            DestroyOriginIndicator();
+            if (parentTransform == null) return;
+
+            originIndicatorGo = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            originIndicatorGo.name = $"OriginIndicator_{setupAnchor?.Name ?? "Transform"}";
+            var col = originIndicatorGo.GetComponent<Collider>();
+            if (col != null) UnityEngine.Object.Destroy(col);
+
+            originIndicatorGo.transform.SetParent(parentTransform, false);
+            originIndicatorGo.transform.localPosition = localPos ?? Vector3.zero;
+            originIndicatorGo.transform.localRotation = Quaternion.identity;
+            originIndicatorGo.transform.localScale = Vector3.one * OriginIndicatorSize;
+
+            UpdateOriginIndicatorMaterial();
+            originIndicatorGo.SetActive(ShowOriginIndicator);
+        }
+
+        public void DestroyOriginIndicator() {
+            if (originIndicatorGo != null) {
+                UnityEngine.Object.Destroy(originIndicatorGo);
+                originIndicatorGo = null;
+            }
+            if (originIndicatorMat != null) {
+                UnityEngine.Object.Destroy(originIndicatorMat);
+                originIndicatorMat = null;
+            }
+        }
+
         protected override void OnDestroy() {
             base.OnDestroy();
+            DestroyOriginIndicator();
             DestroyAnchor();
         }
 
@@ -74,18 +156,36 @@ namespace FlameStream {
             setupAnchor.Transform.Position = Position;
             setupAnchor.Transform.Rotation = Rotation;
             setupAnchor.Transform.Scale = Scale;
+            setupAnchor.ShowOrigin = ShowOriginIndicator;
+            setupAnchor.AlwaysOnTop = OriginAlwaysOnTop;
+            setupAnchor.OnShowOriginChange = (show) => {
+                SetOriginIndicatorVisible(show);
+            };
+            setupAnchor.OnAlwaysOnTopChange = (onTop) => {
+                SetOriginAlwaysOnTop(onTop);
+            };
+
             OnCreateAnchor?.Invoke(this, setupAnchor);
             setupAnchor.Broadcast();
             Scene.UpdateNewAssetName(setupAnchor);
+
+            if (ShowOriginIndicator && setupAnchor != null && setupAnchor.GameObject != null && setupAnchor.GameObject.transform.parent != null) {
+                CreateOriginIndicator(setupAnchor.GameObject.transform.parent);
+            }
 
             setupAnchor.OnAnimationChange = (a) => {
                 OnAnimationChange?.Invoke(a);
             };
 
+            if (!ShowAnimation && OnAnimationChange == null) {
+                setupAnchor.HideAnimation();
+            }
+
             return setupAnchor;
         }
 
         public void DestroyAnchor() {
+            DestroyOriginIndicator();
             if (setupAnchor == null) return;
             try {
                 Scene.RemoveAsset(setupAnchor.Id);

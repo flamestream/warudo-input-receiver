@@ -27,26 +27,43 @@ namespace FlameStream
         [Section("FINGER_MOVEMENT")]
 
         [DataInput(200)]
-        [Label("KEYBOARD_LAYOUT_PRESET")]
-        public KeyboardLayoutPreset LayoutPreset = KeyboardLayoutPreset.StandardQWERTY;
+        [Label("FINGER_ANIMATIONS")]
+        public KeyboardFingerAnimations FingerAnimations;
 
-        [Trigger(210)]
-        [Label("APPLY_LAYOUT_PRESET")]
+        [DataInput(210)]
+        [Label("KEY_TRANSITIONS")]
+        public KeyboardKeyTransitions Transitions;
+
+        [DataInput(220)]
+        [Label("KEY_BINDINGS_LAYOUT")]
+        public KeyboardKeyBindingCollection KeyBindingsCollection;
+
+        public KeyboardKeyBinding[] KeyBindings {
+            get => KeyBindingsCollection?.KeyBindings ?? new KeyboardKeyBinding[0];
+            set {
+                if (KeyBindingsCollection == null) {
+                    KeyBindingsCollection = StructuredData.Create<KeyboardKeyBindingCollection>();
+                    KeyBindingsCollection.Parent = this;
+                }
+                KeyBindingsCollection.KeyBindings = value;
+            }
+        }
+
+        public KeyboardLayoutPreset LayoutPreset {
+            get => KeyBindingsCollection?.Preset ?? KeyboardLayoutPreset.StandardQWERTY;
+            set {
+                if (KeyBindingsCollection != null) {
+                    KeyBindingsCollection.Preset = value;
+                }
+            }
+        }
+
         public void TriggerApplyLayoutPreset() {
             ApplyPreset(LayoutPreset);
         }
 
-        [DataInput(220)]
-        [Label("KEY_PRESS_TRANSITION")]
-        public Transition KeyPressTransition = new Transition { Time = 0.04f, Ease = Ease.OutQuad };
-
-        [DataInput(230)]
-        [Label("KEY_RELEASE_TRANSITION")]
-        public Transition KeyReleaseTransition = new Transition { Time = 0.08f, Ease = Ease.OutQuad };
-
-        [DataInput(240)]
-        [Label("KEY_BINDINGS")]
-        public KeyboardKeyBinding[] KeyBindings = new KeyboardKeyBinding[0];
+        public Transition KeyPressTransition => Transitions?.Press;
+        public Transition KeyReleaseTransition => Transitions?.Release;
 
         // Runtime animation and movement state
         Tween[] fingerTweens = new Tween[10];
@@ -67,10 +84,47 @@ namespace FlameStream
         float rightKeyReleaseTime = -1f;
 
         void OnCreateFingerMovement() {
+            if (FingerAnimations == null) {
+                FingerAnimations = StructuredData.Create<KeyboardFingerAnimations>();
+                FingerAnimations.CollapsedSelf = true;
+            }
+            FingerAnimations.Parent = this;
+
+            if (Transitions == null) {
+                Transitions = StructuredData.Create<KeyboardKeyTransitions>();
+                Transitions.CollapsedSelf = true;
+            }
+            Transitions.Parent = this;
+
+            if (KeyBindingsCollection == null) {
+                KeyBindingsCollection = StructuredData.Create<KeyboardKeyBindingCollection>();
+                KeyBindingsCollection.CollapsedSelf = true;
+            }
+            KeyBindingsCollection.Parent = this;
+
+            Watch(nameof(FingerAnimations), delegate {
+                if (FingerAnimations != null) {
+                    FingerAnimations.Parent = this;
+                }
+                SynchronizeAllFingerAnimations();
+            });
+
+            Watch(nameof(Transitions), delegate {
+                if (Transitions != null) {
+                    Transitions.Parent = this;
+                }
+            });
+
+            Watch(nameof(KeyBindingsCollection), delegate {
+                if (KeyBindingsCollection != null) {
+                    KeyBindingsCollection.Parent = this;
+                }
+                RefreshKeyBindingsParent();
+            });
+
             if (KeyBindings == null || KeyBindings.Length == 0) {
                 ApplyPreset(KeyboardLayoutPreset.StandardQWERTY, false);
             }
-            Watch(nameof(KeyBindings), delegate { RefreshKeyBindingsParent(); });
             RefreshKeyBindingsParent();
         }
 
@@ -308,7 +362,7 @@ namespace FlameStream
                 }
 
                 leftAnchor.Transform.Position = currentLeftHandPos;
-                leftAnchor.Transform.Rotation = currentLeftHandRot;
+                leftAnchor.Transform.Rotation = ApplyHandIKIntermediateRotation(true, currentLeftHandRot);
                 leftAnchor.Transform.Broadcast();
             }
 
@@ -327,7 +381,7 @@ namespace FlameStream
                 }
 
                 rightAnchor.Transform.Position = currentRightHandPos;
-                rightAnchor.Transform.Rotation = currentRightHandRot;
+                rightAnchor.Transform.Rotation = ApplyHandIKIntermediateRotation(false, currentRightHandRot);
                 rightAnchor.Transform.Broadcast();
             }
 
@@ -592,22 +646,18 @@ namespace FlameStream
             // Adjustments for Split Ergonomic preset
             if (preset == KeyboardLayoutPreset.SplitErgonomic) {
                 LeftHandRestPosition = new Vector3(-0.09f, 0.02f, 0f);
-                LeftHandRestRotation = new Vector3(0f, 78f, 0f);
+                LeftHandRestRotation = new Vector3(0f, -12f, 0f);
                 RightHandRestPosition = new Vector3(0.09f, 0.02f, 0f);
-                RightHandRestRotation = new Vector3(0f, -78f, 0f);
+                RightHandRestRotation = new Vector3(0f, 12f, 0f);
 
                 foreach (var b in list) {
-                    if (b.Finger.IsLeftHand()) {
-                        b.DeltaRotation = new Vector3(0f, -12f, 0f);
-                    } else {
-                        b.DeltaRotation = new Vector3(0f, 12f, 0f);
-                    }
+                    b.DeltaRotation = Vector3.zero;
                 }
             } else {
                 LeftHandRestPosition = new Vector3(-0.07f, 0.02f, 0f);
-                LeftHandRestRotation = new Vector3(0f, 90f, 0f);
+                LeftHandRestRotation = Vector3.zero;
                 RightHandRestPosition = new Vector3(0.07f, 0.02f, 0f);
-                RightHandRestRotation = new Vector3(0f, -90f, 0f);
+                RightHandRestRotation = Vector3.zero;
             }
 
             if (LeftHandRestTransform != null && LeftHandRestTransform.Scale == Vector3.zero) {
@@ -620,9 +670,9 @@ namespace FlameStream
             }
 
             KeyBindings = list.ToArray();
-            BroadcastDataInput(nameof(KeyBindings));
-            BroadcastDataInput(nameof(LeftHandRestTransform));
-            BroadcastDataInput(nameof(RightHandRestTransform));
+            KeyBindingsCollection?.BroadcastDataInput(nameof(KeyBindingsCollection.KeyBindings));
+            BroadcastDataInput(nameof(KeyBindingsCollection));
+            BroadcastDataInput(nameof(HandRestSetup));
 
             if (showToast) {
                 Context.Service?.Toast(

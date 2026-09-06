@@ -167,6 +167,7 @@ namespace FlameStream {
 
         protected override void OnReady() {
             base.OnReady();
+            Transform.ShowAnimation = true;
             Transform.OnAnimationChange = (animation) => {
                 Animation = animation;
                 OnAnimationChange.Invoke(this);

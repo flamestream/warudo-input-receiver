@@ -27,7 +27,8 @@ namespace FlameStream
         public CharacterAsset Character;
 
         [DataInput(30)]
-        [Label("ROOT_INITIAL_TRANSFORM")]
+        [Label("KEYBOARD_ORIGIN")]
+        [Description("KEYBOARD_ORIGIN_DESC")]
         public CollapsibleVisualSetupTransform RootTransform;
 
         public Vector3 GetLeftHandMovementScale() {
@@ -42,23 +43,26 @@ namespace FlameStream
                 : (RightHandRestTransform?.Scale ?? Vector3.one);
         }
 
+        [DataInput(40)]
+        [Label("HAND_REST_POSES")]
+        public KeyboardHandRestSetup HandRestSetup;
 
-        [DataInput(46)]
-        [Label("RETURN_TO_REST")]
-        public bool ReturnToRest = true;
+        public bool ReturnToRest {
+            get => HandRestSetup?.ReturnToRest ?? true;
+            set {
+                if (HandRestSetup != null) HandRestSetup.ReturnToRest = value;
+            }
+        }
 
-        [DataInput(48)]
-        [Label("REST_TIMEOUT")]
-        [FloatSlider(0.1f, 30f)]
-        public float RestTimeout = 3.0f;
+        public float RestTimeout {
+            get => HandRestSetup?.RestTimeout ?? 3.0f;
+            set {
+                if (HandRestSetup != null) HandRestSetup.RestTimeout = value;
+            }
+        }
 
-        [DataInput(50)]
-        [Label("LEFT_HAND_REST_TRANSFORM")]
-        public CollapsibleVisualSetupTransform LeftHandRestTransform;
-
-        [DataInput(60)]
-        [Label("RIGHT_HAND_REST_TRANSFORM")]
-        public CollapsibleVisualSetupTransform RightHandRestTransform;
+        public CollapsibleVisualSetupTransform LeftHandRestTransform => HandRestSetup?.Left;
+        public CollapsibleVisualSetupTransform RightHandRestTransform => HandRestSetup?.Right;
 
         public Vector3 KeyboardRootPosition {
             get => RootTransform?.Position ?? new Vector3(0f, 0.6218f, 0.1484f);
@@ -80,6 +84,25 @@ namespace FlameStream
             }
         }
 
+        public static readonly Vector3 HAND_IK_INTERMEDIATE_ROTATION_LEFT = new Vector3(0f, 90f, 0f);
+        public static readonly Vector3 HAND_IK_INTERMEDIATE_ROTATION_RIGHT = new Vector3(0f, -90f, 0f);
+
+        public static Vector3 ApplyHandIKIntermediateRotation(bool isLeft, Vector3 userRotation) {
+            var intermediateQ = isLeft 
+                ? Quaternion.Euler(HAND_IK_INTERMEDIATE_ROTATION_LEFT) 
+                : Quaternion.Euler(HAND_IK_INTERMEDIATE_ROTATION_RIGHT);
+            var userQ = Quaternion.Euler(userRotation);
+            return Helper.NormalizeRotationAngles((userQ * intermediateQ).eulerAngles);
+        }
+
+        public static Vector3 RemoveHandIKIntermediateRotation(bool isLeft, Vector3 ikRotation) {
+            var intermediateQ = isLeft 
+                ? Quaternion.Euler(HAND_IK_INTERMEDIATE_ROTATION_LEFT) 
+                : Quaternion.Euler(HAND_IK_INTERMEDIATE_ROTATION_RIGHT);
+            var ikQ = Quaternion.Euler(ikRotation);
+            return Helper.NormalizeRotationAngles((ikQ * Quaternion.Inverse(intermediateQ)).eulerAngles);
+        }
+
         public Vector3 LeftHandRestPosition {
             get => LeftHandRestTransform?.Position ?? new Vector3(-0.07f, 0.02f, 0f);
             set {
@@ -91,7 +114,7 @@ namespace FlameStream
         }
 
         public Vector3 LeftHandRestRotation {
-            get => LeftHandRestTransform?.Rotation ?? new Vector3(0f, 90f, 0f);
+            get => LeftHandRestTransform?.Rotation ?? Vector3.zero;
             set {
                 if (LeftHandRestTransform != null) {
                     LeftHandRestTransform.Rotation = value;
@@ -111,7 +134,7 @@ namespace FlameStream
         }
 
         public Vector3 RightHandRestRotation {
-            get => RightHandRestTransform?.Rotation ?? new Vector3(0f, -90f, 0f);
+            get => RightHandRestTransform?.Rotation ?? Vector3.zero;
             set {
                 if (RightHandRestTransform != null) {
                     RightHandRestTransform.Rotation = value;
@@ -187,70 +210,16 @@ namespace FlameStream
             }
         }
 
-        /// <summary>
-        /// 10 FINGER ADDITIVE OVERLAY ANIMATIONS
-        /// </summary>
-        [Section("FINGER_OVERLAY_ANIMATIONS")]
-
-        [DataInput(100)]
-        [AutoCompleteResource("CharacterAnimation", null)]
-        [PreviewGallery]
-        [Label("LEFT_PINKY_ANIMATION")]
-        public string LeftPinkyAnimation;
-
-        [DataInput(110)]
-        [AutoCompleteResource("CharacterAnimation", null)]
-        [PreviewGallery]
-        [Label("LEFT_RING_ANIMATION")]
-        public string LeftRingAnimation;
-
-        [DataInput(120)]
-        [AutoCompleteResource("CharacterAnimation", null)]
-        [PreviewGallery]
-        [Label("LEFT_MIDDLE_ANIMATION")]
-        public string LeftMiddleAnimation;
-
-        [DataInput(130)]
-        [AutoCompleteResource("CharacterAnimation", null)]
-        [PreviewGallery]
-        [Label("LEFT_INDEX_ANIMATION")]
-        public string LeftIndexAnimation;
-
-        [DataInput(140)]
-        [AutoCompleteResource("CharacterAnimation", null)]
-        [PreviewGallery]
-        [Label("LEFT_THUMB_ANIMATION")]
-        public string LeftThumbAnimation;
-
-        [DataInput(150)]
-        [AutoCompleteResource("CharacterAnimation", null)]
-        [PreviewGallery]
-        [Label("RIGHT_THUMB_ANIMATION")]
-        public string RightThumbAnimation;
-
-        [DataInput(160)]
-        [AutoCompleteResource("CharacterAnimation", null)]
-        [PreviewGallery]
-        [Label("RIGHT_INDEX_ANIMATION")]
-        public string RightIndexAnimation;
-
-        [DataInput(170)]
-        [AutoCompleteResource("CharacterAnimation", null)]
-        [PreviewGallery]
-        [Label("RIGHT_MIDDLE_ANIMATION")]
-        public string RightMiddleAnimation;
-
-        [DataInput(180)]
-        [AutoCompleteResource("CharacterAnimation", null)]
-        [PreviewGallery]
-        [Label("RIGHT_RING_ANIMATION")]
-        public string RightRingAnimation;
-
-        [DataInput(190)]
-        [AutoCompleteResource("CharacterAnimation", null)]
-        [PreviewGallery]
-        [Label("RIGHT_PINKY_ANIMATION")]
-        public string RightPinkyAnimation;
+        public string LeftPinkyAnimation => FingerAnimations?.LeftPinky;
+        public string LeftRingAnimation => FingerAnimations?.LeftRing;
+        public string LeftMiddleAnimation => FingerAnimations?.LeftMiddle;
+        public string LeftIndexAnimation => FingerAnimations?.LeftIndex;
+        public string LeftThumbAnimation => FingerAnimations?.LeftThumb;
+        public string RightThumbAnimation => FingerAnimations?.RightThumb;
+        public string RightIndexAnimation => FingerAnimations?.RightIndex;
+        public string RightMiddleAnimation => FingerAnimations?.RightMiddle;
+        public string RightRingAnimation => FingerAnimations?.RightRing;
+        public string RightPinkyAnimation => FingerAnimations?.RightPinky;
 
         public string GetFingerLayerSuffix(KeyboardFinger finger) {
             switch (finger) {
@@ -269,19 +238,7 @@ namespace FlameStream
         }
 
         public string GetFingerAnimation(KeyboardFinger finger) {
-            switch (finger) {
-                case KeyboardFinger.LeftPinky: return LeftPinkyAnimation;
-                case KeyboardFinger.LeftRing: return LeftRingAnimation;
-                case KeyboardFinger.LeftMiddle: return LeftMiddleAnimation;
-                case KeyboardFinger.LeftIndex: return LeftIndexAnimation;
-                case KeyboardFinger.LeftThumb: return LeftThumbAnimation;
-                case KeyboardFinger.RightThumb: return RightThumbAnimation;
-                case KeyboardFinger.RightIndex: return RightIndexAnimation;
-                case KeyboardFinger.RightMiddle: return RightMiddleAnimation;
-                case KeyboardFinger.RightRing: return RightRingAnimation;
-                case KeyboardFinger.RightPinky: return RightPinkyAnimation;
-                default: return null;
-            }
+            return FingerAnimations?.GetAnimation(finger);
         }
 
         public string GetFingerLayerId(KeyboardFinger finger) {
@@ -290,6 +247,15 @@ namespace FlameStream
 
         void SetupVisualTransforms() {
             SetupRootTransform();
+            SetupHandRestTransforms();
+        }
+
+        public void SetupHandRestTransforms() {
+            if (HandRestSetup == null) {
+                HandRestSetup = StructuredData.Create<KeyboardHandRestSetup>();
+                HandRestSetup.Parent = this;
+            }
+            HandRestSetup.CollapsedSelf = true;
             SetupLeftHandRestTransform();
             SetupRightHandRestTransform();
         }
@@ -300,7 +266,7 @@ namespace FlameStream
                 RootTransform.Position = new Vector3(0f, 0.6218f, 0.1484f);
                 RootTransform.Rotation = Vector3.zero;
             }
-            RootTransform.LocalizationKey = "KEYBOARD_ROOT";
+            RootTransform.LocalizationKey = "KEYBOARD_ORIGIN";
             RootTransform.HideScale();
             RootTransform.OnEnterVisualSetup = (tr) => {
                 EnsureAnchors();
@@ -314,6 +280,8 @@ namespace FlameStream
                 }
                 setupAnchor.Transform.Position = tr.Position;
                 setupAnchor.Transform.Rotation = tr.Rotation;
+                setupAnchor.Name = "⌛⚓-Keyboard Origin";
+                setupAnchor.Instructions = "Position and rotate the **Keyboard Origin** reference anchor, relative to the **Character** (Avatar Root).\nThe red sphere indicates the origin location (character root).\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             RootTransform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -328,15 +296,19 @@ namespace FlameStream
             };
         }
 
-        void SetupLeftHandRestTransform() {
-            if (LeftHandRestTransform == null) {
-                LeftHandRestTransform = StructuredData.Create<CollapsibleVisualSetupTransform>();
-                LeftHandRestTransform.Position = new Vector3(-0.07f, 0.02f, 0f);
-                LeftHandRestTransform.Rotation = new Vector3(0f, 90f, 0f);
-                LeftHandRestTransform.Scale = Vector3.one;
-                LeftHandRestTransform.SetDataInput(nameof(LeftHandRestTransform.Scale), Vector3.one, true);
+        public void SetupLeftHandRestTransform() {
+            var rest = HandRestSetup;
+            if (rest == null) return;
+            rest.CollapsedSelf = true;
+            if (rest.Left == null) {
+                rest.Left = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                rest.Left.Position = new Vector3(-0.07f, 0.02f, 0f);
+                rest.Left.Rotation = Vector3.zero;
+                rest.Left.Scale = Vector3.one;
+                rest.Left.SetDataInput(nameof(rest.Left.Scale), Vector3.one, true);
             }
-            LeftHandRestTransform.LocalizationKey = "KEYBOARD_LEFT_HAND_REST";
+            rest.Left.CollapsedSelf = true;
+            LeftHandRestTransform.LocalizationKey = "LEFT_HAND_REST";
             LeftHandRestTransform.OnEnterVisualSetup = (tr) => {
                 EnsureAnchors();
             };
@@ -351,6 +323,8 @@ namespace FlameStream
                 setupAnchor.Transform.Position = tr.Position;
                 setupAnchor.Transform.Rotation = tr.Rotation;
                 setupAnchor.Transform.Scale = tr.Scale;
+                setupAnchor.Name = "⌛⚓-Left Hand Rest Pose";
+                setupAnchor.Instructions = "Position, rotate, and scale the **Left Hand Rest Pose** (resting over ASDF), relative to the **Keyboard Origin**.\nThe red sphere indicates the origin location (Keyboard Origin).\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             LeftHandRestTransform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -367,15 +341,19 @@ namespace FlameStream
             };
         }
 
-        void SetupRightHandRestTransform() {
-            if (RightHandRestTransform == null) {
-                RightHandRestTransform = StructuredData.Create<CollapsibleVisualSetupTransform>();
-                RightHandRestTransform.Position = new Vector3(0.07f, 0.02f, 0f);
-                RightHandRestTransform.Rotation = new Vector3(0f, -90f, 0f);
-                RightHandRestTransform.Scale = Vector3.one;
-                RightHandRestTransform.SetDataInput(nameof(RightHandRestTransform.Scale), Vector3.one, true);
+        public void SetupRightHandRestTransform() {
+            var rest = HandRestSetup;
+            if (rest == null) return;
+            rest.CollapsedSelf = true;
+            if (rest.Right == null) {
+                rest.Right = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                rest.Right.Position = new Vector3(0.07f, 0.02f, 0f);
+                rest.Right.Rotation = Vector3.zero;
+                rest.Right.Scale = Vector3.one;
+                rest.Right.SetDataInput(nameof(rest.Right.Scale), Vector3.one, true);
             }
-            RightHandRestTransform.LocalizationKey = "KEYBOARD_RIGHT_HAND_REST";
+            rest.Right.CollapsedSelf = true;
+            RightHandRestTransform.LocalizationKey = "RIGHT_HAND_REST";
             RightHandRestTransform.OnEnterVisualSetup = (tr) => {
                 EnsureAnchors();
             };
@@ -390,6 +368,8 @@ namespace FlameStream
                 setupAnchor.Transform.Position = tr.Position;
                 setupAnchor.Transform.Rotation = tr.Rotation;
                 setupAnchor.Transform.Scale = tr.Scale;
+                setupAnchor.Name = "⌛⚓-Right Hand Rest Pose";
+                setupAnchor.Instructions = "Position, rotate, and scale the **Right Hand Rest Pose** (resting over JKL;), relative to the **Keyboard Origin**.\nThe red sphere indicates the origin location (Keyboard Origin).\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             RightHandRestTransform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -407,26 +387,25 @@ namespace FlameStream
         }
 
         void OnCreateBasicSetup() {
+            if (HandRestSetup == null) {
+                HandRestSetup = StructuredData.Create<KeyboardHandRestSetup>();
+                HandRestSetup.CollapsedSelf = true;
+            }
+            HandRestSetup.Parent = this;
+
             SetupVisualTransforms();
 
             Watch(nameof(RootTransform), delegate { SetupRootTransform(); });
-            Watch(nameof(LeftHandRestTransform), delegate { SetupLeftHandRestTransform(); });
-            Watch(nameof(RightHandRestTransform), delegate { SetupRightHandRestTransform(); });
+            Watch(nameof(HandRestSetup), delegate {
+                if (HandRestSetup != null) {
+                    HandRestSetup.Parent = this;
+                }
+                SetupHandRestTransforms();
+            });
 
             Watch(nameof(IsEnabled), delegate { UpdateHandTrackingState(); });
             Watch(nameof(IsHandEnabled), delegate { UpdateHandTrackingState(); });
             Watch(nameof(Character), delegate { UpdateHandTrackingState(); });
-
-            Watch(nameof(LeftPinkyAnimation), delegate { SynchronizeFingerAnimation(KeyboardFinger.LeftPinky); });
-            Watch(nameof(LeftRingAnimation), delegate { SynchronizeFingerAnimation(KeyboardFinger.LeftRing); });
-            Watch(nameof(LeftMiddleAnimation), delegate { SynchronizeFingerAnimation(KeyboardFinger.LeftMiddle); });
-            Watch(nameof(LeftIndexAnimation), delegate { SynchronizeFingerAnimation(KeyboardFinger.LeftIndex); });
-            Watch(nameof(LeftThumbAnimation), delegate { SynchronizeFingerAnimation(KeyboardFinger.LeftThumb); });
-            Watch(nameof(RightThumbAnimation), delegate { SynchronizeFingerAnimation(KeyboardFinger.RightThumb); });
-            Watch(nameof(RightIndexAnimation), delegate { SynchronizeFingerAnimation(KeyboardFinger.RightIndex); });
-            Watch(nameof(RightMiddleAnimation), delegate { SynchronizeFingerAnimation(KeyboardFinger.RightMiddle); });
-            Watch(nameof(RightRingAnimation), delegate { SynchronizeFingerAnimation(KeyboardFinger.RightRing); });
-            Watch(nameof(RightPinkyAnimation), delegate { SynchronizeFingerAnimation(KeyboardFinger.RightPinky); });
         }
 
         public KeyboardKeyBinding ActiveKeyBindingInVisualSetup;
@@ -470,9 +449,10 @@ namespace FlameStream
                 // If in visual setup mode for LeftHandRestTransform, drive LeftHandAnchor in real time!
                 if (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode && LeftHandRestTransform.setupAnchor != null && LeftHandAnchor != null) {
                     var st = LeftHandRestTransform.setupAnchor.Transform;
-                    if (LeftHandAnchor.Transform.Position != st.Position || LeftHandAnchor.Transform.Rotation != st.Rotation) {
+                    var ikRot = ApplyHandIKIntermediateRotation(true, st.Rotation);
+                    if (LeftHandAnchor.Transform.Position != st.Position || LeftHandAnchor.Transform.Rotation != ikRot) {
                         LeftHandAnchor.Transform.Position = st.Position;
-                        LeftHandAnchor.Transform.Rotation = st.Rotation;
+                        LeftHandAnchor.Transform.Rotation = ikRot;
                         LeftHandAnchor.Transform.Broadcast();
                     }
                 }
@@ -480,9 +460,10 @@ namespace FlameStream
                 // If in visual setup mode for RightHandRestTransform, drive RightHandAnchor in real time!
                 if (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode && RightHandRestTransform.setupAnchor != null && RightHandAnchor != null) {
                     var st = RightHandRestTransform.setupAnchor.Transform;
-                    if (RightHandAnchor.Transform.Position != st.Position || RightHandAnchor.Transform.Rotation != st.Rotation) {
+                    var ikRot = ApplyHandIKIntermediateRotation(false, st.Rotation);
+                    if (RightHandAnchor.Transform.Position != st.Position || RightHandAnchor.Transform.Rotation != ikRot) {
                         RightHandAnchor.Transform.Position = st.Position;
-                        RightHandAnchor.Transform.Rotation = st.Rotation;
+                        RightHandAnchor.Transform.Rotation = ikRot;
                         RightHandAnchor.Transform.Broadcast();
                     }
                 }
@@ -531,22 +512,24 @@ namespace FlameStream
         void UpdateHandRestTransforms() {
             var left = LeftHandAnchor;
             if (left != null) {
+                var ikRot = ApplyHandIKIntermediateRotation(true, LeftHandRestRotation);
                 left.Transform.Position = LeftHandRestPosition;
-                left.Transform.Rotation = LeftHandRestRotation;
+                left.Transform.Rotation = ikRot;
                 left.Transform.Broadcast();
                 if (left.GameObject != null) {
                     left.GameObject.transform.localPosition = LeftHandRestPosition;
-                    left.GameObject.transform.localRotation = Quaternion.Euler(LeftHandRestRotation);
+                    left.GameObject.transform.localRotation = Quaternion.Euler(ikRot);
                 }
             }
             var right = RightHandAnchor;
             if (right != null) {
+                var ikRot = ApplyHandIKIntermediateRotation(false, RightHandRestRotation);
                 right.Transform.Position = RightHandRestPosition;
-                right.Transform.Rotation = RightHandRestRotation;
+                right.Transform.Rotation = ikRot;
                 right.Transform.Broadcast();
                 if (right.GameObject != null) {
                     right.GameObject.transform.localPosition = RightHandRestPosition;
-                    right.GameObject.transform.localRotation = Quaternion.Euler(RightHandRestRotation);
+                    right.GameObject.transform.localRotation = Quaternion.Euler(ikRot);
                 }
             }
             ResetActiveKeyValues();
@@ -572,8 +555,9 @@ namespace FlameStream
             if (rootAnchor.GameObject != null) {
                 leftHandAnchor.GameObject.transform.SetParent(rootAnchor.GameObject.transform, false);
             }
+            var leftIkRot = ApplyHandIKIntermediateRotation(true, LeftHandRestRotation);
             leftHandAnchor.Transform.Position = LeftHandRestPosition;
-            leftHandAnchor.Transform.Rotation = LeftHandRestRotation;
+            leftHandAnchor.Transform.Rotation = leftIkRot;
             leftHandAnchor.Transform.Broadcast();
 
             // 3. Right Hand IK Anchor
@@ -589,8 +573,9 @@ namespace FlameStream
             if (rootAnchor.GameObject != null) {
                 rightHandAnchor.GameObject.transform.SetParent(rootAnchor.GameObject.transform, false);
             }
+            var rightIkRot = ApplyHandIKIntermediateRotation(false, RightHandRestRotation);
             rightHandAnchor.Transform.Position = RightHandRestPosition;
-            rightHandAnchor.Transform.Rotation = RightHandRestRotation;
+            rightHandAnchor.Transform.Rotation = rightIkRot;
             rightHandAnchor.Transform.Broadcast();
         }
 

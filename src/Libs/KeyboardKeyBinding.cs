@@ -18,6 +18,7 @@ namespace FlameStream {
 
         [DataInput(30)]
         [Label("TRANSFORM")]
+        [Description("KEYBOARD_KEY_BINDING_TRANSFORM_DESC")]
         public VisualSetupTransform Transform;
 
         [DataInput(40)]
@@ -87,6 +88,7 @@ namespace FlameStream {
         public void SetupTransformCallbacks() {
             if (Transform == null) return;
             Transform.HideScale();
+            Transform.ShowOriginIndicator = false;
             Transform.LocalizationKey = "KEYBOARD_KEY_BINDING";
 
             Transform.OnEnterVisualSetup = (tr) => {
@@ -119,10 +121,12 @@ namespace FlameStream {
                 setupAnchor.Transform.Position = initialPos;
                 setupAnchor.Transform.Rotation = initialRot;
                 setupAnchor.Name = $"⌛⚓-Key [{Key}] ({Finger})";
+                string handName = isLeft ? "Left Hand Rest Pose" : "Right Hand Rest Pose";
                 setupAnchor.Instructions = $@"
 ### Key Binding Setup: {Key} ({Finger})
 
-Position and rotate this anchor where the **{Finger}** should be placed when pressing key **[{Key}]**.
+Position and rotate this anchor where the **{Finger}** should be placed when pressing key **[{Key}]**, relative to the **{handName}**.
+The red sphere indicates the resting hand origin ({handName}).
 The avatar's hand and finger will follow this anchor in real-time.
 Click **[Apply Transform]** when finished.
 ";
@@ -130,6 +134,15 @@ Click **[Apply Transform]** when finished.
 
                 Transform parentTr = root != null && root.GameObject != null ? root.GameObject.transform : null;
                 CreateDebugVisuals(restPos, parentTr);
+
+                setupAnchor.OnShowOriginChange = (show) => {
+                    if (debugRestSphere != null) {
+                        debugRestSphere.SetActive(show);
+                    }
+                };
+                setupAnchor.OnAlwaysOnTopChange = (onTop) => {
+                    SetDebugSphereAlwaysOnTop(onTop);
+                };
             };
 
             Transform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -177,6 +190,44 @@ Click **[Apply Transform]** when finished.
             };
         }
 
+        public bool DebugSphereAlwaysOnTop = false;
+
+        public void SetDebugSphereAlwaysOnTop(bool alwaysOnTop) {
+            DebugSphereAlwaysOnTop = alwaysOnTop;
+            UpdateDebugSphereMaterial();
+        }
+
+        public void UpdateDebugSphereMaterial() {
+            if (debugRestSphere == null) return;
+            if (debugRestSphereMat != null) {
+                UnityEngine.Object.Destroy(debugRestSphereMat);
+                debugRestSphereMat = null;
+            }
+
+            if (DebugSphereAlwaysOnTop) {
+                var overlayShader = Shader.Find("GUI/Text Shader") ?? Shader.Find("Hidden/Internal-Colored");
+                if (overlayShader != null) {
+                    debugRestSphereMat = new Material(overlayShader);
+                    debugRestSphereMat.color = new Color(1f, 0.1f, 0.1f, 0.95f);
+                } else {
+                    debugRestSphereMat = new Material(Shader.Find("Standard"));
+                    debugRestSphereMat.color = new Color(1f, 0f, 0f, 0.95f);
+                    debugRestSphereMat.EnableKeyword("_EMISSION");
+                    debugRestSphereMat.SetColor("_EmissionColor", new Color(0.8f, 0f, 0f));
+                    debugRestSphereMat.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
+                }
+                debugRestSphereMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Overlay + 1000;
+            } else {
+                debugRestSphereMat = new Material(Shader.Find("Standard"));
+                debugRestSphereMat.color = new Color(1f, 0f, 0f, 0.9f);
+                debugRestSphereMat.EnableKeyword("_EMISSION");
+                debugRestSphereMat.SetColor("_EmissionColor", new Color(0.8f, 0f, 0f));
+            }
+
+            var rend = debugRestSphere.GetComponent<Renderer>();
+            if (rend != null) rend.material = debugRestSphereMat;
+        }
+
         public void CreateDebugVisuals(Vector3 restPos, Transform parentTransform) {
             DestroyDebugVisuals();
 
@@ -192,11 +243,10 @@ Click **[Apply Transform]** when finished.
             debugRestSphere.transform.localPosition = restPos;
             debugRestSphere.transform.localScale = new Vector3(0.05f, 0.05f, 0.05f); // 5cm diameter
 
-            debugRestSphereMat = new Material(Shader.Find("Standard"));
-            debugRestSphereMat.color = new Color(1f, 0f, 0f, 0.9f);
-            debugRestSphereMat.EnableKeyword("_EMISSION");
-            debugRestSphereMat.SetColor("_EmissionColor", new Color(0.8f, 0f, 0f));
-            debugRestSphere.GetComponent<Renderer>().material = debugRestSphereMat;
+            UpdateDebugSphereMaterial();
+            if (Transform != null && Transform.setupAnchor != null) {
+                debugRestSphere.SetActive(Transform.setupAnchor.ShowOrigin);
+            }
 
             UpdateDebugVisuals();
         }
