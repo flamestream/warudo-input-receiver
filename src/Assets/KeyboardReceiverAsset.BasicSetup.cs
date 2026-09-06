@@ -147,6 +147,13 @@ namespace FlameStream
             }
         }
 
+        [Trigger(1005)]
+        [Label("DEACTIVATE_ALL_DEBUG_KEYS")]
+        [Hidden]
+        public void TriggerDeactivateAllDebugKeys() {
+            DeactivateAllDebugKeys();
+        }
+
         [Section("ADVANCED")]
         [Trigger(1010)]
         [Label("RESET_ANCHORS")]
@@ -154,6 +161,44 @@ namespace FlameStream
         public void TriggerResetAnchors() {
             ClearAnchors();
             Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Info, Name, "Anchors reset and character IK detached. Fresh anchors will regenerate when enabled.");
+        }
+
+        public void UpdateAdvancedSectionDebugState() {
+            bool isDebug = IsDebugKeyModeActive;
+            string sectionTitle = isDebug ? "ADVANCED_DEBUG_MODE".Localized() : "ADVANCED".Localized();
+
+            var deactPort = GetTriggerPort(nameof(TriggerDeactivateAllDebugKeys));
+            if (deactPort != null && deactPort.Properties != null) {
+                deactPort.Properties.hidden = !isDebug;
+                deactPort.Properties.sectionTitle = isDebug ? sectionTitle : "";
+                if (isDebug) {
+                    var keyList = string.Join(", ", DebugForcedKeys.Select(k => k.ToString()));
+                    deactPort.Properties.description = string.Format("DEACTIVATE_ALL_DEBUG_KEYS_DESC".Localized(), keyList);
+                } else {
+                    deactPort.Properties.description = "";
+                }
+                BroadcastTriggerProperties(nameof(TriggerDeactivateAllDebugKeys));
+            }
+
+            var resetPort = GetTriggerPort(nameof(TriggerResetAnchors));
+            if (resetPort != null && resetPort.Properties != null) {
+                resetPort.Properties.sectionTitle = isDebug ? "" : sectionTitle;
+                BroadcastTriggerProperties(nameof(TriggerResetAnchors));
+            }
+        }
+
+        public void UpdateAllDebugButtonStates() {
+            if (KeyBindingsCollection?.KeyBindings != null) {
+                foreach (var b in KeyBindingsCollection.KeyBindings) {
+                    b?.UpdateDebugButtonState();
+                }
+            }
+            if (VirtualKeysCollection?.Keys != null) {
+                foreach (var k in VirtualKeysCollection.Keys) {
+                    k?.UpdateDebugButtonState();
+                }
+            }
+            UpdateAdvancedSectionDebugState();
         }
 
         [DataInput]
@@ -457,12 +502,15 @@ namespace FlameStream
                 UpdateHandTrackingState(); 
                 AutoSetup?.UpdateButtonState();
             });
+
+            UpdateAdvancedSectionDebugState();
         }
 
         public KeyboardKeyBinding ActiveKeyBindingInVisualSetup;
 
         void OnDestroyBasicSetup() {
             ActiveKeyBindingInVisualSetup = null;
+            DeactivateAllDebugKeys();
 
             try {
                 if (Character != null && Character.Active && Character.OverlappingAnimations != null) {

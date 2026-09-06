@@ -166,8 +166,9 @@ All input receivers inherit from `ReceiverAsset`:
 ### 4.16 Decoupling Prop & Keyset Rigs from Humanoid Hand IK Rotations
 - Avatar Hand IK targets require intermediate wrist rotations (`Vector3(0, 90, 0)` / `Vector3(0, -90, 0)`) to face palms forward/downward.
 - Never parent props or virtual key clusters directly to Hand IK targets. Instead, parent clusters to the workstation root (`RootAnchor`) and offset them relative to resting hand positions using resting hand Euler angles.
-- This ensures that at zero rotation (`Rotation == Vector3.zero`), keys and props sit flat and aligned with the workstation without fighting humanoid IK wrist twist.
-
+### 4.17 Section Boundaries: `[Section]` Attributes & Dynamic `sectionTitle` Broadcasting
+- **Single Section Declaration**: Only annotate the **first** member of a section with `[Section("SECTION_NAME")]`. Subsequent members automatically inherit the active section until a new section is declared. Decorating multiple sibling members with `[Section]` causes Warudo to close and reopen duplicate section containers with identical headers.
+- **Dynamic `port.Properties.sectionTitle` Rule**: Setting `sectionTitle` dynamically on a port and broadcasting it does **not** group items by tag; it designates that specific port as the **start boundary** of a section container. Never broadcast `sectionTitle` on multiple sibling ports in the same section. Exactly **one active port** in the section must set `sectionTitle`, while all other ports in that section must set `sectionTitle = ""`. If the leading port can be hidden, dynamically shift `sectionTitle` to the visible leading port and clear it on the hidden one.
 
 ---
 

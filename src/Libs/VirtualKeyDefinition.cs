@@ -69,6 +69,24 @@ namespace FlameStream
             }
         }
 
+        [Trigger(130)]
+        [Label("DEBUG_FORCE_KEY")]
+        public void TriggerDebugForceKey() {
+            Parent?.ToggleDebugVirtualKey(this);
+        }
+
+        public bool IsDebugForced => Parent != null && Parent.IsKeyDebugForced(Key);
+
+        public void UpdateDebugButtonState() {
+            var port = GetTriggerPort(nameof(TriggerDebugForceKey));
+            if (port == null || port.Properties == null) return;
+            bool forced = IsDebugForced;
+            port.Properties.label = forced ? "DEBUG_RELEASE_KEY" : "DEBUG_FORCE_KEY";
+            port.Properties.description = forced ? "DEBUG_RELEASE_KEY_DESC".Localized() : "DEBUG_FORCE_KEY_DESC".Localized();
+            BroadcastTriggerProperties(nameof(TriggerDebugForceKey));
+            BroadcastDataInput(nameof(Transform));
+        }
+
         public bool IsLocating => Parent != null && Parent.IdentifiedVirtualKey == this;
 
         public void UpdateLocateButtonLabel(bool isLocating) {
@@ -116,7 +134,8 @@ namespace FlameStream
             var pos = Transform != null ? Transform.Position : Vector3.zero;
             var listeningTag = IsListeningForKey ? " ⏳[LISTENING]" : "";
             var locateTag = IsLocating ? " ✨[LOCATING]" : "";
-            return $"[{label}] ➔ [{anchorTag}] Pos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}){listeningTag}{locateTag}";
+            var debugTag = IsDebugForced ? " ⚡[DEBUG]" : "";
+            return $"[{label}] ➔ [{anchorTag}] Pos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}){listeningTag}{locateTag}{debugTag}";
         }
 
         protected override void OnCreate() {
@@ -141,6 +160,7 @@ namespace FlameStream
             Transform.HideScale();
             SetupTransformCallbacks();
             SyncUI();
+            UpdateDebugButtonState();
 
             Watch(nameof(Transform), delegate {
                 SetupTransformCallbacks();
@@ -150,7 +170,10 @@ namespace FlameStream
                     KeyGameObject.transform.localScale = Transform.Scale;
                 }
             });
-            Watch(nameof(Key), delegate { BroadcastDataInput(nameof(Transform)); });
+            Watch(nameof(Key), delegate { 
+                UpdateDebugButtonState();
+                BroadcastDataInput(nameof(Transform)); 
+            });
             Watch(nameof(DisplayLabel), delegate { BroadcastDataInput(nameof(Transform)); });
             Watch(nameof(AttachmentAnchor), delegate {
                 if (Parent != null) {

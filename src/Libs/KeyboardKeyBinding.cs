@@ -49,6 +49,24 @@ namespace FlameStream {
         [Description("KEYBOARD_KEY_BINDING_TRANSFORM_DESC")]
         public VisualSetupTransform Transform;
 
+        [Trigger(50)]
+        [Label("DEBUG_FORCE_KEY")]
+        public void TriggerDebugForceKey() {
+            Parent?.ToggleDebugKey(Key, Finger);
+        }
+
+        public bool IsDebugForced => Parent != null && Parent.IsKeyDebugForced(Key);
+
+        public void UpdateDebugButtonState() {
+            var port = GetTriggerPort(nameof(TriggerDebugForceKey));
+            if (port == null || port.Properties == null) return;
+            bool forced = IsDebugForced;
+            port.Properties.label = forced ? "DEBUG_RELEASE_KEY" : "DEBUG_FORCE_KEY";
+            port.Properties.description = forced ? "DEBUG_RELEASE_KEY_DESC".Localized() : "DEBUG_FORCE_KEY_DESC".Localized();
+            BroadcastTriggerProperties(nameof(TriggerDebugForceKey));
+            BroadcastDataInput(nameof(Transform));
+        }
+
         public Vector3 DeltaPosition {
             get => Transform != null ? Transform.Position : deltaPosition;
             set {
@@ -80,7 +98,8 @@ namespace FlameStream {
             var handMovementTag = EnableHandMovement ? "" : " (No Hand Move)";
             var pos = Transform != null ? Transform.Position : DeltaPosition;
             var listeningTag = IsListeningForKey ? " ⏳[LISTENING]" : "";
-            return $"[{Key}] ➔ [{handSide}] {Finger} ΔPos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}){handMovementTag}{listeningTag}";
+            var debugTag = IsDebugForced ? " ⚡[DEBUG]" : "";
+            return $"[{Key}] ➔ [{handSide}] {Finger} ΔPos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}){handMovementTag}{listeningTag}{debugTag}";
         }
 
         public void SyncUI() {
@@ -103,11 +122,13 @@ namespace FlameStream {
             Transform.HideScale();
             SetupTransformCallbacks();
             SyncUI();
+            UpdateDebugButtonState();
 
             Watch(nameof(Transform), delegate {
                 SetupTransformCallbacks();
             });
             Watch(nameof(Key), delegate {
+                UpdateDebugButtonState();
                 BroadcastDataInput(nameof(Transform));
             });
             Watch(nameof(Finger), delegate {

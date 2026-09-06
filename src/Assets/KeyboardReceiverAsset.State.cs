@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Warudo.Core;
+using Warudo.Core.Localization;
 
 namespace FlameStream {
     public partial class KeyboardReceiverAsset : ReceiverAsset {
@@ -19,7 +20,46 @@ namespace FlameStream {
         public bool AnyDown;
         public int LastVkCode;
 
+        public readonly HashSet<VKCode> DebugForcedKeys = new HashSet<VKCode>();
+        public readonly Dictionary<KeyboardFinger, VKCode> DebugFingerToKey = new Dictionary<KeyboardFinger, VKCode>();
+
+        public bool IsDebugKeyModeActive => DebugForcedKeys.Count > 0;
+
+        public bool IsKeyDebugForced(VKCode key) => DebugForcedKeys.Contains(key);
+
         void OnUpdateState() {
+            if (IsDebugKeyModeActive) {
+                // Ignore all incoming network input signals.
+                // KeyDownRegistry is driven exclusively by DebugForcedKeys.
+                AnyDown = DebugForcedKeys.Count > 0;
+
+                for (int currentVkCode = 0; currentVkCode < 256; currentVkCode++) {
+                    bool wasDown = KeyDownRegistry[currentVkCode];
+                    bool currentValue = DebugForcedKeys.Contains((VKCode)currentVkCode);
+
+                    LastKeyDownRegistry[currentVkCode] = DownDiffRegistry[currentVkCode] = wasDown;
+                    KeyDownRegistry[currentVkCode] = currentValue;
+
+                    if (currentValue) {
+                        if (!wasDown) {
+                            KeyPressTimestamp[currentVkCode] = ++currentFrameCounter;
+                        }
+                    } else {
+                        KeyPressTimestamp[currentVkCode] = 0;
+                    }
+                }
+
+                // Compute last pressed key
+                DownDiffRegistry.Xor(KeyDownRegistry).And(KeyDownRegistry);
+                for (int i = 0; i < DownDiffRegistry.Length; ++i) {
+                    if (DownDiffRegistry[i]) {
+                        LastVkCode = i;
+                        break;
+                    }
+                }
+                return;
+            }
+
             if (lastState == null) return;
 
             var parts = lastState.Split(';');
@@ -134,6 +174,72 @@ namespace FlameStream {
             }
 
             return newestBinding;
+        }
+
+        public void ToggleDebugKey(VKCode key, KeyboardFinger? finger = null) {
+            if (DebugForcedKeys.Contains(key)) {
+                // Deactivate this key
+                DebugForcedKeys.Remove(key);
+                if (finger.HasValue && DebugFingerToKey.TryGetValue(finger.Value, out var k) && k == key) {
+                    DebugFingerToKey.Remove(finger.Value);
+                } else {
+                    var fingerEntry = DebugFingerToKey.FirstOrDefault(kvp => kvp.Value == key);
+                    if (fingerEntry.Value == key) {
+                        DebugFingerToKey.Remove(fingerEntry.Key);
+                    }
+                }
+            } else {
+                // If this finger already has an active key, release the previous key on this finger
+                if (finger.HasValue && DebugFingerToKey.TryGetValue(finger.Value, out var existingKey)) {
+                    DebugForcedKeys.Remove(existingKey);
+                    DebugFingerToKey.Remove(finger.Value);
+                }
+
+                // Check 10-key maximum
+                if (DebugForcedKeys.Count >= 10) {
+                    Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Warning, Name, "DEBUG_MAX_KEYS_REACHED".Localized());
+                    return;
+                }
+
+                DebugForcedKeys.Add(key);
+                if (finger.HasValue) {
+                    DebugFingerToKey[finger.Value] = key;
+                }
+            }
+
+            UpdateAllDebugButtonStates();
+            Context.Service?.BroadcastOpenedScene();
+        }
+
+        public void ToggleDebugVirtualKey(VirtualKeyDefinition keyDef) {
+            if (keyDef == null) return;
+
+            KeyboardFinger? finger = null;
+            if (KeyBindings != null) {
+                var binding = KeyBindings.FirstOrDefault(b => b != null && b.Key == keyDef.Key);
+                if (binding != null) {
+                    finger = binding.Finger;
+                }
+            }
+
+            ToggleDebugKey(keyDef.Key, finger);
+        }
+
+        public void DeactivateAllDebugKeys() {
+            if (DebugForcedKeys.Count == 0) return;
+
+            DebugForcedKeys.Clear();
+            DebugFingerToKey.Clear();
+
+            KeyDownRegistry.SetAll(false);
+            LastKeyDownRegistry.SetAll(false);
+            DownDiffRegistry.SetAll(false);
+            Array.Clear(KeyPressTimestamp, 0, KeyPressTimestamp.Length);
+            AnyDown = false;
+
+            UpdateAllDebugButtonStates();
+            Context.Service?.BroadcastOpenedScene();
+            Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Info, Name, "DEBUG_RELEASED_ALL_KEYS".Localized());
         }
     }
 }
