@@ -158,6 +158,16 @@ All input receivers inherit from `ReceiverAsset`:
 - **Default Collapsed State**: Classes implementing `ICollapsibleStructuredData` default to expanded (`CollapsedSelf == false`). Always set `CollapsedSelf = true;` inside `OnCreate()` or after `StructuredData.Create<T>()` if the card should be collapsed by default.
 - **Preventing Accordion Recursion**: Never implement `ICollapsibleStructuredData` on basic data primitives (like `VisualSetupTransform`) if they are meant to be embedded inside a parent collapsible structured data. Instead, keep the base primitive non-collapsible (so it renders inline) and subclass it (e.g. `CollapsibleVisualSetupTransform : VisualSetupTransform, ICollapsibleStructuredData`) for standalone top-level ports.
 
+### 4.15 Visual Setup Calibration & Non-Destructive Actions
+- **Anchor-Only Manipulation**: Interactive calibration gizmos (`VisualSetupAnchorAsset`) and modal actions (such as `RESET_TO_ORIGIN`) must only mutate the temporary calibration anchor (`setupAnchor.Transform`) and live preview GameObjects.
+- **Never Prematurely Mutate Asset Data**: Never call `SetDataInput` or modify `Position`, `Rotation`, or `Scale` on the parent asset during calibration. Modifying asset fields prematurely corrupts the previous state and breaks `[Cancel Transform]` rollback.
+- **Exclusively on Anchor Asset**: Calibration-specific triggers (e.g. `[Trigger(2)] RESET_TO_ORIGIN`) belong exclusively on `VisualSetupAnchorAsset` (in visual setup mode), not on the base `VisualSetupTransform` inspector.
+
+### 4.16 Decoupling Prop & Keyset Rigs from Humanoid Hand IK Rotations
+- Avatar Hand IK targets require intermediate wrist rotations (`Vector3(0, 90, 0)` / `Vector3(0, -90, 0)`) to face palms forward/downward.
+- Never parent props or virtual key clusters directly to Hand IK targets. Instead, parent clusters to the workstation root (`RootAnchor`) and offset them relative to resting hand positions using resting hand Euler angles.
+- This ensures that at zero rotation (`Rotation == Vector3.zero`), keys and props sit flat and aligned with the workstation without fighting humanoid IK wrist twist.
+
 
 ---
 

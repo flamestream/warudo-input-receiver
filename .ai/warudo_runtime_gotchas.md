@@ -1049,5 +1049,62 @@ Warudo generates inspector UI by sequentially scanning class members. When refle
 **Only annotate the FIRST member of a section with `[Section("SECTION_NAME")]`.**
 Never repeat `[Section]` on subsequent fields, ports, or trigger methods within the same section. All following members automatically inherit the active section until a different `[Section]` attribute is declared.
 
+---
+
+## 31. Visual Calibration Mode Non-Destructive Lifecycle (Reset to Origin & Cancel Rollback)
+
+### The Phenomenon
+When building an interactive visual calibration mode (spawning a temporary `VisualSetupAnchorAsset` gizmo in 3D to let users visually reposition/rotate transforms):
+- Users wanted a `↺ Reset to Origin` button during calibration to easily return the calibration anchor to zero.
+- However, if the reset button called `Parent.SetDataInput(nameof(Position), Vector3.zero)`, the parent asset's serialized data was overwritten immediately in memory.
+- If the user subsequently clicked `[Cancel Transform]`, the session exited, but the original transform values were already gone and could not be restored.
+- Furthermore, exposing `[Trigger] ResetToOriginTrigger` directly on the `VisualSetupTransform` class caused a redundant reset button to appear in the main inspector's data display outside of visual setup mode.
+
+### Architectural Rules
+1. **Calibration Triggers Belong Exclusively on the Temporary Anchor**:
+   Triggers intended strictly for the calibration session (`[Trigger] ResetTrigger` ➔ `RESET_TO_ORIGIN`) must be declared on `VisualSetupAnchorAsset` (order index `[Trigger(2)]`, placed directly above `[Trigger(3)] CANCEL_TRANSFORM`), **not** on the base `VisualSetupTransform` class. This keeps the asset inspector clean and prevents confusion outside of visual setup mode.
+2. **Never Mutate Asset State During Calibration**:
+   Calibration manipulations and reset helpers must exclusively mutate `setupAnchor.Transform` (the temporary 3D anchor gizmo) and any preview GameObjects:
+   ```csharp
+   public void ResetAnchorToOrigin() {
+       if (!InVisualSetupMode || setupAnchor == null) return;
+       if (OnResetAnchor != null) {
+           OnResetAnchor.Invoke(this, setupAnchor);
+       } else {
+           setupAnchor.Transform.Position = Vector3.zero;
+           setupAnchor.Transform.Rotation = Vector3.zero;
+           setupAnchor.Transform.Scale = Vector3.one;
+           setupAnchor.Transform.Broadcast();
+       }
+   }
+   ```
+   Do **not** call `SetDataInput` or mutate `Position`, `Rotation`, or `Scale` on the parent asset during `ResetAnchorToOrigin`.
+3. **Commit Strictly on Apply, Rollback on Cancel**:
+   - `Apply(anchor)`: Copies `anchor.Transform` to the parent `VisualSetupTransform`, calls `OnApplyAnchor`, and commits values via `SetDataInput` / `BroadcastDataInput`.
+   - `ExitVisualSetup(false)`: Discards the anchor without committing. Since the asset's fields were never modified, the original values are preserved 100%. Handlers (e.g. `OnExitVisualSetup(isApplied)`) should restore live preview objects to the original committed values when `!isApplied`.
+
+---
+
+## 32. Decoupling Visual Key & Prop Rigs from Intermediate Humanoid Hand IK Rotations
+
+### The Phenomenon
+In Warudo, humanoid avatar wrist/hand IK targets require intermediate rotations (e.g. `(0f, 90f, 0f)` for Left Hand, `(0f, -90f, 0f)` for Right Hand) so the avatar's palm faces forward/downward toward a desk or workstation.
+If props, keyboard clusters (e.g. split keyboard halves), or visual meshes are parented directly to Hand IK anchors or evaluate their coordinate frame inside the Hand IK target's local rotation space:
+- Setting the cluster's rotation to `Vector3.zero` causes the geometry to face 90 degrees sideways or upside down.
+- Users are forced to apply counter-rotations (e.g. `-90` degrees yaw) just to make a keyboard sit flat on a desk.
+
+### The Fix: Parent to Workstation Root & Offset by Hand Rest Poses
+1. Parent prop/key cluster GameObjects (e.g. `leftKeysGroupGo`, `rightKeysGroupGo`) to the workstation root (`RootAnchor`), **not** to the Hand IK targets.
+2. Calculate world/local placement relative to the resting hand position using resting hand Euler angles, completely bypassing the intermediate IK wrist twists:
+   ```csharp
+   var basePos = LeftHandRestPosition;
+   var baseRot = Quaternion.Euler(LeftHandRestRotation);
+   leftKeysGroupGo.transform.localPosition = basePos + baseRot * LeftKeysetTransform.Position;
+   leftKeysGroupGo.transform.localRotation = baseRot * Quaternion.Euler(LeftKeysetTransform.Rotation);
+   leftKeysGroupGo.transform.localScale = LeftKeysetTransform.Scale;
+   ```
+3. At `Position = Vector3.zero` and `Rotation = Vector3.zero`, the prop or keyset aligns perfectly flat and straight with the workstation rest pose without fighting the humanoid wrist IK standard.
+
+
 
 
