@@ -26,6 +26,10 @@ namespace FlameStream
         [Description("CHARACTER_DESC")]
         public CharacterAsset Character;
 
+        [DataInput(25)]
+        [Label("AUTO_SETUP")]
+        public KeyboardAutoSetup AutoSetup;
+
         [DataInput(30)]
         [Label("KEYBOARD_RIG_ORIGIN")]
         [Description("KEYBOARD_RIG_ORIGIN_DESC")]
@@ -243,8 +247,18 @@ namespace FlameStream
         }
 
         void SetupVisualTransforms() {
+            SetupAutoSetup();
             SetupRootTransform();
             SetupHandRestTransforms();
+        }
+
+        public void SetupAutoSetup() {
+            if (AutoSetup == null) {
+                AutoSetup = StructuredData.Create<KeyboardAutoSetup>();
+            }
+            AutoSetup.Parent = this;
+            AutoSetup.CollapsedSelf = true;
+            AutoSetup.UpdateButtonState();
         }
 
         public void SetupHandRestTransforms() {
@@ -263,6 +277,7 @@ namespace FlameStream
                 RootTransform.Position = new Vector3(0f, 0.6218f, 0.1484f);
                 RootTransform.Rotation = Vector3.zero;
             }
+            RootTransform.CollapsedSelf = true;
             RootTransform.LocalizationKey = "KEYBOARD_RIG_ORIGIN";
             RootTransform.HideScale();
             RootTransform.OnEnterVisualSetup = (tr) => {
@@ -402,6 +417,12 @@ namespace FlameStream
         }
 
         void OnCreateBasicSetup() {
+            if (AutoSetup == null) {
+                AutoSetup = StructuredData.Create<KeyboardAutoSetup>();
+            }
+            AutoSetup.Parent = this;
+            AutoSetup.CollapsedSelf = true;
+
             if (HandRestSetup == null) {
                 HandRestSetup = StructuredData.Create<KeyboardHandRestSetup>();
                 HandRestSetup.CollapsedSelf = true;
@@ -410,6 +431,12 @@ namespace FlameStream
 
             SetupVisualTransforms();
 
+            Watch(nameof(AutoSetup), delegate {
+                if (AutoSetup != null) {
+                    AutoSetup.Parent = this;
+                }
+                AutoSetup?.UpdateButtonState();
+            });
             Watch(nameof(RootTransform), delegate { SetupRootTransform(); });
             Watch(nameof(HandRestSetup), delegate {
                 if (HandRestSetup != null) {
@@ -418,9 +445,18 @@ namespace FlameStream
                 SetupHandRestTransforms();
             });
 
-            Watch(nameof(IsEnabled), delegate { UpdateHandTrackingState(); });
-            Watch(nameof(IsHandEnabled), delegate { UpdateHandTrackingState(); });
-            Watch(nameof(Character), delegate { UpdateHandTrackingState(); });
+            Watch(nameof(IsEnabled), delegate { 
+                UpdateHandTrackingState(); 
+                AutoSetup?.UpdateButtonState();
+            });
+            Watch(nameof(IsHandEnabled), delegate { 
+                UpdateHandTrackingState(); 
+                AutoSetup?.UpdateButtonState();
+            });
+            Watch(nameof(Character), delegate { 
+                UpdateHandTrackingState(); 
+                AutoSetup?.UpdateButtonState();
+            });
         }
 
         public KeyboardKeyBinding ActiveKeyBindingInVisualSetup;
@@ -437,6 +473,10 @@ namespace FlameStream
         }
 
         void OnUpdateBasicSetup() {
+            if (AutoSetup == null) {
+                SetupAutoSetup();
+            }
+
             if (RootTransform != null && string.IsNullOrEmpty(RootTransform.LocalizationKey)) {
                 SetupVisualTransforms();
             }
@@ -592,6 +632,129 @@ namespace FlameStream
             rightHandAnchor.Transform.Position = RightHandRestPosition;
             rightHandAnchor.Transform.Rotation = rightIkRot;
             rightHandAnchor.Transform.Broadcast();
+        }
+
+        Vector3 GetIndexTipWorldPosition(Animator animator, bool isLeft) {
+            var distalBone = isLeft ? HumanBodyBones.LeftIndexDistal : HumanBodyBones.RightIndexDistal;
+            var distalTransform = animator.GetBoneTransform(distalBone);
+            if (distalTransform != null) {
+                if (distalTransform.childCount > 0) {
+                    return distalTransform.GetChild(0).position;
+                }
+                var interBone = isLeft ? HumanBodyBones.LeftIndexIntermediate : HumanBodyBones.RightIndexIntermediate;
+                var interTransform = animator.GetBoneTransform(interBone);
+                if (interTransform != null) {
+                    var delta = distalTransform.position - interTransform.position;
+                    if (delta.sqrMagnitude > 0.00001f) {
+                        return distalTransform.position + delta.normalized * (delta.magnitude * 0.75f);
+                    }
+                }
+                return distalTransform.position;
+            }
+            var handBone = isLeft ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand;
+            var handTransform = animator.GetBoneTransform(handBone);
+            return handTransform != null ? handTransform.position : Vector3.zero;
+        }
+
+        public void AutoSetupFromCharacterPose() {
+            if (Character == null || !Character.Active || Character.GameObject == null) {
+                Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Warning, "AUTO_SETUP".Localized(), "AUTO_SETUP_BLOCK_NO_CHARACTER".Localized());
+                return;
+            }
+
+            if (IsHandEnabled) {
+                Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Warning, "AUTO_SETUP".Localized(), "AUTO_SETUP_BLOCK_HANDS_ENABLED".Localized());
+                return;
+            }
+
+            var animator = Character.Animator;
+            if (animator == null) {
+                Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Error, "AUTO_SETUP".Localized(), "AUTO_SETUP_NO_ANIMATOR".Localized());
+                return;
+            }
+
+            var leftHandBone = animator.GetBoneTransform(HumanBodyBones.LeftHand);
+            var rightHandBone = animator.GetBoneTransform(HumanBodyBones.RightHand);
+            if (leftHandBone == null || rightHandBone == null) {
+                Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Error, "AUTO_SETUP".Localized(), "AUTO_SETUP_NO_HAND_BONES".Localized());
+                return;
+            }
+
+            // Cancel any active visual setup anchors to avoid dirty states
+            if (RootTransform != null && RootTransform.InVisualSetupMode) {
+                RootTransform.CancelVisualSetupTrigger();
+            }
+            if (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode) {
+                LeftHandRestTransform.CancelVisualSetupTrigger();
+            }
+            if (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode) {
+                RightHandRestTransform.CancelVisualSetupTrigger();
+            }
+
+            var charTransform = Character.GameObject.transform;
+            var leftHandLocal = charTransform.InverseTransformPoint(leftHandBone.position);
+            var rightHandLocal = charTransform.InverseTransformPoint(rightHandBone.position);
+
+            var leftTipWorld = GetIndexTipWorldPosition(animator, true);
+            var rightTipWorld = GetIndexTipWorldPosition(animator, false);
+
+            var leftTipLocal = charTransform.InverseTransformPoint(leftTipWorld);
+            var rightTipLocal = charTransform.InverseTransformPoint(rightTipWorld);
+
+            // KEYBOARD_RIG_ORIGIN: in between X and Y of hands, Z from index fingertips
+            var rigX = (leftHandLocal.x + rightHandLocal.x) * 0.5f;
+            var rigY = (leftHandLocal.y + rightHandLocal.y) * 0.5f;
+            var rigZ = (leftTipLocal.z + rightTipLocal.z) * 0.5f;
+            var newRigPos = new Vector3(rigX, rigY, rigZ);
+
+            // Hand Rest Poses relative to Keyboard Rig Origin (facing straight forward, rotation zero)
+            var newLeftPos = leftHandLocal - newRigPos;
+            var newRightPos = rightHandLocal - newRigPos;
+
+            var invCharRot = Quaternion.Inverse(charTransform.rotation);
+            var leftHandLocalRot = invCharRot * leftHandBone.rotation;
+            var rightHandLocalRot = invCharRot * rightHandBone.rotation;
+
+            var userLeftRot = RemoveHandIKIntermediateRotation(true, leftHandLocalRot.eulerAngles);
+            var userRightRot = RemoveHandIKIntermediateRotation(false, rightHandLocalRot.eulerAngles);
+
+            // Apply values using SetDataInput and broadcast
+            if (RootTransform != null) {
+                RootTransform.Position = newRigPos;
+                RootTransform.Rotation = Vector3.zero;
+                RootTransform.SetDataInput(nameof(RootTransform.Position), newRigPos, true);
+                RootTransform.SetDataInput(nameof(RootTransform.Rotation), Vector3.zero, true);
+                RootTransform.BroadcastDataInput(nameof(RootTransform.Position));
+                RootTransform.BroadcastDataInput(nameof(RootTransform.Rotation));
+            }
+
+            if (LeftHandRestTransform != null) {
+                LeftHandRestTransform.Position = newLeftPos;
+                LeftHandRestTransform.Rotation = userLeftRot;
+                LeftHandRestTransform.SetDataInput(nameof(LeftHandRestTransform.Position), newLeftPos, true);
+                LeftHandRestTransform.SetDataInput(nameof(LeftHandRestTransform.Rotation), userLeftRot, true);
+                LeftHandRestTransform.BroadcastDataInput(nameof(LeftHandRestTransform.Position));
+                LeftHandRestTransform.BroadcastDataInput(nameof(LeftHandRestTransform.Rotation));
+            }
+
+            if (RightHandRestTransform != null) {
+                RightHandRestTransform.Position = newRightPos;
+                RightHandRestTransform.Rotation = userRightRot;
+                RightHandRestTransform.SetDataInput(nameof(RightHandRestTransform.Position), newRightPos, true);
+                RightHandRestTransform.SetDataInput(nameof(RightHandRestTransform.Rotation), userRightRot, true);
+                RightHandRestTransform.BroadcastDataInput(nameof(RightHandRestTransform.Position));
+                RightHandRestTransform.BroadcastDataInput(nameof(RightHandRestTransform.Rotation));
+            }
+
+            EnsureAnchors();
+            UpdateRootTransform();
+            UpdateHandRestTransforms();
+            UpdateGroupTransforms();
+
+            AutoSetup?.UpdateButtonState();
+
+            Context.Service?.BroadcastOpenedScene();
+            Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Success, "AUTO_SETUP".Localized(), "AUTO_SETUP_SUCCESS".Localized());
         }
 
         public void ApplyBasicSetup() {

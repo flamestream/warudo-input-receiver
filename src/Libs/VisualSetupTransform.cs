@@ -281,6 +281,11 @@ namespace FlameStream {
     }
 
     public class CollapsibleVisualSetupTransform : VisualSetupTransform, ICollapsibleStructuredData {
+        protected override void OnCreate() {
+            base.OnCreate();
+            CollapsedSelf = true;
+        }
+
         public virtual string GetHeader() {
             var title = !string.IsNullOrEmpty(LocalizationKey) ? LocalizationKey.Localized() : "TRANSFORM".Localized();
             return $"{title} Pos({Position.x:F3}, {Position.y:F3}, {Position.z:F3})";
