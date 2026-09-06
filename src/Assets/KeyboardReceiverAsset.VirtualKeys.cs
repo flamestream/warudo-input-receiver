@@ -388,6 +388,7 @@ namespace FlameStream
         void ApplyKeyGlowState(VirtualKeyDefinition keyDef, bool isDown, float dt = 0f) {
             if (keyDef.BorderMaterial == null || keyDef.BodyMaterial == null) return;
 
+            bool isIdentifying = keyDef.IdentifyGlowTimer > 0f;
             var customApp = (keyDef.UseCustomAppearance && keyDef.CustomAppearance != null) ? keyDef.CustomAppearance : null;
             var baseApp = DefaultAppearance;
 
@@ -414,6 +415,7 @@ namespace FlameStream
             }
 
             // 2. Resolve Body Normal and Pressed styles
+            // Note: During Identify, bypass EnablePressedState = false so body color/glow always pulses.
             bool customBodyEnabled = (customApp?.Body != null && customApp.Body.Enabled);
             var bodyNormal = (customBodyEnabled && customApp.Body.Normal != null && customApp.Body.Normal.Enabled)
                 ? customApp.Body.Normal
@@ -421,21 +423,22 @@ namespace FlameStream
 
             VirtualKeyMaterialStateStyle bodyPressed = null;
             if (customBodyEnabled) {
-                if (customApp.Body.EnablePressedState && customApp.Body.Pressed != null && customApp.Body.Pressed.Enabled) {
+                if ((customApp.Body.EnablePressedState || isIdentifying) && customApp.Body.Pressed != null && customApp.Body.Pressed.Enabled) {
                     bodyPressed = customApp.Body.Pressed;
-                } else if (!customApp.Body.EnablePressedState) {
+                } else if (!customApp.Body.EnablePressedState && !isIdentifying) {
                     bodyPressed = bodyNormal; // User explicitly disabled press state for this key
-                } else if (baseApp?.Body != null && baseApp.Body.EnablePressedState && baseApp.Body.Pressed != null && baseApp.Body.Pressed.Enabled) {
+                } else if (baseApp?.Body != null && (baseApp.Body.EnablePressedState || isIdentifying) && baseApp.Body.Pressed != null && baseApp.Body.Pressed.Enabled) {
                     bodyPressed = baseApp.Body.Pressed;
                 } else {
                     bodyPressed = bodyNormal;
                 }
             } else {
-                bool baseHasPressed = (baseApp?.Body != null && baseApp.Body.EnablePressedState && baseApp.Body.Pressed != null && baseApp.Body.Pressed.Enabled);
+                bool baseHasPressed = (baseApp?.Body != null && (baseApp.Body.EnablePressedState || isIdentifying) && baseApp.Body.Pressed != null && baseApp.Body.Pressed.Enabled);
                 bodyPressed = baseHasPressed ? baseApp.Body.Pressed : bodyNormal;
             }
 
             // 3. Resolve Border Normal and Pressed styles
+            // Note: During Identify, bypass EnablePressedState = false so border color/glow always pulses.
             bool customBorderEnabled = (customApp?.Border != null && customApp.Border.Enabled);
             var borderNormal = (customBorderEnabled && customApp.Border.Normal != null && customApp.Border.Normal.Enabled)
                 ? customApp.Border.Normal
@@ -443,17 +446,17 @@ namespace FlameStream
 
             VirtualKeyMaterialStateStyle borderPressed = null;
             if (customBorderEnabled) {
-                if (customApp.Border.EnablePressedState && customApp.Border.Pressed != null && customApp.Border.Pressed.Enabled) {
+                if ((customApp.Border.EnablePressedState || isIdentifying) && customApp.Border.Pressed != null && customApp.Border.Pressed.Enabled) {
                     borderPressed = customApp.Border.Pressed;
-                } else if (!customApp.Border.EnablePressedState) {
+                } else if (!customApp.Border.EnablePressedState && !isIdentifying) {
                     borderPressed = borderNormal; // User explicitly disabled press state for this key
-                } else if (baseApp?.Border != null && baseApp.Border.EnablePressedState && baseApp.Border.Pressed != null && baseApp.Border.Pressed.Enabled) {
+                } else if (baseApp?.Border != null && (baseApp.Border.EnablePressedState || isIdentifying) && baseApp.Border.Pressed != null && baseApp.Border.Pressed.Enabled) {
                     borderPressed = baseApp.Border.Pressed;
                 } else {
                     borderPressed = borderNormal;
                 }
             } else {
-                bool baseHasPressed = (baseApp?.Border != null && baseApp.Border.EnablePressedState && baseApp.Border.Pressed != null && baseApp.Border.Pressed.Enabled);
+                bool baseHasPressed = (baseApp?.Border != null && (baseApp.Border.EnablePressedState || isIdentifying) && baseApp.Border.Pressed != null && baseApp.Border.Pressed.Enabled) ;
                 borderPressed = baseHasPressed ? baseApp.Border.Pressed : borderNormal;
             }
 
@@ -466,40 +469,43 @@ namespace FlameStream
             float pressOutTime = pressOut?.Time ?? 0.12f;
             Ease pressOutEase = pressOut?.Ease ?? Ease.OutCubic;
 
-            // Progress interpolation
-            float factor = 0f;
-            if (keyDef.IdentifyGlowTimer > 0f) {
-                factor = Mathf.PingPong(Time.time * 6f, 1f);
-            } else {
-                if (isDown) {
-                    if (pressInTime <= 0.001f || dt <= 0f) {
-                        keyDef.CurrentPressProgress = 1.0f;
-                    } else {
-                        keyDef.CurrentPressProgress = Mathf.MoveTowards(keyDef.CurrentPressProgress, 1.0f, dt / pressInTime);
-                    }
-                    factor = DOVirtual.EasedValue(0f, 1f, keyDef.CurrentPressProgress, pressInEase);
+            // Physical press progress interpolation
+            if (isDown) {
+                if (pressInTime <= 0.001f || dt <= 0f) {
+                    keyDef.CurrentPressProgress = 1.0f;
                 } else {
-                    if (pressOutTime <= 0.001f || dt <= 0f) {
-                        keyDef.CurrentPressProgress = 0.0f;
-                    } else {
-                        keyDef.CurrentPressProgress = Mathf.MoveTowards(keyDef.CurrentPressProgress, 0.0f, dt / pressOutTime);
-                    }
-                    factor = DOVirtual.EasedValue(0f, 1f, keyDef.CurrentPressProgress, pressOutEase);
+                    keyDef.CurrentPressProgress = Mathf.MoveTowards(keyDef.CurrentPressProgress, 1.0f, dt / pressInTime);
+                }
+            } else {
+                if (pressOutTime <= 0.001f || dt <= 0f) {
+                    keyDef.CurrentPressProgress = 0.0f;
+                } else {
+                    keyDef.CurrentPressProgress = Mathf.MoveTowards(keyDef.CurrentPressProgress, 0.0f, dt / pressOutTime);
                 }
             }
 
-            // Calculate animated dimensions
+            float pressFactor = isDown
+                ? DOVirtual.EasedValue(0f, 1f, keyDef.CurrentPressProgress, pressInEase)
+                : DOVirtual.EasedValue(0f, 1f, keyDef.CurrentPressProgress, pressOutEase);
+
+            // Shape factor: Only driven by physical key press, NEVER morphed by Identify
+            float shapeFactor = pressFactor;
+
+            // Glow factor: Pulses during Identify, otherwise follows physical key press
+            float glowFactor = isIdentifying ? Mathf.PingPong(Time.time * 6f, 1f) : pressFactor;
+
+            // Calculate animated dimensions (driven purely by shapeFactor)
             Vector2 normalSize = shapeNormal != null ? shapeNormal.Size : BaseKeySize;
             Vector2 pressedSize = shapePressed != null ? shapePressed.Size : normalSize;
-            Vector2 currentSize = Vector2.Lerp(normalSize, pressedSize, factor);
+            Vector2 currentSize = Vector2.Lerp(normalSize, pressedSize, shapeFactor);
 
             Vector4 normalCorners = shapeNormal != null ? shapeNormal.GetCornerRadii() : BorderVector4Extensions.Uniform(0.25f);
             Vector4 pressedCorners = shapePressed != null ? shapePressed.GetCornerRadii() : normalCorners;
-            Vector4 currentCorners = Vector4.Lerp(normalCorners, pressedCorners, factor);
+            Vector4 currentCorners = Vector4.Lerp(normalCorners, pressedCorners, shapeFactor);
 
             Vector4 normalBorders = shapeNormal != null ? shapeNormal.GetBorderWidths() : BorderVector4Extensions.Uniform(0.0025f);
             Vector4 pressedBorders = shapePressed != null ? shapePressed.GetBorderWidths() : normalBorders;
-            Vector4 currentBorders = Vector4.Lerp(normalBorders, pressedBorders, factor);
+            Vector4 currentBorders = Vector4.Lerp(normalBorders, pressedBorders, shapeFactor);
 
             float maxRadius = Mathf.Min(currentSize.x, currentSize.y) * 0.5f;
             Vector4 absoluteCorners = currentCorners * maxRadius;
@@ -521,13 +527,28 @@ namespace FlameStream
                 }
             }
 
-            // Apply Body
+            // Apply Body (Color & Glow)
             if (bodyNormal != null) {
                 var targetPressed = bodyPressed ?? bodyNormal;
-                Color bodyColor = Color.Lerp(bodyNormal.Color, targetPressed.Color, factor);
-                float bodySelfIllum = Mathf.Clamp01(Mathf.Lerp(bodyNormal.SelfIllumination, targetPressed.SelfIllumination, factor));
-                Color bodyGlowColor = Color.Lerp(bodyNormal.GlowColor, targetPressed.GlowColor, factor);
-                float bodyGlowIntensity = Mathf.Lerp(bodyNormal.GlowIntensity, targetPressed.GlowIntensity, factor);
+                Color targetBodyColor = targetPressed.Color;
+                float targetBodySelfIllum = targetPressed.SelfIllumination;
+                Color targetBodyGlowColor = targetPressed.GlowColor;
+                float targetBodyGlowIntensity = targetPressed.GlowIntensity;
+
+                if (isIdentifying) {
+                    // Guaranteed prominent pulse during Identify even if press state has 0 glow
+                    if (targetBodyGlowIntensity <= 0.2f) {
+                        targetBodyGlowIntensity = Mathf.Max(bodyNormal.GlowIntensity + 2.0f, 2.0f);
+                    }
+                    if (targetBodyGlowColor == Color.clear || targetBodyGlowColor.a <= 0.01f) {
+                        targetBodyGlowColor = Color.white;
+                    }
+                }
+
+                Color bodyColor = Color.Lerp(bodyNormal.Color, targetBodyColor, glowFactor);
+                float bodySelfIllum = Mathf.Clamp01(Mathf.Lerp(bodyNormal.SelfIllumination, targetBodySelfIllum, glowFactor));
+                Color bodyGlowColor = Color.Lerp(bodyNormal.GlowColor, targetBodyGlowColor, glowFactor);
+                float bodyGlowIntensity = Mathf.Lerp(bodyNormal.GlowIntensity, targetBodyGlowIntensity, glowFactor);
 
                 // When SelfIllumination = 1, diffuse albedo is dimmed to 0 so scene lighting/shadows cannot darken or tint it.
                 // The base color is self-emitted, with any additional glow/bloom added on top.
@@ -538,13 +559,28 @@ namespace FlameStream
                 keyDef.BodyMaterial.SetColor("_EmissionColor", emission);
             }
 
-            // Apply Border
+            // Apply Border (Color & Glow)
             if (borderNormal != null) {
                 var targetPressed = borderPressed ?? borderNormal;
-                Color borderColor = Color.Lerp(borderNormal.Color, targetPressed.Color, factor);
-                float borderSelfIllum = Mathf.Clamp01(Mathf.Lerp(borderNormal.SelfIllumination, targetPressed.SelfIllumination, factor));
-                Color borderGlowColor = Color.Lerp(borderNormal.GlowColor, targetPressed.GlowColor, factor);
-                float borderGlowIntensity = Mathf.Lerp(borderNormal.GlowIntensity, targetPressed.GlowIntensity, factor);
+                Color targetBorderColor = targetPressed.Color;
+                float targetBorderSelfIllum = targetPressed.SelfIllumination;
+                Color targetBorderGlowColor = targetPressed.GlowColor;
+                float targetBorderGlowIntensity = targetPressed.GlowIntensity;
+
+                if (isIdentifying) {
+                    // Guaranteed prominent pulse during Identify even if press state has 0 glow
+                    if (targetBorderGlowIntensity <= 0.2f) {
+                        targetBorderGlowIntensity = Mathf.Max(borderNormal.GlowIntensity + 2.5f, 2.5f);
+                    }
+                    if (targetBorderGlowColor == Color.clear || targetBorderGlowColor.a <= 0.01f) {
+                        targetBorderGlowColor = Color.white;
+                    }
+                }
+
+                Color borderColor = Color.Lerp(borderNormal.Color, targetBorderColor, glowFactor);
+                float borderSelfIllum = Mathf.Clamp01(Mathf.Lerp(borderNormal.SelfIllumination, targetBorderSelfIllum, glowFactor));
+                Color borderGlowColor = Color.Lerp(borderNormal.GlowColor, targetBorderGlowColor, glowFactor);
+                float borderGlowIntensity = Mathf.Lerp(borderNormal.GlowIntensity, targetBorderGlowIntensity, glowFactor);
 
                 Color albedo = new Color(borderColor.r * (1f - borderSelfIllum), borderColor.g * (1f - borderSelfIllum), borderColor.b * (1f - borderSelfIllum), borderColor.a);
                 Color emission = (borderColor * borderSelfIllum) + (borderGlowColor * borderGlowIntensity);
