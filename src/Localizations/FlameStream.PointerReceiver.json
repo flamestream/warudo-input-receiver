@@ -439,11 +439,15 @@
         "ENABLE_FLOATING_KEYS": "Enable Floating Keys",
         "KEYS_LAYOUT_PRESET": "Keys Layout Preset",
         "APPLY_KEYS_LAYOUT_PRESET": "⚠️ Apply Preset (Overwrites Key List)",
-        "APPLY_KEYS_LAYOUT_PRESET_DESC": "Loads the selected layout preset. WARNING: This will overwrite and replace the entire Virtual Keys list.",
-        "KEYSET_TRANSFORMS": "Keyset Transforms (Clusters)",
-        "LEFT_KEYSET_TRANSFORM": "Left Keyset Transform",
-        "RIGHT_KEYSET_TRANSFORM": "Right Keyset Transform",
-        "ROOT_KEYSET_TRANSFORM": "Root Keyset Transform",
+        "APPLY_KEYS_LAYOUT_PRESET_DESC": "Loads the selected layout preset. WARNING: This will overwrite and replace the entire Key Definitions list.",
+        "KEY_ORIGINS": "Key Origins",
+        "LEFT_KEY_ORIGIN": "Left Key Origin",
+        "RIGHT_KEY_ORIGIN": "Right Key Origin",
+        "ROOT_KEY_ORIGIN": "Root Key Origin",
+        "KEYSET_TRANSFORMS": "Key Origins",
+        "LEFT_KEYSET_TRANSFORM": "Left Key Origin",
+        "RIGHT_KEYSET_TRANSFORM": "Right Key Origin",
+        "ROOT_KEYSET_TRANSFORM": "Root Key Origin",
         "DEFAULT_KEY_SIZE": "Default Key Size (Width, Height)",
         "DEFAULT_KEY_APPEARANCE": "Default Key Appearance",
         "RESET_DEFAULT_APPEARANCE": "↺ Reset Default Appearance to Preset",
@@ -468,7 +472,8 @@
         "TRANSFORM": "Transform",
         "CLEAR_IDENTIFIED_KEY": "↺ Clear Key Identification",
         "FLOATING_KEY_LAYOUT": "Floating Key Layout",
-        "VIRTUAL_KEYS": "Virtual Keys",
+        "KEY_DEFINITIONS": "Key Definitions",
+        "VIRTUAL_KEYS": "Key Definitions",
         "BINDING_ANCHOR": "Anchor Location",
         "ANCHOR_LEFT_HAND": "Left Hand",
         "ANCHOR_RIGHT_HAND": "Right Hand",
@@ -503,9 +508,9 @@
         "PRESET_LEVERLESS_HITBOX": "Leverless / Fighting Game (Hitbox)",
         "PRESET_NUMPAD": "Numpad",
         "PRESET_STANDARD_60": "Standard 60% Keyboard",
-        "LEFT_KEYSET_CLUSTER": "Left Keyset Cluster",
-        "RIGHT_KEYSET_CLUSTER": "Right Keyset Cluster",
-        "ROOT_KEYSET_CLUSTER": "Root Keyset Cluster"
+        "LEFT_KEYSET_CLUSTER": "Left Key Origin",
+        "RIGHT_KEYSET_CLUSTER": "Right Key Origin",
+        "ROOT_KEYSET_CLUSTER": "Root Key Origin"
     }
 }
 

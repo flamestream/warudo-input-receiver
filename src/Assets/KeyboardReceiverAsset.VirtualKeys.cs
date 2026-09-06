@@ -31,7 +31,10 @@ namespace FlameStream
         [Label("FLOATING_KEY_LAYOUT")]
         public VirtualKeyCollection VirtualKeysCollection;
 
-        public VirtualKeysetTransforms KeysetTransforms => VirtualKeysCollection?.KeysetTransforms;
+        // Key Origins (Collapsible StructuredData)
+        [DataInput(530)]
+        [Label("KEY_ORIGINS")]
+        public VirtualKeysetTransforms KeysetTransforms;
 
         public CollapsibleVisualSetupTransform LeftKeysetTransform => KeysetTransforms?.Left;
         public CollapsibleVisualSetupTransform RightKeysetTransform => KeysetTransforms?.Right;
@@ -87,6 +90,12 @@ namespace FlameStream
                 VirtualKeysCollection.CollapsedSelf = true;
             }
             VirtualKeysCollection.Parent = this;
+
+            if (KeysetTransforms == null) {
+                KeysetTransforms = StructuredData.Create<VirtualKeysetTransforms>();
+                KeysetTransforms.CollapsedSelf = true;
+            }
+            KeysetTransforms.Parent = this;
             SetupKeysetTransforms();
 
             if (DefaultAppearance == null) {
@@ -106,9 +115,14 @@ namespace FlameStream
                 if (VirtualKeysCollection != null) {
                     VirtualKeysCollection.Parent = this;
                 }
-                SetupKeysetTransforms();
                 RefreshVirtualKeysParent();
                 RebuildAllVirtualKeyMeshes();
+            });
+            Watch(nameof(KeysetTransforms), delegate {
+                if (KeysetTransforms != null) {
+                    KeysetTransforms.Parent = this;
+                }
+                SetupKeysetTransforms();
             });
 
             Watch(nameof(DefaultAppearance), delegate {
@@ -139,16 +153,11 @@ namespace FlameStream
         }
 
         public void SetupKeysetTransforms() {
-            if (VirtualKeysCollection == null) {
-                VirtualKeysCollection = StructuredData.Create<VirtualKeyCollection>();
-                VirtualKeysCollection.Parent = this;
-                VirtualKeysCollection.CollapsedSelf = true;
+            if (KeysetTransforms == null) {
+                KeysetTransforms = StructuredData.Create<VirtualKeysetTransforms>();
+                KeysetTransforms.Parent = this;
             }
-            if (VirtualKeysCollection.KeysetTransforms == null) {
-                VirtualKeysCollection.KeysetTransforms = StructuredData.Create<VirtualKeysetTransforms>();
-                VirtualKeysCollection.KeysetTransforms.Parent = this;
-            }
-            VirtualKeysCollection.KeysetTransforms.CollapsedSelf = true;
+            KeysetTransforms.CollapsedSelf = true;
             SetupLeftKeysetTransform();
             SetupRightKeysetTransform();
             SetupRootKeysetTransform();
@@ -165,7 +174,7 @@ namespace FlameStream
                 transforms.Left.Scale = Vector3.one;
             }
             transforms.Left.CollapsedSelf = true;
-            LeftKeysetTransform.LocalizationKey = "LEFT_KEYSET_CLUSTER";
+            LeftKeysetTransform.LocalizationKey = "LEFT_KEY_ORIGIN";
             LeftKeysetTransform.OnEnterVisualSetup = (tr) => { EnsureAnchors(); };
             LeftKeysetTransform.OnCreateAnchor = (tr, setupAnchor) => {
                 var parent = LeftHandAnchor;
@@ -178,8 +187,8 @@ namespace FlameStream
                 setupAnchor.Transform.Position = tr.Position;
                 setupAnchor.Transform.Rotation = tr.Rotation;
                 setupAnchor.Transform.Scale = tr.Scale;
-                setupAnchor.Name = "⌛⚓-Left Keyset Cluster";
-                setupAnchor.Instructions = "Position, rotate, and scale the entire **Left Hand Keyset** cluster.\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Name = "⌛⚓-Left Key Origin";
+                setupAnchor.Instructions = "Position, rotate, and scale the entire **Left Hand Key Origin**.\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             LeftKeysetTransform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -206,7 +215,7 @@ namespace FlameStream
                 transforms.Right.Scale = Vector3.one;
             }
             transforms.Right.CollapsedSelf = true;
-            RightKeysetTransform.LocalizationKey = "RIGHT_KEYSET_CLUSTER";
+            RightKeysetTransform.LocalizationKey = "RIGHT_KEY_ORIGIN";
             RightKeysetTransform.OnEnterVisualSetup = (tr) => { EnsureAnchors(); };
             RightKeysetTransform.OnCreateAnchor = (tr, setupAnchor) => {
                 var parent = RightHandAnchor;
@@ -219,8 +228,8 @@ namespace FlameStream
                 setupAnchor.Transform.Position = tr.Position;
                 setupAnchor.Transform.Rotation = tr.Rotation;
                 setupAnchor.Transform.Scale = tr.Scale;
-                setupAnchor.Name = "⌛⚓-Right Keyset Cluster";
-                setupAnchor.Instructions = "Position, rotate, and scale the entire **Right Hand Keyset** cluster.\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Name = "⌛⚓-Right Key Origin";
+                setupAnchor.Instructions = "Position, rotate, and scale the entire **Right Hand Key Origin**.\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             RightKeysetTransform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -247,7 +256,7 @@ namespace FlameStream
                 transforms.Root.Scale = Vector3.one;
             }
             transforms.Root.CollapsedSelf = true;
-            RootKeysetTransform.LocalizationKey = "ROOT_KEYSET_CLUSTER";
+            RootKeysetTransform.LocalizationKey = "ROOT_KEY_ORIGIN";
             RootKeysetTransform.OnEnterVisualSetup = (tr) => { EnsureAnchors(); };
             RootKeysetTransform.OnCreateAnchor = (tr, setupAnchor) => {
                 var parent = RootAnchor;
@@ -260,8 +269,8 @@ namespace FlameStream
                 setupAnchor.Transform.Position = tr.Position;
                 setupAnchor.Transform.Rotation = tr.Rotation;
                 setupAnchor.Transform.Scale = tr.Scale;
-                setupAnchor.Name = "⌛⚓-Root Keyset Cluster";
-                setupAnchor.Instructions = "Position, rotate, and scale the entire **Root Keyset** cluster.\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Name = "⌛⚓-Root Key Origin";
+                setupAnchor.Instructions = "Position, rotate, and scale the entire **Root Key Origin**.\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             RootKeysetTransform.OnApplyAnchor = (tr, setupAnchor) => {

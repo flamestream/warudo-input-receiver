@@ -33,14 +33,10 @@ namespace FlameStream
         public VirtualKeyPresetConfig LayoutPreset;
 
         [DataInput(20)]
-        [Label("KEYSET_TRANSFORMS")]
-        public VirtualKeysetTransforms KeysetTransforms;
-
-        [DataInput(30)]
-        [Label("VIRTUAL_KEYS")]
+        [Label("KEY_DEFINITIONS")]
         public VirtualKeyDefinition[] Keys = new VirtualKeyDefinition[0];
 
-        [Trigger(40)]
+        [Trigger(30)]
         [Label("CLEAR_IDENTIFIED_KEY")]
         public void TriggerClearIdentifiedKey() {
             Parent?.ClearIdentifiedKey();
@@ -68,11 +64,6 @@ namespace FlameStream
                 LayoutPreset.Parent = Parent;
                 LayoutPreset.CollapsedSelf = true;
             }
-            if (KeysetTransforms == null) {
-                KeysetTransforms = StructuredData.Create<VirtualKeysetTransforms>();
-                KeysetTransforms.Parent = Parent;
-                KeysetTransforms.CollapsedSelf = true;
-            }
             Watch(nameof(Keys), delegate {
                 Parent?.OnVirtualKeysChanged();
             });
@@ -80,12 +71,6 @@ namespace FlameStream
                 if (LayoutPreset != null) {
                     LayoutPreset.Parent = Parent;
                 }
-            });
-            Watch(nameof(KeysetTransforms), delegate {
-                if (KeysetTransforms != null) {
-                    KeysetTransforms.Parent = Parent;
-                }
-                Parent?.SetupKeysetTransforms();
             });
         }
     }
