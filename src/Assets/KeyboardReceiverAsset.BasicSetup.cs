@@ -192,7 +192,7 @@ namespace FlameStream
             }
 
             if (stateChanged) {
-                Broadcast();
+                RequestUiRefresh();
             }
         }
 

@@ -19,6 +19,17 @@ namespace FlameStream {
         [DataInput]
         public int AssetVersion = 1;
 
+        protected long uiVersion = 0;
+
+        public override long GetVersion() {
+            return base.GetVersion() + uiVersion;
+        }
+
+        public void RequestUiRefresh() {
+            uiVersion++;
+            Broadcast();
+        }
+
         protected abstract ushort PROTOCOL_VERSION { get; }
         protected abstract string PROTOCOL_ID { get; }
         protected abstract int DEFAULT_PORT { get; }

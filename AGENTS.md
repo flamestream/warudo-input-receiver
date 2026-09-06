@@ -170,6 +170,11 @@ All input receivers inherit from `ReceiverAsset`:
 - **Single Section Declaration**: Only annotate the **first** member of a section with `[Section("SECTION_NAME")]`. Subsequent members automatically inherit the active section until a new section is declared. Decorating multiple sibling members with `[Section]` causes Warudo to close and reopen duplicate section containers with identical headers.
 - **Dynamic `port.Properties.sectionTitle` Rule**: Setting `sectionTitle` dynamically on a port and broadcasting it does **not** group items by tag; it designates that specific port as the **start boundary** of a section container. Never broadcast `sectionTitle` on multiple sibling ports in the same section. The section title must always be owned by a **permanent, visible port** in that section (e.g. `TriggerResetAnchors`). Never transfer `sectionTitle` to a port that can become hidden, as hiding it leaves the section container stranded with the previous title in Warudo's Vue UI. Dynamically hide/show child ports without assigning them a `sectionTitle`.
 
+### 4.18 Dynamic Section Header Updating & Inspector Re-rendering via `GetVersion()`
+- **The Issue**: When changing `port.Properties.sectionTitle` dynamically in C#, neither `BroadcastTriggerProperties` nor `Broadcast()` will update the section header on the screen unless the user navigates away and back to the asset. Conversely, calling `BroadcastOpenedScene()` causes a disruptive modal "Waiting..." loading overlay.
+- **Root Cause**: In Warudo's web client (`warudo-client-electron`), `createSections` only runs when `props.entityId` changes or when `entity.value?.version` changes. Because `Entity.GetVersion()` returns a constant `0L`, Vue never sees the version change.
+- **Rule**: In `ReceiverAsset`, `GetVersion()` is overridden to return `base.GetVersion() + uiVersion`. To refresh section headers and schema layout in-place without any "Waiting..." overlay, call `RequestUiRefresh()` (which increments `uiVersion` and calls `Broadcast()`).
+
 ---
 
 ## 5. Troubleshooting & Runtime Logs

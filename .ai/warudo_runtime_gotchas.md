@@ -1123,6 +1123,49 @@ If props, keyboard clusters (e.g. split keyboard halves), or visual meshes are p
    ```
 3. At `Position = Vector3.zero` and `Rotation = Vector3.zero`, the prop or keyset aligns perfectly flat and straight with the workstation rest pose without fighting the humanoid wrist IK standard.
 
+---
+
+## 33. Dynamic Section Header Updating & Inspector Re-rendering via `Entity.GetVersion()`
+
+### The Phenomenon
+When dynamically modifying `port.Properties.sectionTitle` in C# (for example, renaming a section from `"Advanced"` to `"Advanced ⚠️[DEBUG MODE]"`), calling `BroadcastTriggerProperties` or `this.Broadcast()` updates port properties, but Warudo's Vue UI inspector never updates the section header text on screen. The new section title only appears if the user clicks away to another asset in the scene hierarchy and then clicks back to the asset.
+
+Conversely, attempting to force a refresh with `Context.Service?.BroadcastOpenedScene()` causes a disruptive modal "Waiting..." loading overlay because the frontend interprets it as a complete scene reload.
+
+### Root Cause Analysis
+In Warudo's frontend (`warudo-client-electron`):
+1. The inspector component (`EntityInspector`) builds sections using `createSections(inputs.value)`.
+2. This `build()` function is watched by two triggers:
+   ```javascript
+   watch(() => props.entityId, build);
+   watch(() => entity.value?.version, build);
+   ```
+3. In `Warudo.Core.Data.Entity`, the base implementation of `GetVersion()` is:
+   ```csharp
+   public virtual long GetVersion() { return 0L; }
+   ```
+   Because `GetVersion()` constantly returns `0L`, every serialized `FrameUpdate` sends `version: 0`. The Vue reactive watcher `entity.value?.version` never sees a change, so `build()` is never invoked on `Broadcast()`. Switching to another asset changes `props.entityId`, which is why navigating away and back forced a rebuild.
+
+### Architectural Solution
+1. In `ReceiverAsset`, introduce a `uiVersion` counter and override `GetVersion()`:
+   ```csharp
+   protected long uiVersion = 0;
+
+   public override long GetVersion() {
+       return base.GetVersion() + uiVersion;
+   }
+
+   public void RequestUiRefresh() {
+       uiVersion++;
+       Broadcast();
+   }
+   ```
+2. Whenever section headers or schema layouts change dynamically:
+   - Update `port.Properties.sectionTitle`.
+   - Call `RequestUiRefresh()`.
+3. Warudo serializes the asset with the incremented `version`. The Vue client detects `entity.value.version` changing and re-runs `build()`, instantly updating all section titles and schema containers in-place without reloading the scene or showing any "Waiting..." overlay.
+
+
 
 
 
