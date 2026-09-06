@@ -208,7 +208,6 @@ namespace FlameStream {
             }
 
             UpdateAllDebugButtonStates();
-            Context.Service?.BroadcastOpenedScene();
         }
 
         public void ToggleDebugVirtualKey(VirtualKeyDefinition keyDef) {
@@ -238,7 +237,6 @@ namespace FlameStream {
             AnyDown = false;
 
             UpdateAllDebugButtonStates();
-            Context.Service?.BroadcastOpenedScene();
             Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Info, Name, "DEBUG_RELEASED_ALL_KEYS".Localized());
         }
     }

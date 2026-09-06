@@ -163,8 +163,13 @@ namespace FlameStream
             DeactivateAllDebugKeys();
         }
 
+        private bool lastAdvancedDebugState = false;
+
         public void UpdateAdvancedSectionDebugState() {
             bool isDebug = IsDebugKeyModeActive;
+            bool stateChanged = isDebug != lastAdvancedDebugState;
+            lastAdvancedDebugState = isDebug;
+
             string sectionTitle = isDebug ? "ADVANCED_DEBUG_MODE".Localized() : "ADVANCED".Localized();
 
             var resetPort = GetTriggerPort(nameof(TriggerResetAnchors));
@@ -186,7 +191,9 @@ namespace FlameStream
                 BroadcastTriggerProperties(nameof(TriggerDeactivateAllDebugKeys));
             }
 
-            Broadcast();
+            if (stateChanged) {
+                Broadcast();
+            }
         }
 
         public void UpdateAllDebugButtonStates() {
@@ -201,9 +208,6 @@ namespace FlameStream
                 }
             }
             UpdateAdvancedSectionDebugState();
-            BroadcastDataInput(nameof(KeyBindingsCollection));
-            BroadcastDataInput(nameof(VirtualKeysCollection));
-            Broadcast();
         }
 
         [DataInput]
