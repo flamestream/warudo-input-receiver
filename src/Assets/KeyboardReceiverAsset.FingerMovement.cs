@@ -28,15 +28,15 @@ namespace FlameStream
 
         [Section("FINGER_MOVEMENT")]
 
-        [DataInput(200)]
+        [DataInput(300)]
         [Label("FINGER_ANIMATIONS")]
         public KeyboardFingerAnimations FingerAnimations;
 
-        [DataInput(210)]
+        [DataInput(310)]
         [Label("KEY_TRANSITIONS")]
         public KeyboardKeyTransitions Transitions;
 
-        [DataInput(220)]
+        [DataInput(320)]
         [Label("KEY_BINDINGS_LAYOUT")]
         public KeyboardKeyBindingCollection KeyBindingsCollection;
 
@@ -787,5 +787,343 @@ namespace FlameStream
                 );
             }
         }
+
+        #region Auto-Generate Key Bindings from Floating Keys
+
+        private float GetAvatarFingerLength(Animator anim, HumanBodyBones proximalBone, HumanBodyBones interBone, HumanBodyBones distalBone) {
+            float len = 0f;
+            var p = anim.GetBoneTransform(proximalBone);
+            var i = anim.GetBoneTransform(interBone);
+            var d = anim.GetBoneTransform(distalBone);
+            if (p != null && i != null) len += Vector3.Distance(p.position, i.position);
+            if (i != null && d != null) len += Vector3.Distance(i.position, d.position);
+            if (d != null && d.childCount > 0) len += Vector3.Distance(d.position, d.GetChild(0).position);
+            else if (d != null && i != null) len += Vector3.Distance(i.position, d.position) * 0.75f;
+            return len > 0.02f ? len : 0.085f;
+        }
+
+        private KeyboardFinger GetDefaultFingerForKey(VKCode key, bool isLeftHand) {
+            if (isLeftHand) {
+                switch (key) {
+                    case VKCode.ESCAPE:
+                    case VKCode.OEM_3: // ` / ~
+                    case VKCode.KEY_1:
+                    case VKCode.TAB:
+                    case VKCode.Q:
+                    case VKCode.CAPITAL:
+                    case VKCode.A:
+                    case VKCode.LSHIFT:
+                    case VKCode.Z:
+                    case VKCode.LCONTROL:
+                    case VKCode.F1:
+                    case VKCode.F13: // M1
+                    case VKCode.F14: // M2
+                    case VKCode.F15: // M3
+                    case VKCode.F16: // M4
+                    case VKCode.F17: // M5
+                    case VKCode.VOLUME_MUTE: // Knob 1
+                        return KeyboardFinger.LeftPinky;
+
+                    case VKCode.KEY_2:
+                    case VKCode.W:
+                    case VKCode.S:
+                    case VKCode.X:
+                    case VKCode.F2:
+                        return KeyboardFinger.LeftRing;
+
+                    case VKCode.KEY_3:
+                    case VKCode.E:
+                    case VKCode.D:
+                    case VKCode.C:
+                    case VKCode.F3:
+                        return KeyboardFinger.LeftMiddle;
+
+                    case VKCode.KEY_4:
+                    case VKCode.KEY_5:
+                    case VKCode.R:
+                    case VKCode.T:
+                    case VKCode.F:
+                    case VKCode.G:
+                    case VKCode.V:
+                    case VKCode.B:
+                    case VKCode.F4:
+                    case VKCode.F5:
+                        return KeyboardFinger.LeftIndex;
+
+                    case VKCode.LMENU:
+                    case VKCode.LWIN:
+                    case VKCode.SPACE:
+                        return KeyboardFinger.LeftThumb;
+
+                    default:
+                        return KeyboardFinger.LeftIndex;
+                }
+            } else {
+                switch (key) {
+                    case VKCode.RMENU:
+                    case VKCode.RWIN:
+                    case VKCode.SPACE:
+                        return KeyboardFinger.RightThumb;
+
+                    case VKCode.KEY_6:
+                    case VKCode.KEY_7:
+                    case VKCode.Y:
+                    case VKCode.U:
+                    case VKCode.H:
+                    case VKCode.J:
+                    case VKCode.N:
+                    case VKCode.M:
+                    case VKCode.F6:
+                    case VKCode.F7:
+                        return KeyboardFinger.RightIndex;
+
+                    case VKCode.KEY_8:
+                    case VKCode.I:
+                    case VKCode.K:
+                    case VKCode.OEM_COMMA: // ,
+                    case VKCode.F8:
+                        return KeyboardFinger.RightMiddle;
+
+                    case VKCode.KEY_9:
+                    case VKCode.O:
+                    case VKCode.L:
+                    case VKCode.OEM_PERIOD: // .
+                    case VKCode.F9:
+                        return KeyboardFinger.RightRing;
+
+                    case VKCode.KEY_0:
+                    case VKCode.OEM_MINUS: // -
+                    case VKCode.OEM_PLUS:  // =
+                    case VKCode.BACK:
+                    case VKCode.P:
+                    case VKCode.OEM_4: // [
+                    case VKCode.OEM_6: // ]
+                    case VKCode.OEM_5: // \
+                    case VKCode.OEM_1: // ;
+                    case VKCode.OEM_7: // '
+                    case VKCode.RETURN:
+                    case VKCode.OEM_2: // /
+                    case VKCode.RSHIFT:
+                    case VKCode.RCONTROL:
+                    case VKCode.F10:
+                    case VKCode.F11:
+                    case VKCode.F12:
+                    case VKCode.SNAPSHOT: // PrtSc
+                    case VKCode.DELETE:
+                    case VKCode.PRIOR:    // PgUp
+                    case VKCode.NEXT:     // PgDn
+                    case VKCode.END:
+                    case VKCode.HOME:
+                    case VKCode.INSERT:
+                    case VKCode.UP:
+                    case VKCode.DOWN:
+                    case VKCode.LEFT:
+                    case VKCode.RIGHT:
+                    case VKCode.MEDIA_PLAY_PAUSE: // Knob 2
+                        return KeyboardFinger.RightPinky;
+
+                    default:
+                        return KeyboardFinger.RightIndex;
+                }
+            }
+        }
+
+        public void AutoGenerateKeyBindingsFromFloatingKeys() {
+            if (Character == null || !Character.Active || Character.GameObject == null) {
+                Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Warning, "AUTO_GENERATE_KEY_BINDINGS".Localized(), "AUTO_GENERATE_NO_CHARACTER".Localized());
+                return;
+            }
+
+            var animator = Character.Animator;
+            if (animator == null) {
+                Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Error, "AUTO_GENERATE_KEY_BINDINGS".Localized(), "AUTO_SETUP_NO_ANIMATOR".Localized());
+                return;
+            }
+
+            if (VirtualKeysCollection?.Keys == null || VirtualKeysCollection.Keys.Length == 0) {
+                Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Warning, "AUTO_GENERATE_KEY_BINDINGS".Localized(), "AUTO_GENERATE_NO_KEYS".Localized());
+                return;
+            }
+
+            var leftWristBone = animator.GetBoneTransform(HumanBodyBones.LeftHand);
+            var rightWristBone = animator.GetBoneTransform(HumanBodyBones.RightHand);
+            if (leftWristBone == null || rightWristBone == null) {
+                Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Error, "AUTO_GENERATE_KEY_BINDINGS".Localized(), "AUTO_SETUP_NO_HAND_BONES".Localized());
+                return;
+            }
+
+            // World to Rig matrix
+            Matrix4x4 worldToRig;
+            if (RootAnchor != null && RootAnchor.GameObject != null) {
+                worldToRig = RootAnchor.GameObject.transform.worldToLocalMatrix;
+            } else {
+                var charTransform = Character.GameObject.transform;
+                Vector3 rigWorldPos = charTransform.TransformPoint(KeyboardRootPosition);
+                Quaternion rigWorldRot = charTransform.rotation * Quaternion.Euler(KeyboardRootRotation);
+                worldToRig = Matrix4x4.TRS(rigWorldPos, rigWorldRot, Vector3.one).inverse;
+            }
+
+            // Sample Elbows in Rig Space
+            var leftElbowBone = animator.GetBoneTransform(HumanBodyBones.LeftLowerArm);
+            var rightElbowBone = animator.GetBoneTransform(HumanBodyBones.RightLowerArm);
+            Vector3 leftElbowRig = leftElbowBone != null ? worldToRig.MultiplyPoint3x4(leftElbowBone.position) : (LeftHandRestPosition - new Vector3(0.05f, -0.05f, 0.25f));
+            Vector3 rightElbowRig = rightElbowBone != null ? worldToRig.MultiplyPoint3x4(rightElbowBone.position) : (RightHandRestPosition - new Vector3(-0.05f, -0.05f, 0.25f));
+
+            // Measure finger proportions from avatar bones
+            float lIndexLen = GetAvatarFingerLength(animator, HumanBodyBones.LeftIndexProximal, HumanBodyBones.LeftIndexIntermediate, HumanBodyBones.LeftIndexDistal);
+            float lMiddleLen = GetAvatarFingerLength(animator, HumanBodyBones.LeftMiddleProximal, HumanBodyBones.LeftMiddleIntermediate, HumanBodyBones.LeftMiddleDistal);
+            float lRingLen = GetAvatarFingerLength(animator, HumanBodyBones.LeftRingProximal, HumanBodyBones.LeftRingIntermediate, HumanBodyBones.LeftRingDistal);
+            float lPinkyLen = GetAvatarFingerLength(animator, HumanBodyBones.LeftLittleProximal, HumanBodyBones.LeftLittleIntermediate, HumanBodyBones.LeftLittleDistal);
+            float lScale = lIndexLen / 0.085f;
+
+            float rIndexLen = GetAvatarFingerLength(animator, HumanBodyBones.RightIndexProximal, HumanBodyBones.RightIndexIntermediate, HumanBodyBones.RightIndexDistal);
+            float rMiddleLen = GetAvatarFingerLength(animator, HumanBodyBones.RightMiddleProximal, HumanBodyBones.RightMiddleIntermediate, HumanBodyBones.RightMiddleDistal);
+            float rRingLen = GetAvatarFingerLength(animator, HumanBodyBones.RightRingProximal, HumanBodyBones.RightRingIntermediate, HumanBodyBones.RightRingDistal);
+            float rPinkyLen = GetAvatarFingerLength(animator, HumanBodyBones.RightLittleProximal, HumanBodyBones.RightLittleIntermediate, HumanBodyBones.RightLittleDistal);
+            float rScale = rIndexLen / 0.085f;
+
+            // Fingertip offsets relative to wrist in palm forward frame
+            Vector3 GetNeutralTipOffset(KeyboardFinger f) {
+                switch (f) {
+                    case KeyboardFinger.LeftThumb:  return new Vector3(0.035f * lScale, -0.015f * lScale, 0.045f * lScale);
+                    case KeyboardFinger.LeftIndex:  return new Vector3(0.015f * lScale, -0.020f * lScale, lIndexLen);
+                    case KeyboardFinger.LeftMiddle: return new Vector3(0.0f, -0.020f * lScale, lMiddleLen);
+                    case KeyboardFinger.LeftRing:   return new Vector3(-0.015f * lScale, -0.020f * lScale, lRingLen);
+                    case KeyboardFinger.LeftPinky:  return new Vector3(-0.030f * lScale, -0.020f * lScale, lPinkyLen);
+
+                    case KeyboardFinger.RightThumb:  return new Vector3(-0.035f * rScale, -0.015f * rScale, 0.045f * rScale);
+                    case KeyboardFinger.RightIndex:  return new Vector3(-0.015f * rScale, -0.020f * rScale, rIndexLen);
+                    case KeyboardFinger.RightMiddle: return new Vector3(0.0f, -0.020f * rScale, rMiddleLen);
+                    case KeyboardFinger.RightRing:   return new Vector3(0.015f * rScale, -0.020f * rScale, rRingLen);
+                    case KeyboardFinger.RightPinky:  return new Vector3(0.030f * rScale, -0.020f * rScale, rPinkyLen);
+                    default: return Vector3.forward * 0.08f;
+                }
+            }
+
+            Vector3 GetPressedTipOffset(KeyboardFinger f) {
+                float s = f.IsLeftHand() ? lScale : rScale;
+                return GetNeutralTipOffset(f) + new Vector3(0f, -0.014f * s, -0.006f * s);
+            }
+
+            Vector3 leftWrist0 = LeftHandRestPosition;
+            Quaternion leftWristRot0 = Quaternion.Euler(LeftHandRestRotation);
+            Vector3 rightWrist0 = RightHandRestPosition;
+            Quaternion rightWristRot0 = Quaternion.Euler(RightHandRestRotation);
+
+            var list = new List<KeyboardKeyBinding>();
+
+            foreach (var k in VirtualKeysCollection.Keys) {
+                if (k == null) continue;
+
+                // Compute key position and orientation in Rig Space
+                Vector3 groupPos;
+                Quaternion groupRot;
+                if (k.AttachmentAnchor == VirtualKeyAnchor.LeftHand) {
+                    var basePos = LeftHandRestPosition;
+                    var baseRot = Quaternion.Euler(LeftHandRestRotation);
+                    var pos = LeftKeysetTransform?.Position ?? Vector3.zero;
+                    var rot = LeftKeysetTransform?.Rotation ?? Vector3.zero;
+                    groupPos = basePos + baseRot * pos;
+                    groupRot = baseRot * Quaternion.Euler(rot);
+                } else if (k.AttachmentAnchor == VirtualKeyAnchor.RightHand) {
+                    var basePos = RightHandRestPosition;
+                    var baseRot = Quaternion.Euler(RightHandRestRotation);
+                    var pos = RightKeysetTransform?.Position ?? Vector3.zero;
+                    var rot = RightKeysetTransform?.Rotation ?? Vector3.zero;
+                    groupPos = basePos + baseRot * pos;
+                    groupRot = baseRot * Quaternion.Euler(rot);
+                } else {
+                    var pos = RootKeysetTransform?.Position ?? Vector3.zero;
+                    var rot = RootKeysetTransform?.Rotation ?? Vector3.zero;
+                    groupPos = pos;
+                    groupRot = Quaternion.Euler(rot);
+                }
+
+                Vector3 keyPosRig = groupPos + groupRot * k.Transform.Position;
+                Quaternion keyRotRig = groupRot * Quaternion.Euler(k.Transform.Rotation);
+
+                bool isLeftHand;
+                if (k.AttachmentAnchor == VirtualKeyAnchor.LeftHand) {
+                    isLeftHand = true;
+                } else if (k.AttachmentAnchor == VirtualKeyAnchor.RightHand) {
+                    isLeftHand = false;
+                } else {
+                    isLeftHand = keyPosRig.x < 0f;
+                }
+
+                KeyboardFinger finger = GetDefaultFingerForKey(k.Key, isLeftHand);
+
+                Vector3 wrist0 = isLeftHand ? leftWrist0 : rightWrist0;
+                Quaternion wristRot0 = isLeftHand ? leftWristRot0 : rightWristRot0;
+                Vector3 elbowRig = isLeftHand ? leftElbowRig : rightElbowRig;
+                Vector3 tipPressed = GetPressedTipOffset(finger);
+
+                // 1. Forearm yaw angle around elbow pivot
+                Vector3 vReach = keyPosRig - elbowRig;
+                Vector3 arm0 = wrist0 - elbowRig;
+                float reachAngle = Mathf.Atan2(vReach.x, vReach.z) * Mathf.Rad2Deg;
+                float neutralAngle = Mathf.Atan2(arm0.x, arm0.z) * Mathf.Rad2Deg;
+                float deltaYaw = Mathf.DeltaAngle(neutralAngle, reachAngle);
+
+                // 2. Hand pitch adjustment to match key tilt & row height
+                float keyPitch = keyRotRig.eulerAngles.x;
+                if (keyPitch > 180f) keyPitch -= 360f;
+
+                Vector3 neutralTipRig = wrist0 + wristRot0 * GetNeutralTipOffset(finger);
+                float deltaY = keyPosRig.y - neutralTipRig.y;
+                float deltaPitch = keyPitch * 0.5f + Mathf.Clamp(deltaY / 0.08f, -1f, 1f) * 12f;
+
+                Quaternion targetHandRot = Quaternion.Euler(deltaPitch, deltaYaw * 0.7f, 0f) * wristRot0;
+
+                // 3. Wrist target position so pressed fingertip hits the key center
+                Vector3 targetWristPos = keyPosRig - (targetHandRot * tipPressed);
+
+                // 4. Displacements
+                Vector3 deltaPos = targetWristPos - wrist0;
+
+                Vector3 handScale = isLeftHand ? GetLeftHandMovementScale() : GetRightHandMovementScale();
+                if (handScale.x != 0f) deltaPos.x /= handScale.x;
+                if (handScale.y != 0f) deltaPos.y /= handScale.y;
+                if (handScale.z != 0f) deltaPos.z /= handScale.z;
+
+                Quaternion deltaRotQuat = targetHandRot * Quaternion.Inverse(wristRot0);
+                Vector3 deltaRot = deltaRotQuat.eulerAngles;
+                if (deltaRot.x > 180f) deltaRot.x -= 360f;
+                if (deltaRot.y > 180f) deltaRot.y -= 360f;
+                if (deltaRot.z > 180f) deltaRot.z -= 360f;
+
+                // 5. Ergonomic neutral check
+                bool enableHandMove = true;
+                if (deltaPos.sqrMagnitude < 0.000064f && Mathf.Abs(deltaYaw) < 3f) {
+                    deltaPos = Vector3.zero;
+                    deltaRot = Vector3.zero;
+                    enableHandMove = false;
+                }
+
+                var binding = StructuredData.Create<KeyboardKeyBinding>(b => {
+                    b.Parent = this;
+                    b.Key = k.Key;
+                    b.Finger = finger;
+                    b.DeltaPosition = deltaPos;
+                    b.DeltaRotation = deltaRot;
+                    b.EnableHandMovement = enableHandMove;
+                    b.SetupTransformCallbacks();
+                });
+                list.Add(binding);
+            }
+
+            KeyBindings = list.ToArray();
+            KeyBindingsCollection?.BroadcastDataInput(nameof(KeyBindingsCollection.KeyBindings));
+            BroadcastDataInput(nameof(KeyBindingsCollection));
+            RequestUiRefresh();
+
+            Context.Service?.Toast(
+                Warudo.Core.Server.ToastSeverity.Success,
+                "AUTO_GENERATE_KEY_BINDINGS".Localized(),
+                string.Format("AUTO_GENERATE_SUCCESS".Localized(), KeyBindings.Length)
+            );
+        }
+
+        #endregion
     }
 }

@@ -27,6 +27,13 @@ namespace FlameStream
 
     public class KeyboardKeyBindingCollection : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData
     {
+        [Trigger(5)]
+        [Label("AUTO_GENERATE_KEY_BINDINGS")]
+        [Description("AUTO_GENERATE_KEY_BINDINGS_DESC")]
+        public void TriggerAutoGenerateKeyBindings() {
+            Parent?.AutoGenerateKeyBindingsFromFloatingKeys();
+        }
+
         [DataInput(10)]
         [Label("LAYOUT_PRESET")]
         public KeyboardLayoutPresetConfig LayoutPreset;

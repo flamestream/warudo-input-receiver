@@ -15,19 +15,19 @@ namespace FlameStream
     {
         [Section("FLOATING_KEYS")]
 
-        [DataInput(500)]
+        [DataInput(200)]
         [Label("ENABLE_FLOATING_KEYS")]
         public bool EnableFloatingKeys = false;
 
         // Base Look & Feel
-        [DataInput(510)]
+        [DataInput(210)]
         [Label("DEFAULT_KEY_APPEARANCE")]
         public VirtualKeyAppearance DefaultAppearance;
 
         public Vector2 BaseKeySize => DefaultAppearance?.Shape?.Normal?.Size ?? new Vector2(0.032f, 0.032f);
 
         // Floating Key Layout (Collapsible StructuredData)
-        [DataInput(520)]
+        [DataInput(220)]
         [Label("FLOATING_KEY_LAYOUT")]
         public VirtualKeyCollection VirtualKeysCollection;
 
@@ -54,7 +54,7 @@ namespace FlameStream
         }
 
         // Key Origins (Collapsible StructuredData)
-        [DataInput(530)]
+        [DataInput(230)]
         [Label("KEY_ORIGINS")]
         public VirtualKeysetTransforms KeysetTransforms;
 
