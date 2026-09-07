@@ -1057,12 +1057,83 @@ namespace FlameStream
 
             float pitch = 0.036f; // Standard key spacing (32mm key + 4mm gap)
 
-            void AddKey(VKCode key, string label, VirtualKeyAnchor anchor, float posX, float posZ, float unitWidth = 1f, float unitHeight = 1f, float rotY = 0f, bool isCircle = false) {
+            KeyboardFinger GetDefaultTouchTypingFinger(VKCode k, VirtualKeyAnchor a, float posX) {
+                bool isLeft = a == VirtualKeyAnchor.LeftHand || (a == VirtualKeyAnchor.KeyboardRoot && posX < 0f);
+                if (isLeft) {
+                    switch (k) {
+                        case VKCode.SPACE:
+                        case VKCode.LMENU:
+                        case VKCode.LWIN:
+                            return KeyboardFinger.LeftThumb;
+                        case VKCode.KEY_4:
+                        case VKCode.KEY_5:
+                        case VKCode.R:
+                        case VKCode.T:
+                        case VKCode.F:
+                        case VKCode.G:
+                        case VKCode.V:
+                        case VKCode.B:
+                        case VKCode.F4:
+                        case VKCode.F5:
+                            return KeyboardFinger.LeftIndex;
+                        case VKCode.KEY_3:
+                        case VKCode.E:
+                        case VKCode.D:
+                        case VKCode.C:
+                        case VKCode.F3:
+                            return KeyboardFinger.LeftMiddle;
+                        case VKCode.KEY_2:
+                        case VKCode.W:
+                        case VKCode.S:
+                        case VKCode.X:
+                        case VKCode.F2:
+                            return KeyboardFinger.LeftRing;
+                        default:
+                            return KeyboardFinger.LeftPinky;
+                    }
+                } else {
+                    switch (k) {
+                        case VKCode.SPACE:
+                        case VKCode.RMENU:
+                        case VKCode.RWIN:
+                            return KeyboardFinger.RightThumb;
+                        case VKCode.KEY_6:
+                        case VKCode.KEY_7:
+                        case VKCode.Y:
+                        case VKCode.U:
+                        case VKCode.H:
+                        case VKCode.J:
+                        case VKCode.N:
+                        case VKCode.M:
+                        case VKCode.F6:
+                        case VKCode.F7:
+                            return KeyboardFinger.RightIndex;
+                        case VKCode.KEY_8:
+                        case VKCode.I:
+                        case VKCode.K:
+                        case VKCode.OEM_COMMA:
+                        case VKCode.F8:
+                            return KeyboardFinger.RightMiddle;
+                        case VKCode.KEY_9:
+                        case VKCode.O:
+                        case VKCode.L:
+                        case VKCode.OEM_PERIOD:
+                        case VKCode.F9:
+                            return KeyboardFinger.RightRing;
+                        default:
+                            return KeyboardFinger.RightPinky;
+                    }
+                }
+            }
+
+            void AddKey(VKCode key, string label, VirtualKeyAnchor anchor, float posX, float posZ, float unitWidth = 1f, float unitHeight = 1f, float rotY = 0f, bool isCircle = false, KeyboardFinger? finger = null) {
+                KeyboardFinger assignedFinger = finger ?? GetDefaultTouchTypingFinger(key, anchor, posX);
                 var def = StructuredData.Create<VirtualKeyDefinition>(d => {
                     d.Parent = this;
                     d.Key = key;
                     d.DisplayLabel = label;
                     d.AttachmentAnchor = anchor;
+                    d.AssignedFinger = assignedFinger;
                     d.Transform.Position = new Vector3(posX, 0f, posZ);
                     d.Transform.Rotation = new Vector3(0f, rotY, 0f);
                     d.Transform.Scale = Vector3.one;

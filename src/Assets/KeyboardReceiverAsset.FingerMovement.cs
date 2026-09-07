@@ -802,132 +802,6 @@ namespace FlameStream
             return len > 0.02f ? len : 0.085f;
         }
 
-        private KeyboardFinger GetDefaultFingerForKey(VKCode key, bool isLeftHand) {
-            if (isLeftHand) {
-                switch (key) {
-                    case VKCode.ESCAPE:
-                    case VKCode.OEM_3: // ` / ~
-                    case VKCode.KEY_1:
-                    case VKCode.TAB:
-                    case VKCode.Q:
-                    case VKCode.CAPITAL:
-                    case VKCode.A:
-                    case VKCode.LSHIFT:
-                    case VKCode.Z:
-                    case VKCode.LCONTROL:
-                    case VKCode.F1:
-                    case VKCode.F13: // M1
-                    case VKCode.F14: // M2
-                    case VKCode.F15: // M3
-                    case VKCode.F16: // M4
-                    case VKCode.F17: // M5
-                    case VKCode.VOLUME_MUTE: // Knob 1
-                        return KeyboardFinger.LeftPinky;
-
-                    case VKCode.KEY_2:
-                    case VKCode.W:
-                    case VKCode.S:
-                    case VKCode.X:
-                    case VKCode.F2:
-                        return KeyboardFinger.LeftRing;
-
-                    case VKCode.KEY_3:
-                    case VKCode.E:
-                    case VKCode.D:
-                    case VKCode.C:
-                    case VKCode.F3:
-                        return KeyboardFinger.LeftMiddle;
-
-                    case VKCode.KEY_4:
-                    case VKCode.KEY_5:
-                    case VKCode.R:
-                    case VKCode.T:
-                    case VKCode.F:
-                    case VKCode.G:
-                    case VKCode.V:
-                    case VKCode.B:
-                    case VKCode.F4:
-                    case VKCode.F5:
-                        return KeyboardFinger.LeftIndex;
-
-                    case VKCode.LMENU:
-                    case VKCode.LWIN:
-                    case VKCode.SPACE:
-                        return KeyboardFinger.LeftThumb;
-
-                    default:
-                        return KeyboardFinger.LeftIndex;
-                }
-            } else {
-                switch (key) {
-                    case VKCode.RMENU:
-                    case VKCode.RWIN:
-                    case VKCode.SPACE:
-                        return KeyboardFinger.RightThumb;
-
-                    case VKCode.KEY_6:
-                    case VKCode.KEY_7:
-                    case VKCode.Y:
-                    case VKCode.U:
-                    case VKCode.H:
-                    case VKCode.J:
-                    case VKCode.N:
-                    case VKCode.M:
-                    case VKCode.F6:
-                    case VKCode.F7:
-                        return KeyboardFinger.RightIndex;
-
-                    case VKCode.KEY_8:
-                    case VKCode.I:
-                    case VKCode.K:
-                    case VKCode.OEM_COMMA: // ,
-                    case VKCode.F8:
-                        return KeyboardFinger.RightMiddle;
-
-                    case VKCode.KEY_9:
-                    case VKCode.O:
-                    case VKCode.L:
-                    case VKCode.OEM_PERIOD: // .
-                    case VKCode.F9:
-                        return KeyboardFinger.RightRing;
-
-                    case VKCode.KEY_0:
-                    case VKCode.OEM_MINUS: // -
-                    case VKCode.OEM_PLUS:  // =
-                    case VKCode.BACK:
-                    case VKCode.P:
-                    case VKCode.OEM_4: // [
-                    case VKCode.OEM_6: // ]
-                    case VKCode.OEM_5: // \
-                    case VKCode.OEM_1: // ;
-                    case VKCode.OEM_7: // '
-                    case VKCode.RETURN:
-                    case VKCode.OEM_2: // /
-                    case VKCode.RSHIFT:
-                    case VKCode.RCONTROL:
-                    case VKCode.F10:
-                    case VKCode.F11:
-                    case VKCode.F12:
-                    case VKCode.SNAPSHOT: // PrtSc
-                    case VKCode.DELETE:
-                    case VKCode.PRIOR:    // PgUp
-                    case VKCode.NEXT:     // PgDn
-                    case VKCode.END:
-                    case VKCode.HOME:
-                    case VKCode.INSERT:
-                    case VKCode.UP:
-                    case VKCode.DOWN:
-                    case VKCode.LEFT:
-                    case VKCode.RIGHT:
-                    case VKCode.MEDIA_PLAY_PAUSE: // Knob 2
-                        return KeyboardFinger.RightPinky;
-
-                    default:
-                        return KeyboardFinger.RightIndex;
-                }
-            }
-        }
-
         public void AutoGenerateKeyBindingsFromFloatingKeys() {
             if (Character == null || !Character.Active || Character.GameObject == null) {
                 Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Warning, "AUTO_GENERATE_KEY_BINDINGS".Localized(), "AUTO_GENERATE_NO_CHARACTER".Localized());
@@ -1042,16 +916,8 @@ namespace FlameStream
                 Vector3 keyPosRig = groupPos + groupRot * k.Transform.Position;
                 Quaternion keyRotRig = groupRot * Quaternion.Euler(k.Transform.Rotation);
 
-                bool isLeftHand;
-                if (k.AttachmentAnchor == VirtualKeyAnchor.LeftHand) {
-                    isLeftHand = true;
-                } else if (k.AttachmentAnchor == VirtualKeyAnchor.RightHand) {
-                    isLeftHand = false;
-                } else {
-                    isLeftHand = keyPosRig.x < 0f;
-                }
-
-                KeyboardFinger finger = GetDefaultFingerForKey(k.Key, isLeftHand);
+                KeyboardFinger finger = k.AssignedFinger;
+                bool isLeftHand = finger.IsLeftHand();
 
                 Vector3 wrist0 = isLeftHand ? leftWrist0 : rightWrist0;
                 Quaternion wristRot0 = isLeftHand ? leftWristRot0 : rightWristRot0;

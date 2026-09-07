@@ -50,6 +50,10 @@ namespace FlameStream
         [Label("ATTACHMENT_ANCHOR")]
         public VirtualKeyAnchor AttachmentAnchor = VirtualKeyAnchor.LeftHand;
 
+        [DataInput(35)]
+        [Label("ASSIGNED_FINGER")]
+        public KeyboardFinger AssignedFinger = KeyboardFinger.LeftIndex;
+
         [DataInput(40)]
         [Label("TRANSFORM")]
         [Description("VIRTUAL_KEY_TRANSFORM_DESC")]
