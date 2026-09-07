@@ -790,16 +790,160 @@ namespace FlameStream
 
         #region Auto-Generate Key Bindings from Floating Keys
 
-        private float GetAvatarFingerLength(Animator anim, HumanBodyBones proximalBone, HumanBodyBones interBone, HumanBodyBones distalBone) {
-            float len = 0f;
-            var p = anim.GetBoneTransform(proximalBone);
-            var i = anim.GetBoneTransform(interBone);
-            var d = anim.GetBoneTransform(distalBone);
-            if (p != null && i != null) len += Vector3.Distance(p.position, i.position);
-            if (i != null && d != null) len += Vector3.Distance(i.position, d.position);
-            if (d != null && d.childCount > 0) len += Vector3.Distance(d.position, d.GetChild(0).position);
-            else if (d != null && i != null) len += Vector3.Distance(i.position, d.position) * 0.75f;
-            return len > 0.02f ? len : 0.085f;
+        private HumanBodyBones GetDistalBoneForFinger(KeyboardFinger finger) {
+            switch (finger) {
+                case KeyboardFinger.LeftThumb: return HumanBodyBones.LeftThumbDistal;
+                case KeyboardFinger.LeftIndex: return HumanBodyBones.LeftIndexDistal;
+                case KeyboardFinger.LeftMiddle: return HumanBodyBones.LeftMiddleDistal;
+                case KeyboardFinger.LeftRing: return HumanBodyBones.LeftRingDistal;
+                case KeyboardFinger.LeftPinky: return HumanBodyBones.LeftLittleDistal;
+                case KeyboardFinger.RightThumb: return HumanBodyBones.RightThumbDistal;
+                case KeyboardFinger.RightIndex: return HumanBodyBones.RightIndexDistal;
+                case KeyboardFinger.RightMiddle: return HumanBodyBones.RightMiddleDistal;
+                case KeyboardFinger.RightRing: return HumanBodyBones.RightRingDistal;
+                case KeyboardFinger.RightPinky: return HumanBodyBones.RightLittleDistal;
+                default: return HumanBodyBones.LeftIndexDistal;
+            }
+        }
+
+        private HumanBodyBones GetIntermediateBoneForFinger(KeyboardFinger finger) {
+            switch (finger) {
+                case KeyboardFinger.LeftThumb: return HumanBodyBones.LeftThumbIntermediate;
+                case KeyboardFinger.LeftIndex: return HumanBodyBones.LeftIndexIntermediate;
+                case KeyboardFinger.LeftMiddle: return HumanBodyBones.LeftMiddleIntermediate;
+                case KeyboardFinger.LeftRing: return HumanBodyBones.LeftRingIntermediate;
+                case KeyboardFinger.LeftPinky: return HumanBodyBones.LeftLittleIntermediate;
+                case KeyboardFinger.RightThumb: return HumanBodyBones.RightThumbIntermediate;
+                case KeyboardFinger.RightIndex: return HumanBodyBones.RightIndexIntermediate;
+                case KeyboardFinger.RightMiddle: return HumanBodyBones.RightMiddleIntermediate;
+                case KeyboardFinger.RightRing: return HumanBodyBones.RightRingIntermediate;
+                case KeyboardFinger.RightPinky: return HumanBodyBones.RightLittleIntermediate;
+                default: return HumanBodyBones.LeftIndexIntermediate;
+            }
+        }
+
+        public Vector3 GetFingerTipWorldPosition(Animator anim, KeyboardFinger finger) {
+            var distalBone = GetDistalBoneForFinger(finger);
+            var distalTransform = anim.GetBoneTransform(distalBone);
+            if (distalTransform != null) {
+                if (distalTransform.childCount > 0) {
+                    return distalTransform.GetChild(0).position;
+                }
+                var interBone = GetIntermediateBoneForFinger(finger);
+                var interTransform = anim.GetBoneTransform(interBone);
+                if (interTransform != null) {
+                    var delta = distalTransform.position - interTransform.position;
+                    if (delta.sqrMagnitude > 0.00001f) {
+                        return distalTransform.position + delta.normalized * (delta.magnitude * 0.75f);
+                    }
+                }
+                return distalTransform.position;
+            }
+            var handBone = finger.IsLeftHand() ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand;
+            var handTransform = anim.GetBoneTransform(handBone);
+            return handTransform != null ? handTransform.position : Vector3.zero;
+        }
+
+        private Vector3 GetFingerTipMeshWorldPosition(Animator anim, SkinnedMeshRenderer[] smrs, KeyboardFinger finger, Vector3 fallbackBoneTip, bool isPressed, Matrix4x4 worldToRig, out bool usedMesh) {
+            usedMesh = false;
+            try {
+                if (anim == null || smrs == null || smrs.Length == 0) return fallbackBoneTip;
+
+                var distalBone = GetDistalBoneForFinger(finger);
+                var distalTransform = anim.GetBoneTransform(distalBone);
+                if (distalTransform == null) return fallbackBoneTip;
+
+                var interBone = GetIntermediateBoneForFinger(finger);
+                var interTransform = anim.GetBoneTransform(interBone);
+                Vector3 boneDir = (interTransform != null) 
+                    ? (distalTransform.position - interTransform.position).normalized 
+                    : distalTransform.forward;
+
+                SkinnedMeshRenderer targetSmr = null;
+                int boneIdx = -1;
+
+                for (int s = 0; s < smrs.Length; s++) {
+                    var smr = smrs[s];
+                    if (smr == null || smr.sharedMesh == null || !smr.sharedMesh.isReadable) continue;
+                    var bones = smr.bones;
+                    if (bones == null) continue;
+                    int idx = Array.IndexOf(bones, distalTransform);
+                    if (idx >= 0) {
+                        targetSmr = smr;
+                        boneIdx = idx;
+                        break;
+                    }
+                }
+
+                if (targetSmr == null || boneIdx < 0) return fallbackBoneTip;
+
+                var sharedMesh = targetSmr.sharedMesh;
+                var weights = sharedMesh.boneWeights;
+                if (weights == null || weights.Length == 0) return fallbackBoneTip;
+
+                Mesh bakedMesh = new Mesh();
+                targetSmr.BakeMesh(bakedMesh);
+                var bakedVerts = bakedMesh.vertices;
+                if (bakedVerts == null || bakedVerts.Length != weights.Length) {
+                    UnityEngine.Object.DestroyImmediate(bakedMesh);
+                    return fallbackBoneTip;
+                }
+
+                var smrTransform = targetSmr.transform;
+                Vector3 distalPos = distalTransform.position;
+
+                List<Vector3> distalVertsWorld = new List<Vector3>();
+                float maxForward = float.MinValue;
+                Vector3 apexVertexWorld = fallbackBoneTip;
+
+                for (int i = 0; i < weights.Length; i++) {
+                    var bw = weights[i];
+                    if ((bw.boneIndex0 == boneIdx && bw.weight0 > 0.25f) ||
+                        (bw.boneIndex1 == boneIdx && bw.weight1 > 0.25f) ||
+                        (bw.boneIndex2 == boneIdx && bw.weight2 > 0.25f) ||
+                        (bw.boneIndex3 == boneIdx && bw.weight3 > 0.25f)) {
+
+                        Vector3 vWorld = smrTransform.TransformPoint(bakedVerts[i]);
+                        float fwd = Vector3.Dot(vWorld - distalPos, boneDir);
+                        if (fwd > maxForward) {
+                            maxForward = fwd;
+                            apexVertexWorld = vWorld;
+                        }
+                        if (fwd >= -0.002f) {
+                            distalVertsWorld.Add(vWorld);
+                        }
+                    }
+                }
+
+                UnityEngine.Object.DestroyImmediate(bakedMesh);
+
+                if (distalVertsWorld.Count == 0) return fallbackBoneTip;
+
+                usedMesh = true;
+                if (!isPressed) {
+                    return apexVertexWorld;
+                }
+
+                // In pressed state: find the lowest pad vertex in Rig space near the front half of the phalanx
+                Vector3 bestContactWorld = apexVertexWorld;
+                float minYRig = float.MaxValue;
+                float minFwdThreshold = Mathf.Max(0.002f, maxForward * 0.35f);
+
+                for (int i = 0; i < distalVertsWorld.Count; i++) {
+                    Vector3 vW = distalVertsWorld[i];
+                    float fwd = Vector3.Dot(vW - distalPos, boneDir);
+                    if (fwd >= minFwdThreshold) {
+                        Vector3 vRig = worldToRig.MultiplyPoint3x4(vW);
+                        if (vRig.y < minYRig) {
+                            minYRig = vRig.y;
+                            bestContactWorld = vW;
+                        }
+                    }
+                }
+                return bestContactWorld;
+            } catch {
+                return fallbackBoneTip;
+            }
         }
 
         public void AutoGenerateKeyBindingsFromFloatingKeys() {
@@ -826,141 +970,221 @@ namespace FlameStream
                 return;
             }
 
+            // Ensure finger animation layers are configured on Character
+            SynchronizeAllFingerAnimations();
+
+            // Cache character SkinnedMeshRenderers for mesh sampling
+            var smrs = Character.GameObject.GetComponentsInChildren<SkinnedMeshRenderer>();
+
             // World to Rig matrix
             Matrix4x4 worldToRig;
+            Quaternion rootAnchorRot;
             if (RootAnchor != null && RootAnchor.GameObject != null) {
                 worldToRig = RootAnchor.GameObject.transform.worldToLocalMatrix;
+                rootAnchorRot = RootAnchor.GameObject.transform.rotation;
             } else {
                 var charTransform = Character.GameObject.transform;
                 Vector3 rigWorldPos = charTransform.TransformPoint(KeyboardRootPosition);
-                Quaternion rigWorldRot = charTransform.rotation * Quaternion.Euler(KeyboardRootRotation);
-                worldToRig = Matrix4x4.TRS(rigWorldPos, rigWorldRot, Vector3.one).inverse;
+                rootAnchorRot = charTransform.rotation * Quaternion.Euler(KeyboardRootRotation);
+                worldToRig = Matrix4x4.TRS(rigWorldPos, rootAnchorRot, Vector3.one).inverse;
             }
 
-            // Sample Elbows in Rig Space
+            // Resting wrist transforms in Rig Space
+            Vector3 leftWrist0Rig = LeftHandRestPosition;
+            Quaternion leftWristRot0Rig = Quaternion.Euler(LeftHandRestRotation);
+            Vector3 rightWrist0Rig = RightHandRestPosition;
+            Quaternion rightWristRot0Rig = Quaternion.Euler(RightHandRestRotation);
+
+            // Sample Elbows in World Space and Rig Space
             var leftElbowBone = animator.GetBoneTransform(HumanBodyBones.LeftLowerArm);
             var rightElbowBone = animator.GetBoneTransform(HumanBodyBones.RightLowerArm);
-            Vector3 leftElbowRig = leftElbowBone != null ? worldToRig.MultiplyPoint3x4(leftElbowBone.position) : (LeftHandRestPosition - new Vector3(0.05f, -0.05f, 0.25f));
-            Vector3 rightElbowRig = rightElbowBone != null ? worldToRig.MultiplyPoint3x4(rightElbowBone.position) : (RightHandRestPosition - new Vector3(-0.05f, -0.05f, 0.25f));
+            Vector3 leftElbowWorld = leftElbowBone != null ? leftElbowBone.position : (leftWristBone.position - leftWristBone.forward * 0.25f);
+            Vector3 rightElbowWorld = rightElbowBone != null ? rightElbowBone.position : (rightWristBone.position - rightWristBone.forward * 0.25f);
+            Vector3 leftElbowRig = worldToRig.MultiplyPoint3x4(leftElbowWorld);
+            Vector3 rightElbowRig = worldToRig.MultiplyPoint3x4(rightElbowWorld);
 
-            // Measure finger proportions from avatar bones
-            float lIndexLen = GetAvatarFingerLength(animator, HumanBodyBones.LeftIndexProximal, HumanBodyBones.LeftIndexIntermediate, HumanBodyBones.LeftIndexDistal);
-            float lMiddleLen = GetAvatarFingerLength(animator, HumanBodyBones.LeftMiddleProximal, HumanBodyBones.LeftMiddleIntermediate, HumanBodyBones.LeftMiddleDistal);
-            float lRingLen = GetAvatarFingerLength(animator, HumanBodyBones.LeftRingProximal, HumanBodyBones.LeftRingIntermediate, HumanBodyBones.LeftRingDistal);
-            float lPinkyLen = GetAvatarFingerLength(animator, HumanBodyBones.LeftLittleProximal, HumanBodyBones.LeftLittleIntermediate, HumanBodyBones.LeftLittleDistal);
-            float lScale = lIndexLen / 0.085f;
+            // Pre-sample neutral and pressed fingertip offsets in Hand Local Space
+            Vector3[] tipNeutralLocal = new Vector3[10];
+            Vector3[] tipPressedLocal = new Vector3[10];
 
-            float rIndexLen = GetAvatarFingerLength(animator, HumanBodyBones.RightIndexProximal, HumanBodyBones.RightIndexIntermediate, HumanBodyBones.RightIndexDistal);
-            float rMiddleLen = GetAvatarFingerLength(animator, HumanBodyBones.RightMiddleProximal, HumanBodyBones.RightMiddleIntermediate, HumanBodyBones.RightMiddleDistal);
-            float rRingLen = GetAvatarFingerLength(animator, HumanBodyBones.RightRingProximal, HumanBodyBones.RightRingIntermediate, HumanBodyBones.RightRingDistal);
-            float rPinkyLen = GetAvatarFingerLength(animator, HumanBodyBones.RightLittleProximal, HumanBodyBones.RightLittleIntermediate, HumanBodyBones.RightLittleDistal);
-            float rScale = rIndexLen / 0.085f;
+            var animancer = Character.Animancer;
 
-            // Fingertip offsets relative to wrist in palm forward frame
-            Vector3 GetNeutralTipOffset(KeyboardFinger f) {
-                switch (f) {
-                    case KeyboardFinger.LeftThumb:  return new Vector3(0.035f * lScale, -0.015f * lScale, 0.045f * lScale);
-                    case KeyboardFinger.LeftIndex:  return new Vector3(0.015f * lScale, -0.020f * lScale, lIndexLen);
-                    case KeyboardFinger.LeftMiddle: return new Vector3(0.0f, -0.020f * lScale, lMiddleLen);
-                    case KeyboardFinger.LeftRing:   return new Vector3(-0.015f * lScale, -0.020f * lScale, lRingLen);
-                    case KeyboardFinger.LeftPinky:  return new Vector3(-0.030f * lScale, -0.020f * lScale, lPinkyLen);
+            int meshFingersSampled = 0;
 
-                    case KeyboardFinger.RightThumb:  return new Vector3(-0.035f * rScale, -0.015f * rScale, 0.045f * rScale);
-                    case KeyboardFinger.RightIndex:  return new Vector3(-0.015f * rScale, -0.020f * rScale, rIndexLen);
-                    case KeyboardFinger.RightMiddle: return new Vector3(0.0f, -0.020f * rScale, rMiddleLen);
-                    case KeyboardFinger.RightRing:   return new Vector3(0.015f * rScale, -0.020f * rScale, rRingLen);
-                    case KeyboardFinger.RightPinky:  return new Vector3(0.030f * rScale, -0.020f * rScale, rPinkyLen);
-                    default: return Vector3.forward * 0.08f;
+            for (int f = 0; f < 10; f++) {
+                KeyboardFinger finger = (KeyboardFinger)f;
+                bool isLeft = finger.IsLeftHand();
+                var wristBone = isLeft ? leftWristBone : rightWristBone;
+                Vector3 wrist0Rig = isLeft ? leftWrist0Rig : rightWrist0Rig;
+                Quaternion wristRot0Rig = isLeft ? leftWristRot0Rig : rightWristRot0Rig;
+
+                // 1. Measure neutral fingertip offset (sampling mesh skin apex if readable)
+                Vector3 fallbackNeutralTipWorld = GetFingerTipWorldPosition(animator, finger);
+                Vector3 neutralTipWorld = GetFingerTipMeshWorldPosition(animator, smrs, finger, fallbackNeutralTipWorld, false, worldToRig, out bool usedMeshNeutral);
+                Vector3 neutralTipRig = worldToRig.MultiplyPoint3x4(neutralTipWorld);
+                Vector3 neutralOffsetRig = neutralTipRig - wrist0Rig;
+                tipNeutralLocal[f] = Quaternion.Inverse(wristRot0Rig) * neutralOffsetRig;
+
+                // 2. Measure active/pressed fingertip offset using animation clip's final frame & mesh pad surface
+                bool sampledWithAnim = false;
+                bool usedMeshPressed = false;
+                Vector3 pressedTipWorld = neutralTipWorld;
+
+                if (animancer != null && Character.OverlappingAnimations != null) {
+                    var layerId = GetFingerLayerId(finger);
+                    var layerData = Array.Find(Character.OverlappingAnimations, a => a.CustomLayerID == layerId);
+                    if (layerData != null) {
+                        int layerIdx = GetAnimancerLayerIndex(layerData);
+                        if (layerIdx >= 0 && layerIdx < animancer.Layers.Count) {
+                            var layer = animancer.Layers[layerIdx];
+                            if (layer != null) {
+                                float oldWeight = layer.Weight;
+                                Animancer.AnimancerState state = layer.CurrentState;
+                                if (state == null) {
+                                    foreach (Animancer.AnimancerState s in layer) {
+                                        state = s;
+                                        break;
+                                    }
+                                }
+                                if (state == null && layerData.GetAnimationClip() != null) {
+                                    state = layer.GetOrCreateState(layerData.GetAnimationClip());
+                                }
+
+                                if (state != null) {
+                                    float oldTime = state.Time;
+                                    bool wasPlaying = state.IsPlaying;
+
+                                    layer.SetWeight(1f);
+                                    state.NormalizedTime = 1f; // Final frame of pressed keystroke!
+                                    state.IsPlaying = true;
+                                    animancer.Evaluate();
+
+                                    Vector3 fallbackPressedTipWorld = GetFingerTipWorldPosition(animator, finger);
+                                    pressedTipWorld = GetFingerTipMeshWorldPosition(animator, smrs, finger, fallbackPressedTipWorld, true, worldToRig, out usedMeshPressed);
+                                    sampledWithAnim = true;
+
+                                    // Restore original layer state
+                                    layer.SetWeight(oldWeight);
+                                    state.Time = oldTime;
+                                    state.IsPlaying = wasPlaying;
+                                    animancer.Evaluate();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (usedMeshPressed || usedMeshNeutral) {
+                    meshFingersSampled++;
+                }
+
+                if (sampledWithAnim) {
+                    Vector3 pressedTipRig = worldToRig.MultiplyPoint3x4(pressedTipWorld);
+                    Vector3 pressedOffsetRig = pressedTipRig - wrist0Rig;
+                    tipPressedLocal[f] = Quaternion.Inverse(wristRot0Rig) * pressedOffsetRig;
+                } else {
+                    // Fallback curl displacement: move tip downward (-Y) ~1.5cm and slightly back (-Z) ~0.6cm in Hand Local Space
+                    tipPressedLocal[f] = tipNeutralLocal[f] + new Vector3(0f, -0.015f, -0.006f);
                 }
             }
 
-            Vector3 GetPressedTipOffset(KeyboardFinger f) {
-                float s = f.IsLeftHand() ? lScale : rScale;
-                return GetNeutralTipOffset(f) + new Vector3(0f, -0.014f * s, -0.006f * s);
-            }
-
-            Vector3 leftWrist0 = LeftHandRestPosition;
-            Quaternion leftWristRot0 = Quaternion.Euler(LeftHandRestRotation);
-            Vector3 rightWrist0 = RightHandRestPosition;
-            Quaternion rightWristRot0 = Quaternion.Euler(RightHandRestRotation);
-
             var list = new List<KeyboardKeyBinding>();
+
+            // Resting key plane normal
+            Vector3 restKeyNormal = (RootKeysetTransform != null) ? Quaternion.Euler(RootKeysetTransform.Rotation) * Vector3.up : Vector3.up;
 
             foreach (var k in VirtualKeysCollection.Keys) {
                 if (k == null) continue;
 
-                // Compute key position and orientation in Rig Space
-                Vector3 groupPos;
-                Quaternion groupRot;
-                if (k.AttachmentAnchor == VirtualKeyAnchor.LeftHand) {
-                    var basePos = LeftHandRestPosition;
-                    var baseRot = Quaternion.Euler(LeftHandRestRotation);
-                    var pos = LeftKeysetTransform?.Position ?? Vector3.zero;
-                    var rot = LeftKeysetTransform?.Rotation ?? Vector3.zero;
-                    groupPos = basePos + baseRot * pos;
-                    groupRot = baseRot * Quaternion.Euler(rot);
-                } else if (k.AttachmentAnchor == VirtualKeyAnchor.RightHand) {
-                    var basePos = RightHandRestPosition;
-                    var baseRot = Quaternion.Euler(RightHandRestRotation);
-                    var pos = RightKeysetTransform?.Position ?? Vector3.zero;
-                    var rot = RightKeysetTransform?.Rotation ?? Vector3.zero;
-                    groupPos = basePos + baseRot * pos;
-                    groupRot = baseRot * Quaternion.Euler(rot);
+                // 1. Get Key position and orientation in Rig Space
+                Vector3 keyPosRig;
+                Quaternion keyRotRig;
+
+                if (k.KeyGameObject != null) {
+                    keyPosRig = worldToRig.MultiplyPoint3x4(k.KeyGameObject.transform.position);
+                    keyRotRig = Quaternion.Inverse(rootAnchorRot) * k.KeyGameObject.transform.rotation;
                 } else {
-                    var pos = RootKeysetTransform?.Position ?? Vector3.zero;
-                    var rot = RootKeysetTransform?.Rotation ?? Vector3.zero;
-                    groupPos = pos;
-                    groupRot = Quaternion.Euler(rot);
+                    Vector3 groupPos;
+                    Quaternion groupRot;
+                    Vector3 groupScale = Vector3.one;
+
+                    if (k.AttachmentAnchor == VirtualKeyAnchor.LeftHand) {
+                        var basePos = LeftHandRestPosition;
+                        var baseRot = Quaternion.Euler(LeftHandRestRotation);
+                        var pos = LeftKeysetTransform?.Position ?? Vector3.zero;
+                        var rot = LeftKeysetTransform?.Rotation ?? Vector3.zero;
+                        groupScale = LeftKeysetTransform?.Scale ?? Vector3.one;
+                        groupPos = basePos + baseRot * pos;
+                        groupRot = baseRot * Quaternion.Euler(rot);
+                    } else if (k.AttachmentAnchor == VirtualKeyAnchor.RightHand) {
+                        var basePos = RightHandRestPosition;
+                        var baseRot = Quaternion.Euler(RightHandRestRotation);
+                        var pos = RightKeysetTransform?.Position ?? Vector3.zero;
+                        var rot = RightKeysetTransform?.Rotation ?? Vector3.zero;
+                        groupScale = RightKeysetTransform?.Scale ?? Vector3.one;
+                        groupPos = basePos + baseRot * pos;
+                        groupRot = baseRot * Quaternion.Euler(rot);
+                    } else {
+                        var pos = RootKeysetTransform?.Position ?? Vector3.zero;
+                        var rot = RootKeysetTransform?.Rotation ?? Vector3.zero;
+                        groupScale = RootKeysetTransform?.Scale ?? Vector3.one;
+                        groupPos = pos;
+                        groupRot = Quaternion.Euler(rot);
+                    }
+
+                    Vector3 scaledKeyLocalPos = Vector3.Scale(k.Transform.Position, groupScale);
+                    keyPosRig = groupPos + groupRot * scaledKeyLocalPos;
+                    keyRotRig = groupRot * Quaternion.Euler(k.Transform.Rotation);
                 }
 
-                Vector3 keyPosRig = groupPos + groupRot * k.Transform.Position;
-                Quaternion keyRotRig = groupRot * Quaternion.Euler(k.Transform.Rotation);
-
                 KeyboardFinger finger = k.AssignedFinger;
+                int fingerIdx = (int)finger;
                 bool isLeftHand = finger.IsLeftHand();
 
-                Vector3 wrist0 = isLeftHand ? leftWrist0 : rightWrist0;
-                Quaternion wristRot0 = isLeftHand ? leftWristRot0 : rightWristRot0;
+                Vector3 wrist0Rig = isLeftHand ? leftWrist0Rig : rightWrist0Rig;
+                Quaternion wristRot0Rig = isLeftHand ? leftWristRot0Rig : rightWristRot0Rig;
                 Vector3 elbowRig = isLeftHand ? leftElbowRig : rightElbowRig;
-                Vector3 tipPressed = GetPressedTipOffset(finger);
 
-                // 1. Forearm yaw angle around elbow pivot
+                // 2. Forearm alignment with elbow (Yaw):
+                // Swings the hand's forward axis so the line from the elbow to the hand points at the key
+                Vector3 arm0 = wrist0Rig - elbowRig;
                 Vector3 vReach = keyPosRig - elbowRig;
-                Vector3 arm0 = wrist0 - elbowRig;
-                float reachAngle = Mathf.Atan2(vReach.x, vReach.z) * Mathf.Rad2Deg;
-                float neutralAngle = Mathf.Atan2(arm0.x, arm0.z) * Mathf.Rad2Deg;
-                float deltaYaw = Mathf.DeltaAngle(neutralAngle, reachAngle);
+                float neutralYaw = Mathf.Atan2(arm0.x, arm0.z) * Mathf.Rad2Deg;
+                float reachYaw = Mathf.Atan2(vReach.x, vReach.z) * Mathf.Rad2Deg;
+                float deltaYaw = Mathf.DeltaAngle(neutralYaw, reachYaw);
+                float effectiveYaw = Mathf.Clamp(deltaYaw, -35f, 35f);
+                Quaternion elbowYawRot = Quaternion.AngleAxis(effectiveYaw, Vector3.up);
 
-                // 2. Hand pitch adjustment to match key tilt & row height
-                float keyPitch = keyRotRig.eulerAngles.x;
-                if (keyPitch > 180f) keyPitch -= 360f;
+                // 3. Match button plane (Pitch & Roll):
+                // Adjusts the hand tilt so fingers land perpendicular to the key surface
+                Vector3 keyNormalRig = keyRotRig * Vector3.up;
+                Quaternion planeTilt = Quaternion.FromToRotation(restKeyNormal, keyNormalRig);
 
-                Vector3 neutralTipRig = wrist0 + wristRot0 * GetNeutralTipOffset(finger);
-                float deltaY = keyPosRig.y - neutralTipRig.y;
-                float deltaPitch = keyPitch * 0.5f + Mathf.Clamp(deltaY / 0.08f, -1f, 1f) * 12f;
+                // Full target hand rotation in Rig Space
+                Quaternion targetHandRotRig = planeTilt * elbowYawRot * wristRot0Rig;
 
-                Quaternion targetHandRot = Quaternion.Euler(deltaPitch, deltaYaw * 0.7f, 0f) * wristRot0;
+                // 4. Closed-form wrist position anchored at the contact point:
+                // Horizontally (X, Z): align the pressed fingertip contact pad over the key center.
+                // Vertically (Y): preserve the neutral resting height clearance above the key surface so the hand does not hover.
+                Vector3 contactLocal = new Vector3(tipPressedLocal[fingerIdx].x, tipNeutralLocal[fingerIdx].y, tipPressedLocal[fingerIdx].z);
+                Vector3 activeContactRig = targetHandRotRig * contactLocal;
+                Vector3 targetWristRig = keyPosRig - activeContactRig;
 
-                // 3. Wrist target position so pressed fingertip hits the key center
-                Vector3 targetWristPos = keyPosRig - (targetHandRot * tipPressed);
-
-                // 4. Displacements
-                Vector3 deltaPos = targetWristPos - wrist0;
+                // 5. Delta Transforms
+                Vector3 deltaPos = targetWristRig - wrist0Rig;
 
                 Vector3 handScale = isLeftHand ? GetLeftHandMovementScale() : GetRightHandMovementScale();
                 if (handScale.x != 0f) deltaPos.x /= handScale.x;
                 if (handScale.y != 0f) deltaPos.y /= handScale.y;
                 if (handScale.z != 0f) deltaPos.z /= handScale.z;
 
-                Quaternion deltaRotQuat = targetHandRot * Quaternion.Inverse(wristRot0);
-                Vector3 deltaRot = deltaRotQuat.eulerAngles;
-                if (deltaRot.x > 180f) deltaRot.x -= 360f;
-                if (deltaRot.y > 180f) deltaRot.y -= 360f;
-                if (deltaRot.z > 180f) deltaRot.z -= 360f;
+                Vector3 targetHandEuler = targetHandRotRig.eulerAngles;
+                Vector3 restHandEuler = wristRot0Rig.eulerAngles;
+                Vector3 deltaRot = Helper.NormalizeRotationAngles(targetHandEuler - restHandEuler);
 
-                // 5. Ergonomic neutral check
+                // 6. Ergonomic neutral check for resting home keys
                 bool enableHandMove = true;
-                if (deltaPos.sqrMagnitude < 0.000064f && Mathf.Abs(deltaYaw) < 3f) {
+                if (deltaPos.sqrMagnitude < 0.0001f && Mathf.Abs(deltaYaw) < 2.5f) {
                     deltaPos = Vector3.zero;
                     deltaRot = Vector3.zero;
                     enableHandMove = false;
@@ -983,11 +1207,22 @@ namespace FlameStream
             BroadcastDataInput(nameof(KeyBindingsCollection));
             RequestUiRefresh();
 
+            string modeDetail;
+            if (meshFingersSampled == 10) {
+                modeDetail = " (3D Skinned Mesh surface)";
+            } else if (meshFingersSampled > 0) {
+                modeDetail = $" ({meshFingersSampled}/10 Mesh surface, {10 - meshFingersSampled}/10 Bone fallback)";
+            } else {
+                modeDetail = " (Avatar Bone skeleton)";
+            }
+
             Context.Service?.Toast(
                 Warudo.Core.Server.ToastSeverity.Success,
                 "AUTO_GENERATE_KEY_BINDINGS".Localized(),
-                string.Format("AUTO_GENERATE_SUCCESS".Localized(), KeyBindings.Length)
+                string.Format("AUTO_GENERATE_SUCCESS".Localized(), KeyBindings.Length) + modeDetail
             );
+
+            Debug.Log($"[FS Keyboard Receiver] Auto-generated {KeyBindings.Length} key bindings using {modeDetail.Trim(' ', '(', ')')}. Character: '{Character.Name}'.");
         }
 
         #endregion

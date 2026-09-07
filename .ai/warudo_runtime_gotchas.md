@@ -1211,6 +1211,34 @@ In Warudo's web client (`warudo-client-electron`):
    - Call `RequestUiRefresh()`.
 4. Yielding first (`await UniTask.Yield()`) waits for the next frame so Vue finishes processing the active click event and clears its callstack before receiving the version increment. On the next tick, `watch(() => entity.value?.version, build)` cleanly fires to recreate `inputs` with the updated button label.
 
+---
+
+## 35. Multi-Element Visual Setup Guides: Z-Ordering in Always On Top Mode & Per-Frame Visibility
+
+### The Phenomenon
+1. When multiple visual helpers (e.g. Spheres, Quads/Slabs, Cylinders/Lines) all use `Always On Top` shaders (`_ZTest = Always` / `GUI/Text Shader`), objects with identical render queue numbers (`Overlay + 1000`) exhibit camera-distance dependent draw orders. Slabs or lines positioned between the camera and target spheres can draw over the spheres, visually occluding or washing out the spheres.
+2. In visual setup modes where GameObjects are synchronized or repositioned per-frame in `UpdateDebugVisuals()`, calling `SetActive(true)` unconditionally overrides the user's `SHOW_ORIGIN` toggle, making hidden guides reappear on the very next frame.
+
+### Architectural Solution: Explicit Render Queue Hierarchy & Master Visibility Guard
+
+1. **Layered `renderQueue` and `sortingOrder`**:
+   Assign explicit ascending queue priorities and renderer sorting orders so foreground elements always render on top of background reference geometry:
+   - **Background (Lines/Axes)**: `Overlay + 1000`, `sortingOrder = 1000`.
+   - **Middle (Planes/Slabs)**: `Overlay + 2000`, `sortingOrder = 2000`.
+   - **Foreground (Spheres/Fingertip/Key Targets)**: `Overlay + 3000`, `sortingOrder = 3000`.
+
+2. **Master Visibility Guard**:
+   At the start of `UpdateDebugVisuals()`, check the master visibility boolean:
+   ```csharp
+   if (!VisualGuidesVisible) {
+       if (debugKeyCenterSphere != null && debugKeyCenterSphere.activeSelf) debugKeyCenterSphere.SetActive(false);
+       // ... deactivate all guides
+       return;
+   }
+   ```
+   This guarantees that `SHOW_ORIGIN` completely silences the entire visual setup subsystem without per-frame flickering or unintended reactivation.
+
+
 
 
 
