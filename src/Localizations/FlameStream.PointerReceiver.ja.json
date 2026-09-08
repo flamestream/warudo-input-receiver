@@ -556,6 +556,15 @@
         "LEFT_KEYSET_CLUSTER": "左キーの原点",
         "RIGHT_KEYSET_CLUSTER": "右キーの原点",
         "ROOT_KEYSET_CLUSTER": "センターキーの原点",
-        "CENTER_KEYSET_CLUSTER": "センターキーの原点"
+        "CENTER_KEYSET_CLUSTER": "センターキーの原点",
+        "AUTOMATION": "自動調整",
+        "AUTO_ALIGN_KEY_BINDING": "✨ 手と指を自動アライメント",
+        "AUTO_ALIGN_KEY_BINDING_DESC": "手の向きをキーの表面の傾きと肘の自然な回転軸に合わせ、指先がボタン中央に接触するように手の位置を自動調整します。",
+        "ALIGN_HAND_WITH_BUTTON_SURFACE": "📐 手のひらをボタン表面に合わせる",
+        "ALIGN_HAND_WITH_BUTTON_SURFACE_DESC": "手のひらの平面がボタン表面と完全に平行になるように手を回転させます。",
+        "MOVE_FINGER_TO_BUTTON": "🎯 指先をボタンに移動",
+        "MOVE_FINGER_TO_BUTTON_DESC": "割り当てられた指の先端がボタンの中央に接触するように手を平行移動します。",
+        "ROTATE_HAND_TO_NATURAL_ROTATION": "🦴 手を自然な向きに回転",
+        "ROTATE_HAND_TO_NATURAL_ROTATION_DESC": "キー表面の法線を軸に手を回転させ、前腕の向きを肘の自然な軸に合わせます。"
     }
 }

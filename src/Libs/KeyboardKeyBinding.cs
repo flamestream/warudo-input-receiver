@@ -260,6 +260,7 @@ Click **[Apply Transform]** when finished.
 
                 var kbAnchor = setupAnchor as KeyBindingVisualSetupAnchorAsset;
                 if (kbAnchor != null) {
+                    kbAnchor.OnAutoAlignAll = AutoAlignKeyBinding;
                     kbAnchor.OnAlignHandWithSurface = AlignHandWithButtonSurface;
                     kbAnchor.OnMoveFingerToButton = MoveFingerToButton;
                     kbAnchor.OnRotateHandToNaturalRotation = RotateHandToNaturalRotation;
@@ -556,33 +557,119 @@ Click **[Apply Transform]** when finished.
             UpdateDebugVisuals();
         }
 
+        private bool TryGetKeyCenterAndNormal(out Vector3 keyCenterWorld, out Vector3 keyNormalWorld) {
+            keyCenterWorld = Vector3.zero;
+            keyNormalWorld = Vector3.up;
+            if (Parent?.VirtualKeysCollection?.Keys == null) return false;
+
+            var keyDef = Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == this.Key && k.AssignedFinger == this.Finger)
+                      ?? Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == this.Key);
+            if (keyDef == null) return false;
+
+            if (keyDef.KeyGameObject != null) {
+                keyCenterWorld = keyDef.KeyGameObject.transform.position;
+                keyNormalWorld = keyDef.KeyGameObject.transform.rotation * Vector3.up;
+                return true;
+            }
+            if (Parent.RootAnchor?.GameObject != null) {
+                var rootTr = Parent.RootAnchor.GameObject.transform;
+                var pos = keyDef.Transform?.Position ?? Vector3.zero;
+                var rot = keyDef.Transform?.Rotation ?? Vector3.zero;
+                keyCenterWorld = rootTr.TransformPoint(pos);
+                keyNormalWorld = rootTr.rotation * Quaternion.Euler(rot) * Vector3.up;
+                return true;
+            }
+            return false;
+        }
+
+        public void AutoAlignKeyBinding() {
+            if (Parent == null || Transform == null || Transform.setupAnchor == null || Transform.setupAnchor.GameObject == null) return;
+            var animator = Parent?.Character?.Animator;
+            if (animator == null) return;
+            if (!TryGetKeyCenterAndNormal(out Vector3 keyCenterWorld, out Vector3 keyNormal)) return;
+
+            var anchorTr = Transform.setupAnchor.GameObject.transform;
+            Vector3 handPos = anchorTr.position;
+            Quaternion handRot = anchorTr.rotation;
+            Vector3 tipWorld = Parent.GetFingerTipWorldPosition(animator, Finger);
+
+            // 1. Measure contact vector in Hand Anchor space
+            Vector3 dLocal = Quaternion.Inverse(handRot) * (tipWorld - handPos);
+
+            // 2. Tilt hand to match button surface normal
+            Vector3 handNormal = handRot * Vector3.up;
+            Quaternion tilt = Quaternion.FromToRotation(handNormal, keyNormal);
+            Quaternion surfaceRot = tilt * handRot;
+
+            // 3. Rotate hand around key normal to natural forearm reach (compensating for finger lateral offset)
+            Vector3 elbowPos = recordedElbowPosWorld;
+            Vector3 toElbow = elbowPos - keyCenterWorld;
+            Vector3 toElbowOnPlane = Vector3.ProjectOnPlane(toElbow, keyNormal);
+            float D = toElbowOnPlane.magnitude;
+            Vector3 targetBackOnPlane = D > 0.001f ? (toElbowOnPlane / D) : Vector3.back;
+            if (targetBackOnPlane.sqrMagnitude < 0.001f) {
+                targetBackOnPlane = Vector3.ProjectOnPlane(surfaceRot * Vector3.back, keyNormal).normalized;
+            }
+
+            Vector3 currentBackOnPlane = Vector3.ProjectOnPlane(surfaceRot * Vector3.back, keyNormal).normalized;
+            if (currentBackOnPlane.sqrMagnitude < 0.001f) currentBackOnPlane = targetBackOnPlane;
+
+            float baseAngle = Vector3.SignedAngle(currentBackOnPlane, targetBackOnPlane, keyNormal);
+            float alphaDeg = 0f;
+            if (D > 0.001f) {
+                float dx = dLocal.x;
+                float sinAlpha = Mathf.Clamp(dx / D, -0.999f, 0.999f);
+                alphaDeg = Mathf.Asin(sinAlpha) * Mathf.Rad2Deg;
+            }
+            float signedAngle = baseAngle - alphaDeg;
+            Quaternion newHandRot = Quaternion.AngleAxis(signedAngle, keyNormal) * surfaceRot;
+
+            // 4. Place wrist so curled fingertip lands exactly on key center: P_hand = P_key - R_hand * dLocal
+            Vector3 newHandPos = keyCenterWorld - (newHandRot * dLocal);
+
+            // 5. Convert to parent local space
+            Transform parentTr = anchorTr.parent;
+            Vector3 newLocalPos = parentTr != null ? parentTr.InverseTransformPoint(newHandPos) : newHandPos;
+            Quaternion newLocalRot = parentTr != null ? Quaternion.Inverse(parentTr.rotation) * newHandRot : newHandRot;
+
+            Transform.setupAnchor.Transform.Position = newLocalPos;
+            Transform.setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles(newLocalRot.eulerAngles);
+
+            // Synchronously update GameObject transform to eliminate frame lag for immediate queries
+            anchorTr.localPosition = newLocalPos;
+            anchorTr.localRotation = newLocalRot;
+
+            Transform.setupAnchor.Transform.Broadcast();
+            UpdateDebugVisuals();
+        }
+
         public void AlignHandWithButtonSurface() {
             if (Parent == null || Transform == null || Transform.setupAnchor == null || Transform.setupAnchor.GameObject == null) return;
+            var animator = Parent?.Character?.Animator;
+            if (!TryGetKeyCenterAndNormal(out Vector3 keyCenterWorld, out Vector3 keyNormal)) return;
+
             var anchorTr = Transform.setupAnchor.GameObject.transform;
+            Vector3 handPos = anchorTr.position;
             Quaternion handRot = anchorTr.rotation;
             Vector3 handNormal = handRot * Vector3.up;
+            Vector3 tipWorld = (animator != null) ? Parent.GetFingerTipWorldPosition(animator, Finger) : handPos;
 
-            Vector3 keyNormal = Vector3.up;
-            if (Parent?.VirtualKeysCollection?.Keys != null) {
-                var keyDef = Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == this.Key && k.AssignedFinger == this.Finger)
-                          ?? Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == this.Key);
-                if (keyDef != null && keyDef.KeyGameObject != null) {
-                    keyNormal = keyDef.KeyGameObject.transform.rotation * Vector3.up;
-                } else if (keyDef != null && Parent.RootAnchor?.GameObject != null) {
-                    var rootTr = Parent.RootAnchor.GameObject.transform;
-                    var rot = keyDef.Transform?.Rotation ?? Vector3.zero;
-                    keyNormal = rootTr.rotation * Quaternion.Euler(rot) * Vector3.up;
-                }
-            }
+            Vector3 dLocal = Quaternion.Inverse(handRot) * (tipWorld - handPos);
 
             Quaternion tilt = Quaternion.FromToRotation(handNormal, keyNormal);
             Quaternion newHandRot = tilt * handRot;
+            Vector3 newHandPos = keyCenterWorld - (newHandRot * dLocal);
 
-            Quaternion newLocalRot = anchorTr.parent != null
-                ? Quaternion.Inverse(anchorTr.parent.rotation) * newHandRot
-                : newHandRot;
+            Transform parentTr = anchorTr.parent;
+            Vector3 newLocalPos = parentTr != null ? parentTr.InverseTransformPoint(newHandPos) : newHandPos;
+            Quaternion newLocalRot = parentTr != null ? Quaternion.Inverse(parentTr.rotation) * newHandRot : newHandRot;
 
             Transform.setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles(newLocalRot.eulerAngles);
+            Transform.setupAnchor.Transform.Position = newLocalPos;
+
+            anchorTr.localPosition = newLocalPos;
+            anchorTr.localRotation = newLocalRot;
+
             Transform.setupAnchor.Transform.Broadcast();
             UpdateDebugVisuals();
         }
@@ -591,62 +678,73 @@ Click **[Apply Transform]** when finished.
             if (Parent == null || Transform == null || Transform.setupAnchor == null || Transform.setupAnchor.GameObject == null) return;
             var animator = Parent?.Character?.Animator;
             if (animator == null) return;
+            if (!TryGetKeyCenterAndNormal(out Vector3 keyCenterWorld, out _)) return;
 
+            var anchorTr = Transform.setupAnchor.GameObject.transform;
+            Vector3 handPos = anchorTr.position;
+            Quaternion handRot = anchorTr.rotation;
             Vector3 tipWorld = Parent.GetFingerTipWorldPosition(animator, Finger);
-            Vector3 keyCenterWorld = Vector3.zero;
-            bool foundKey = false;
-            if (Parent?.VirtualKeysCollection?.Keys != null) {
-                var keyDef = Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == this.Key && k.AssignedFinger == this.Finger)
-                          ?? Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == this.Key);
-                if (keyDef != null && keyDef.KeyGameObject != null) {
-                    keyCenterWorld = keyDef.KeyGameObject.transform.position;
-                    foundKey = true;
-                } else if (keyDef != null && Parent.RootAnchor?.GameObject != null) {
-                    var rootTr = Parent.RootAnchor.GameObject.transform;
-                    var pos = keyDef.Transform?.Position ?? Vector3.zero;
-                    keyCenterWorld = rootTr.TransformPoint(pos);
-                    foundKey = true;
-                }
-            }
-            if (!foundKey) return;
 
-            Transform parentTr = Transform.setupAnchor.GameObject.transform.parent;
-            Vector3 tipInParent = parentTr != null ? parentTr.InverseTransformPoint(tipWorld) : tipWorld;
-            Vector3 keyInParent = parentTr != null ? parentTr.InverseTransformPoint(keyCenterWorld) : keyCenterWorld;
+            Vector3 dLocal = Quaternion.Inverse(handRot) * (tipWorld - handPos);
+            Vector3 newHandPos = keyCenterWorld - (handRot * dLocal);
 
-            Vector3 delta = keyInParent - tipInParent;
-            Transform.setupAnchor.Transform.Position += delta;
+            Transform parentTr = anchorTr.parent;
+            Vector3 newLocalPos = parentTr != null ? parentTr.InverseTransformPoint(newHandPos) : newHandPos;
+
+            Transform.setupAnchor.Transform.Position = newLocalPos;
+            anchorTr.localPosition = newLocalPos;
+
             Transform.setupAnchor.Transform.Broadcast();
             UpdateDebugVisuals();
         }
 
         public void RotateHandToNaturalRotation() {
             if (Parent == null || Transform == null || Transform.setupAnchor == null || Transform.setupAnchor.GameObject == null) return;
+            var animator = Parent?.Character?.Animator;
+            if (!TryGetKeyCenterAndNormal(out Vector3 keyCenterWorld, out Vector3 keyNormal)) return;
+
             var anchorTr = Transform.setupAnchor.GameObject.transform;
             Vector3 handPos = anchorTr.position;
             Quaternion handRot = anchorTr.rotation;
             Vector3 handNormal = handRot * Vector3.up;
+            Vector3 tipWorld = (animator != null) ? Parent.GetFingerTipWorldPosition(animator, Finger) : handPos;
+
+            Vector3 dLocal = Quaternion.Inverse(handRot) * (tipWorld - handPos);
 
             Vector3 elbowPos = recordedElbowPosWorld;
-            Vector3 toElbow = elbowPos - handPos;
-            Vector3 targetBackOnPlane = Vector3.ProjectOnPlane(toElbow, handNormal).normalized;
+            Vector3 toElbow = elbowPos - keyCenterWorld;
+            Vector3 toElbowOnPlane = Vector3.ProjectOnPlane(toElbow, handNormal);
+            float D = toElbowOnPlane.magnitude;
+            Vector3 targetBackOnPlane = D > 0.001f ? (toElbowOnPlane / D) : Vector3.back;
             if (targetBackOnPlane.sqrMagnitude < 0.001f) return;
 
-            // Current backward direction of the hand projected onto the palm/key plane
             Vector3 currentBack = handRot * Vector3.back;
             Vector3 currentBackOnPlane = Vector3.ProjectOnPlane(currentBack, handNormal).normalized;
             if (currentBackOnPlane.sqrMagnitude < 0.001f) currentBackOnPlane = targetBackOnPlane;
 
-            // Compute minimal rotation angle around handNormal (shortest arc in [-180, 180])
-            float signedAngle = Vector3.SignedAngle(currentBackOnPlane, targetBackOnPlane, handNormal);
-            Quaternion rotDelta = Quaternion.AngleAxis(signedAngle, handNormal);
-            Quaternion newRot = rotDelta * handRot;
+            float baseAngle = Vector3.SignedAngle(currentBackOnPlane, targetBackOnPlane, handNormal);
+            float alphaDeg = 0f;
+            if (D > 0.001f) {
+                float dx = dLocal.x;
+                float sinAlpha = Mathf.Clamp(dx / D, -0.999f, 0.999f);
+                alphaDeg = Mathf.Asin(sinAlpha) * Mathf.Rad2Deg;
+            }
+            float signedAngle = baseAngle - alphaDeg;
 
-            Quaternion newLocalRot = anchorTr.parent != null
-                ? Quaternion.Inverse(anchorTr.parent.rotation) * newRot
-                : newRot;
+            Quaternion rotDelta = Quaternion.AngleAxis(signedAngle, handNormal);
+            Quaternion newHandRot = rotDelta * handRot;
+            Vector3 newHandPos = keyCenterWorld - (newHandRot * dLocal);
+
+            Transform parentTr = anchorTr.parent;
+            Vector3 newLocalPos = parentTr != null ? parentTr.InverseTransformPoint(newHandPos) : newHandPos;
+            Quaternion newLocalRot = parentTr != null ? Quaternion.Inverse(parentTr.rotation) * newHandRot : newHandRot;
 
             Transform.setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles(newLocalRot.eulerAngles);
+            Transform.setupAnchor.Transform.Position = newLocalPos;
+
+            anchorTr.localPosition = newLocalPos;
+            anchorTr.localRotation = newLocalRot;
+
             Transform.setupAnchor.Transform.Broadcast();
             UpdateDebugVisuals();
         }

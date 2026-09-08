@@ -10,12 +10,20 @@ namespace FlameStream {
         Category = "FS_ASSET_CATEGORY_INTERNAL"
     )]
     public class KeyBindingVisualSetupAnchorAsset : VisualSetupAnchorAsset {
+        public Action OnAutoAlignAll;
         public Action OnAlignHandWithSurface;
         public Action OnMoveFingerToButton;
         public Action OnRotateHandToNaturalRotation;
         public Action OnSettingsChanged;
 
         [Section("AUTOMATION")]
+
+        [Trigger(19)]
+        [Label("AUTO_ALIGN_KEY_BINDING")]
+        [Description("AUTO_ALIGN_KEY_BINDING_DESC")]
+        public void TriggerAutoAlignAll() {
+            OnAutoAlignAll?.Invoke();
+        }
 
         [Trigger(20)]
         [Label("ALIGN_HAND_WITH_BUTTON_SURFACE")]

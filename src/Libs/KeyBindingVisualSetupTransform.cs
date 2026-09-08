@@ -37,6 +37,7 @@ namespace FlameStream {
             };
 
             if (KeyBinding != null) {
+                anchor.OnAutoAlignAll = () => KeyBinding.AutoAlignKeyBinding();
                 anchor.OnAlignHandWithSurface = () => KeyBinding.AlignHandWithButtonSurface();
                 anchor.OnMoveFingerToButton = () => KeyBinding.MoveFingerToButton();
                 anchor.OnRotateHandToNaturalRotation = () => KeyBinding.RotateHandToNaturalRotation();

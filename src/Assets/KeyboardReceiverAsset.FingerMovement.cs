@@ -1017,14 +1017,20 @@ namespace FlameStream
                 var wristBone = isLeft ? leftWristBone : rightWristBone;
                 Vector3 wrist0Rig = isLeft ? leftWrist0Rig : rightWrist0Rig;
                 Quaternion wristRot0Rig = isLeft ? leftWristRot0Rig : rightWristRot0Rig;
-                Vector3 wristRig = (wristBone != null) ? worldToRig.MultiplyPoint3x4(wristBone.position) : wrist0Rig;
+                Quaternion intermediateQ = isLeft 
+                    ? Quaternion.Euler(HAND_IK_INTERMEDIATE_ROTATION_LEFT) 
+                    : Quaternion.Euler(HAND_IK_INTERMEDIATE_ROTATION_RIGHT);
 
-                // 1. Measure neutral fingertip offset in Hand Reference Space
+                // 1. Measure neutral fingertip offset in Hand Reference Space (Rig space)
                 Vector3 fallbackNeutralTipWorld = GetFingerTipWorldPosition(animator, finger);
                 Vector3 neutralTipWorld = GetFingerTipMeshWorldPosition(animator, smrs, finger, fallbackNeutralTipWorld, false, worldToRig, out bool usedMeshNeutral);
-                Vector3 neutralTipRig = worldToRig.MultiplyPoint3x4(neutralTipWorld);
-                Vector3 neutralOffsetRig = neutralTipRig - wristRig;
-                tipNeutralLocal[f] = Quaternion.Inverse(wristRot0Rig) * neutralOffsetRig;
+                if (wristBone != null) {
+                    Vector3 neutralOffsetBone = Quaternion.Inverse(wristBone.rotation) * (neutralTipWorld - wristBone.position);
+                    tipNeutralLocal[f] = intermediateQ * neutralOffsetBone;
+                } else {
+                    Vector3 neutralTipRig = worldToRig.MultiplyPoint3x4(neutralTipWorld);
+                    tipNeutralLocal[f] = Quaternion.Inverse(wristRot0Rig) * (neutralTipRig - wrist0Rig);
+                }
 
                 // 2. Measure active/pressed fingertip offset using animation clip's final frame & mesh pad surface
                 bool sampledWithAnim = false;
@@ -1079,10 +1085,12 @@ namespace FlameStream
                     meshFingersSampled++;
                 }
 
-                if (sampledWithAnim) {
+                if (sampledWithAnim && wristBone != null) {
+                    Vector3 pressedOffsetBone = Quaternion.Inverse(wristBone.rotation) * (pressedTipWorld - wristBone.position);
+                    tipPressedLocal[f] = intermediateQ * pressedOffsetBone;
+                } else if (sampledWithAnim) {
                     Vector3 pressedTipRig = worldToRig.MultiplyPoint3x4(pressedTipWorld);
-                    Vector3 pressedOffsetRig = pressedTipRig - wristRig;
-                    tipPressedLocal[f] = Quaternion.Inverse(wristRot0Rig) * pressedOffsetRig;
+                    tipPressedLocal[f] = Quaternion.Inverse(wristRot0Rig) * (pressedTipRig - wrist0Rig);
                 } else {
                     // Fallback curl displacement: move tip downward (-Y) ~2.5cm and slightly back (-Z) ~1.0cm in Hand Local Space
                     tipPressedLocal[f] = tipNeutralLocal[f] + new Vector3(0f, -0.025f, -0.010f);
@@ -1146,22 +1154,37 @@ namespace FlameStream
                 Quaternion wristRot0Rig = isLeftHand ? leftWristRot0Rig : rightWristRot0Rig;
                 Vector3 elbowRig = isLeftHand ? leftElbowRig : rightElbowRig;
 
-                // 2. Forearm reach alignment & key normal matching:
-                // Align hand surface normal directly to the key's surface normal
+                // 2. Forearm reach alignment & key normal matching (identical to the 3 visual setup buttons):
+                // Step A: Align hand surface normal directly to the key's surface normal (AlignHandWithButtonSurface)
+                Vector3 handNormalRig = wristRot0Rig * Vector3.up;
                 Vector3 keyNormalRig = keyRotRig * Vector3.up;
+                Quaternion tilt = Quaternion.FromToRotation(handNormalRig, keyNormalRig);
+                Quaternion surfaceRotRig = tilt * wristRot0Rig;
 
-                // Hand forward axis follows forearm reach direction from elbow projected onto the key plane
-                Vector3 vReach = keyPosRig - elbowRig;
-                Vector3 fwdOnKeyPlane = Vector3.ProjectOnPlane(vReach, keyNormalRig).normalized;
-                if (fwdOnKeyPlane.sqrMagnitude < 0.001f) {
-                    fwdOnKeyPlane = Vector3.ProjectOnPlane(wristRot0Rig * Vector3.forward, keyNormalRig).normalized;
+                // Step B: Rotate hand around key normal towards natural elbow reach vector (RotateHandToNaturalRotation)
+                // Invariant ray connecting keycap center to elbow:
+                Vector3 toElbowRig = elbowRig - keyPosRig;
+                Vector3 toElbowOnPlane = Vector3.ProjectOnPlane(toElbowRig, keyNormalRig);
+                float D = toElbowOnPlane.magnitude;
+                Vector3 targetBackOnPlane = D > 0.001f ? (toElbowOnPlane / D) : Vector3.back;
+                if (targetBackOnPlane.sqrMagnitude < 0.001f) {
+                    targetBackOnPlane = Vector3.ProjectOnPlane(surfaceRotRig * Vector3.back, keyNormalRig).normalized;
                 }
+                Vector3 currentBackOnPlane = Vector3.ProjectOnPlane(surfaceRotRig * Vector3.back, keyNormalRig).normalized;
+                if (currentBackOnPlane.sqrMagnitude < 0.001f) currentBackOnPlane = targetBackOnPlane;
 
-                Quaternion targetHandRotRig = Quaternion.LookRotation(fwdOnKeyPlane, keyNormalRig);
-
-                // 3. Closed-form wrist position anchored at pressed finger contact point:
-                // When finger animation is at the end (pressed), the finger tip is exactly at the key center
+                float baseAngle = Vector3.SignedAngle(currentBackOnPlane, targetBackOnPlane, keyNormalRig);
                 Vector3 contactLocal = tipPressedLocal[fingerIdx];
+                float alphaDeg = 0f;
+                if (D > 0.001f) {
+                    float dx = contactLocal.x;
+                    float sinAlpha = Mathf.Clamp(dx / D, -0.999f, 0.999f);
+                    alphaDeg = Mathf.Asin(sinAlpha) * Mathf.Rad2Deg;
+                }
+                float signedAngle = baseAngle - alphaDeg;
+                Quaternion targetHandRotRig = Quaternion.AngleAxis(signedAngle, keyNormalRig) * surfaceRotRig;
+
+                // Step C: Closed-form wrist position anchored at pressed finger contact point (MoveFingerToButton)
                 Vector3 activeContactRig = targetHandRotRig * contactLocal;
                 Vector3 targetWristRig = keyPosRig - activeContactRig;
 

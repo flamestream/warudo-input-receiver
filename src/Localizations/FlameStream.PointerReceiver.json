@@ -596,6 +596,8 @@
         "ROOT_KEYSET_CLUSTER": "Center Key Origin",
         "CENTER_KEYSET_CLUSTER": "Center Key Origin",
         "AUTOMATION": "Automation",
+        "AUTO_ALIGN_KEY_BINDING": "✨ Auto-Align Hand & Finger",
+        "AUTO_ALIGN_KEY_BINDING_DESC": "Automatically adjusts hand orientation to match key surface, natural elbow yaw, and translates the hand so the finger contacts the button surface center.",
         "ALIGN_HAND_WITH_BUTTON_SURFACE": "📐 Align Hand with Button Surface",
         "ALIGN_HAND_WITH_BUTTON_SURFACE_DESC": "Rotates the hand so the palm plane is perfectly parallel to the button surface.",
         "MOVE_FINGER_TO_BUTTON": "🎯 Move Finger to Button",
