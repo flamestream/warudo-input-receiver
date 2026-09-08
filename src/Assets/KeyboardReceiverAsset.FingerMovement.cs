@@ -1038,6 +1038,7 @@ namespace FlameStream
                 KeyboardKeyBinding.SolveKeyAlignment(
                     handPos0,
                     handRot0,
+                    handRot0,
                     keyCenterWorld,
                     keyNormalWorld,
                     elbowPosWorld,

@@ -1345,6 +1345,37 @@ When non-looping layers (`Looping = false`) reach `NormalizedTime = 1f` with `Is
 4. **Clean Teardown**:
    - After sampling, set `isBatchAutoGenerating = false`, restore prior weights/states, and call `ResetFingerWeights()` to ensure clean runtime state.
 
+---
+
+## 39. Rest-Relative Hand Slab & Surface Normal Calibration
+
+### The Phenomenon
+1. In individual key visual setup and batch key alignment, the green hand slab was visibly tilted relative to the red keycap slab at resting pose, preventing the slab milestone guide from turning pure glowing white.
+2. In `SolveKeyAlignment` and `AlignHandWithButtonSurface`, an artificial $8^\circ\text{–}10^\circ$ tilt was applied to the avatar's hand, twisting the wrist on resting home row keys (`F`, `J`, `A`, `S`, `D`) where the finger was already positioned directly above the button.
+
+### Root Cause
+The code was calculating the hand's palm normal as `handNormal = handRot * Vector3.up`.
+In Warudo and Unity humanoid rigs, avatar wrist/hand IK targets use intermediate Euler rotations (`Vector3(0, 90, 0)` / `Vector3(0, -90, 0)`) to face palms forward toward props. Consequently:
+- The raw $+Y$ axis of the hand anchor does **not** correspond to the palm normal.
+- At rest, `handRot * Vector3.up` had an $8^\circ\text{–}10^\circ$ angular difference from the keyboard surface normal `keyNormal`.
+- `Quaternion.FromToRotation(handNormal, keyNormal)` interpreted this IK coordinate artifact as a physical misalignment, applying an erroneous tilt rotation to the hand.
+
+### Architectural Solution: Rest-Relative Surface Reference
+The avatar's hand at rest is calibrated by the user to be properly aligned over the keyboard. Therefore, the hand's surface normal and slab orientation must always be computed relative to resting rotation $\mathbf{R}_{\text{hand0}}$:
+
+1. **Rest-Relative Rotation Delta**:
+   $$\Delta \mathbf{R} = \mathbf{R}_{\text{hand}} \mathbf{R}_{\text{hand0}}^{-1}$$
+2. **Rest-Aligned Hand Surface Normal**:
+   $$\vec{N}_{\text{hand}} = \Delta \mathbf{R} \times \vec{N}_{\text{key}}$$
+3. **Rest-Aligned Hand Slab Orientation**:
+   $$\mathbf{R}_{\text{handSlab}} = \Delta \mathbf{R} \times \mathbf{R}_{\text{keyBase}} \times \mathbf{R}_{\text{handSlabRot}}$$
+   where $\mathbf{R}_{\text{keyBase}} = \text{FromToRotation}(\vec{u}_y, \vec{N}_{\text{key}})$.
+
+### Benefits
+- **Zero Angular Drift at Rest**: At resting pose ($\Delta \mathbf{R} = \mathbf{I}$), $\vec{N}_{\text{hand}} = \vec{N}_{\text{key}}$ and $\mathbf{R}_{\text{handSlab}} = \mathbf{R}_{\text{keySlab}}$, so the hand slab is automatically parallel ($0.0^\circ$ difference) to the keycap slab, immediately turning the slab milestone pure glowing white.
+- **Zero False Tilt on Planar Keys**: In `SolveKeyAlignment()`, `tilt = FromToRotation(handNormal, keyNormal)` evaluates to identity for all keys on the keyboard surface. Home row resting keys keep $\Delta\text{Rot} \approx (0, 0, 0)$, and reach keys rotate purely in natural forearm yaw around the surface normal without artificial pitch/roll wrist twist.
+
+
 
 
 

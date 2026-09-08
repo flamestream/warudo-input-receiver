@@ -571,9 +571,19 @@ Click **[Apply Transform]** when finished.
             return Parent.TryGetKeyCenterAndNormal(keyDef, out keyCenterWorld, out keyNormalWorld);
         }
 
+        public Quaternion GetHandRestRotationWorld() {
+            if (Parent == null) return Quaternion.identity;
+            bool isLeft = Finger.IsLeftHand();
+            Vector3 restRotRig = isLeft ? Parent.LeftHandRestRotation : Parent.RightHandRestRotation;
+            var root = Parent.GetRootAnchor(false);
+            Transform rootTr = root?.GameObject != null ? root.GameObject.transform : null;
+            return rootTr != null ? rootTr.rotation * Quaternion.Euler(restRotRig) : Quaternion.Euler(restRotRig);
+        }
+
         public static void SolveKeyAlignment(
             Vector3 handPos,
             Quaternion handRot,
+            Quaternion handRot0,
             Vector3 keyCenterWorld,
             Vector3 keyNormal,
             Vector3 elbowPos,
@@ -582,8 +592,10 @@ Click **[Apply Transform]** when finished.
             out Vector3 newLocalPos,
             out Quaternion newLocalRot
         ) {
-            // 1. Tilt hand to match button surface normal
-            Vector3 handNormal = handRot * Vector3.up;
+            // 1. Tilt hand to match button surface normal (referenced to resting hand orientation)
+            // The hand at rest is assumed properly aligned over the keyboard, so deltaRot relative to rest dictates tilt.
+            Quaternion deltaRotFromRest = handRot * Quaternion.Inverse(handRot0);
+            Vector3 handNormal = deltaRotFromRest * keyNormal;
             Quaternion tilt = Quaternion.FromToRotation(handNormal, keyNormal);
             Quaternion surfaceRot = tilt * handRot;
 
@@ -644,6 +656,7 @@ Click **[Apply Transform]** when finished.
             var anchorTr = Transform.setupAnchor.GameObject.transform;
             Vector3 handPos = anchorTr.position;
             Quaternion handRot = anchorTr.rotation;
+            Quaternion handRot0 = GetHandRestRotationWorld();
             Vector3 tipWorld = Parent.GetFingerTipWorldPosition(animator, Finger);
             Vector3 dLocal = Parent.GetCurledFingerTipContactVector(animator, Finger);
             if (dLocal == Vector3.zero) {
@@ -653,6 +666,7 @@ Click **[Apply Transform]** when finished.
             SolveKeyAlignment(
                 handPos,
                 handRot,
+                handRot0,
                 keyCenterWorld,
                 keyNormal,
                 recordedElbowPosWorld,
@@ -681,7 +695,9 @@ Click **[Apply Transform]** when finished.
             var anchorTr = Transform.setupAnchor.GameObject.transform;
             Vector3 handPos = anchorTr.position;
             Quaternion handRot = anchorTr.rotation;
-            Vector3 handNormal = handRot * Vector3.up;
+            Quaternion handRot0 = GetHandRestRotationWorld();
+            Quaternion deltaRotFromRest = handRot * Quaternion.Inverse(handRot0);
+            Vector3 handNormal = deltaRotFromRest * keyNormal;
             Vector3 tipWorld = (animator != null) ? Parent.GetFingerTipWorldPosition(animator, Finger) : handPos;
 
             Vector3 dLocal = Quaternion.Inverse(handRot) * (tipWorld - handPos);
@@ -736,23 +752,22 @@ Click **[Apply Transform]** when finished.
             var anchorTr = Transform.setupAnchor.GameObject.transform;
             Vector3 handPos = anchorTr.position;
             Quaternion handRot = anchorTr.rotation;
-            Vector3 handNormal = handRot * Vector3.up;
             Vector3 tipWorld = (animator != null) ? Parent.GetFingerTipWorldPosition(animator, Finger) : handPos;
 
             Vector3 dLocal = Quaternion.Inverse(handRot) * (tipWorld - handPos);
 
             Vector3 elbowPos = recordedElbowPosWorld;
             Vector3 toElbow = elbowPos - keyCenterWorld;
-            Vector3 toElbowOnPlane = Vector3.ProjectOnPlane(toElbow, handNormal);
+            Vector3 toElbowOnPlane = Vector3.ProjectOnPlane(toElbow, keyNormal);
             float D = toElbowOnPlane.magnitude;
             Vector3 targetBackOnPlane = D > 0.001f ? (toElbowOnPlane / D) : Vector3.back;
             if (targetBackOnPlane.sqrMagnitude < 0.001f) return;
 
             Vector3 currentBack = handRot * Vector3.back;
-            Vector3 currentBackOnPlane = Vector3.ProjectOnPlane(currentBack, handNormal).normalized;
+            Vector3 currentBackOnPlane = Vector3.ProjectOnPlane(currentBack, keyNormal).normalized;
             if (currentBackOnPlane.sqrMagnitude < 0.001f) currentBackOnPlane = targetBackOnPlane;
 
-            float baseAngle = Vector3.SignedAngle(currentBackOnPlane, targetBackOnPlane, handNormal);
+            float baseAngle = Vector3.SignedAngle(currentBackOnPlane, targetBackOnPlane, keyNormal);
             float alphaDeg = 0f;
             if (D > 0.001f) {
                 float dx = dLocal.x;
@@ -761,7 +776,7 @@ Click **[Apply Transform]** when finished.
             }
             float signedAngle = baseAngle - alphaDeg;
 
-            Quaternion rotDelta = Quaternion.AngleAxis(signedAngle, handNormal);
+            Quaternion rotDelta = Quaternion.AngleAxis(signedAngle, keyNormal);
             Quaternion newHandRot = rotDelta * handRot;
             Vector3 newHandPos = keyCenterWorld - (newHandRot * dLocal);
 
@@ -825,7 +840,8 @@ Click **[Apply Transform]** when finished.
             var anchorTr = Transform.setupAnchor.GameObject.transform;
             Vector3 handPos = anchorTr.position;
             Quaternion handRot = anchorTr.rotation;
-            Vector3 handNormal = handRot * Vector3.up;
+            Quaternion handRot0 = GetHandRestRotationWorld();
+            Quaternion deltaRotFromRest = handRot * Quaternion.Inverse(handRot0);
 
             Vector3 keyCenterWorld = Vector3.zero;
             Vector3 keyNormal = Vector3.up;
@@ -866,6 +882,8 @@ Click **[Apply Transform]** when finished.
                 }
             }
 
+            Vector3 handNormal = deltaRotFromRest * keyNormal;
+
             if (debugHandPlaneQuad != null) {
                 Vector3 handSlabOffset = handSlabTr != null ? handSlabTr.Position : new Vector3(0f, 0f, 0.025f);
                 Vector3 handSlabRot = handSlabTr != null ? handSlabTr.Rotation : Vector3.zero;
@@ -878,7 +896,8 @@ Click **[Apply Transform]** when finished.
                 Vector3 handRightOnPlane = Vector3.Cross(handNormal, handFwdOnPlane).normalized;
 
                 Vector3 handPlanePos = handPos + (handRightOnPlane * handSlabOffset.x) + (handNormal * handSlabOffset.y) + (handFwdOnPlane * handSlabOffset.z);
-                Quaternion handPlaneRot = Quaternion.FromToRotation(Vector3.up, handNormal) * Quaternion.Euler(handSlabRot);
+                Quaternion keyBaseRot = Quaternion.FromToRotation(Vector3.up, keyNormal);
+                Quaternion handPlaneRot = deltaRotFromRest * keyBaseRot * Quaternion.Euler(handSlabRot);
 
                 debugHandPlaneQuad.transform.position = handPlanePos;
                 debugHandPlaneQuad.transform.rotation = handPlaneRot;

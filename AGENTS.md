@@ -185,7 +185,13 @@ All input receivers inherit from `ReceiverAsset`:
   - Always guard runtime weight updates with a flag (e.g. `isBatchAutoGenerating`).
   - While active, pin layer weights at target values (e.g. `1.0f`) in `OnUpdate()` and kill any active release tweens.
   - Set `state.NormalizedTime = 1f; state.IsPlaying = false;` to freeze Animancer states at the end pose without triggering `Events.OnEnd` or looping resets.
-  - Compute fingertip contact vectors in bone-local space ($\vec{d}_{\text{local}} = \mathbf{Q}_{\text{intermediate}} \times \text{handTransform.InverseTransformPoint}(\vec{P}_{\text{tip}})$) so that batch alignment yields values identical to individual visual setup regardless of world position.
+### 4.20 Rest-Relative Hand Slab & Surface Normal Orientation
+- **Never Use Raw Hand Anchor Axes**: Do not compute hand surface normal using `handRot * Vector3.up`. Humanoid avatar wrist IK targets require intermediate Euler rotations (`Vector3(0, 90, 0)` / `Vector3(0, -90, 0)`), which skews the local Y-axis by $8^\circ\text{–}10^\circ$ relative to the keyboard plane.
+- **The Rest-Relative Standard**: The avatar's hand at rest is calibrated by the user to be properly aligned over the keyboard. Therefore, hand surface normal and slab orientation must always be computed relative to resting rotation $\mathbf{R}_{\text{hand0}}$:
+  $$\Delta \mathbf{R} = \mathbf{R}_{\text{hand}} \mathbf{R}_{\text{hand0}}^{-1}$$
+  $$\vec{N}_{\text{hand}} = \Delta \mathbf{R} \times \vec{N}_{\text{key}}$$
+  $$\mathbf{R}_{\text{handSlab}} = \Delta \mathbf{R} \times \mathbf{R}_{\text{keyBase}} \times \mathbf{R}_{\text{handSlabRot}}$$
+- **Eliminating False Tilt**: At resting pose ($\Delta \mathbf{R} = \mathbf{I}$), $\vec{N}_{\text{hand}} = \vec{N}_{\text{key}}$, guaranteeing that the hand slab is automatically parallel ($0.0^\circ$ angle) to the key slab. In `SolveKeyAlignment()`, `tilt = FromToRotation(handNormal, keyNormal)` evaluates to identity for all keys on the keyboard surface, preventing artificial pitch/roll wrist twisting on both resting keys and reach keys.
 
 ---
 
