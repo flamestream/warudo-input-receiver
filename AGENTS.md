@@ -178,6 +178,15 @@ All input receivers inherit from `ReceiverAsset`:
   - In `StructuredData` classes (e.g. `KeyboardKeyBinding`, `VirtualKeyDefinition`), override both `GetVersion()` and `Serialize()` to assign `serialized.version = GetVersion()`.
   - Implement an async `RequestUiRefresh()` (`await UniTask.Yield(); uiVersion++; Broadcast();`). Yielding before broadcasting ensures Vue has completed processing the active click event before receiving the version bump, smoothly re-rendering section titles and button labels in-place without any "Waiting..." overlay.
 
+### 4.19 Batch Sampling Animancer Poses & Preventing `OnUpdate` Reset Races
+- **Synchronous vs Asynchronous Evaluation**: Calling `animator.Update(0f)` synchronously within a single frame does not flush Animancer/PlayableGraph layer weight changes into humanoid bone positions. Unity requires player loop frame progression. Use `await UniTask.Delay(150)` to allow the avatar's bones to physically reach the blended/curled pose.
+- **`OnUpdate` Race Condition Guard**: When batch-sampling active poses (such as all 10 curled fingertips during batch key binding auto-generation), `OnUpdate()` continues executing on subsequent main thread frames during the async delay. If no keys are actively pressed, normal runtime logic (e.g. `ApplyFingerLayerWeight`) will command weights back to 0, uncurling the fingers before the delay finishes.
+- **The Rule**:
+  - Always guard runtime weight updates with a flag (e.g. `isBatchAutoGenerating`).
+  - While active, pin layer weights at target values (e.g. `1.0f`) in `OnUpdate()` and kill any active release tweens.
+  - Set `state.NormalizedTime = 1f; state.IsPlaying = false;` to freeze Animancer states at the end pose without triggering `Events.OnEnd` or looping resets.
+  - Compute fingertip contact vectors in bone-local space ($\vec{d}_{\text{local}} = \mathbf{Q}_{\text{intermediate}} \times \text{handTransform.InverseTransformPoint}(\vec{P}_{\text{tip}})$) so that batch alignment yields values identical to individual visual setup regardless of world position.
+
 ---
 
 ## 5. Troubleshooting & Runtime Logs

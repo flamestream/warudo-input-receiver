@@ -891,6 +891,55 @@ namespace FlameStream
             }
         }
 
+        public bool TryGetKeyCenterAndNormal(VirtualKeyDefinition k, out Vector3 keyCenterWorld, out Vector3 keyNormalWorld) {
+            keyCenterWorld = Vector3.zero;
+            keyNormalWorld = Vector3.up;
+            if (k == null) return false;
+
+            if (k.KeyGameObject != null) {
+                keyCenterWorld = k.KeyGameObject.transform.position;
+                keyNormalWorld = k.KeyGameObject.transform.rotation * Vector3.up;
+                return true;
+            }
+
+            Transform rootTr = RootAnchor?.GameObject != null ? RootAnchor.GameObject.transform : null;
+            Vector3 groupPos;
+            Quaternion groupRot;
+            Vector3 groupScale = Vector3.one;
+
+            if (k.AttachmentAnchor == VirtualKeyAnchor.LeftHand) {
+                var basePos = LeftHandRestPosition;
+                var baseRot = Quaternion.Euler(LeftHandRestRotation);
+                var pos = LeftKeysetTransform?.Position ?? Vector3.zero;
+                var rot = LeftKeysetTransform?.Rotation ?? Vector3.zero;
+                groupScale = LeftKeysetTransform?.Scale ?? Vector3.one;
+                groupPos = basePos + baseRot * pos;
+                groupRot = baseRot * Quaternion.Euler(rot);
+            } else if (k.AttachmentAnchor == VirtualKeyAnchor.RightHand) {
+                var basePos = RightHandRestPosition;
+                var baseRot = Quaternion.Euler(RightHandRestRotation);
+                var pos = RightKeysetTransform?.Position ?? Vector3.zero;
+                var rot = RightKeysetTransform?.Rotation ?? Vector3.zero;
+                groupScale = RightKeysetTransform?.Scale ?? Vector3.one;
+                groupPos = basePos + baseRot * pos;
+                groupRot = baseRot * Quaternion.Euler(rot);
+            } else {
+                var pos = RootKeysetTransform?.Position ?? Vector3.zero;
+                var rot = RootKeysetTransform?.Rotation ?? Vector3.zero;
+                groupScale = RootKeysetTransform?.Scale ?? Vector3.one;
+                groupPos = pos;
+                groupRot = Quaternion.Euler(rot);
+            }
+
+            Vector3 scaledKeyLocalPos = Vector3.Scale(k.Transform != null ? k.Transform.Position : Vector3.zero, groupScale);
+            Vector3 keyPosRig = groupPos + groupRot * scaledKeyLocalPos;
+            Quaternion keyRotRig = groupRot * Quaternion.Euler(k.Transform != null ? k.Transform.Rotation : Vector3.zero);
+
+            keyCenterWorld = rootTr != null ? rootTr.TransformPoint(keyPosRig) : keyPosRig;
+            keyNormalWorld = rootTr != null ? (rootTr.rotation * keyRotRig * Vector3.up) : (keyRotRig * Vector3.up);
+            return true;
+        }
+
         public void RebuildVirtualKeyMesh(VirtualKeyDefinition keyDef) {
             if (keyDef == null || !EnableFloatingKeys || !IsEnabled) return;
 

@@ -1292,5 +1292,59 @@ Because the subclass constructor runs immediately upon `new FingerTipGuideSphere
      - **Approach Span $\to$ Snap-to-White Threshold**: Smooth blend from base color to bright tint.
      - **Snap-to-White Threshold $\to$ Contact**: Pure glowing white.
 
+---
+
+## 38. Batch Sampling Curled Animancer Poses vs. `OnUpdate` Tween Race Conditions
+
+### The Phenomenon
+When batch-generating key bindings or auto-aligning multiple fingers simultaneously across 90+ keys (`AUTO_GENERATE_KEY_BINDINGS`):
+1. In individual visual setup, `AUTO_ALIGN_KEY_BINDING` positions the activated fingertip with pinpoint accuracy, turning all alignment guides (spheres, slabs, forearm lines) pure white.
+2. But batch generation was calculating against the relaxed (un-curled) finger pose, placing solved hand targets too low:
+   - Left index finger key `F`: solved $y = 0.0198\text{m}$ instead of $0.0319\text{m}$ ($+1.2\text{cm}$ error).
+3. If code attempted to set weights to $1.0\text{f}$ and evaluate synchronously (`animator.Update(0f)`), the finger positions remained unchanged at their rest pose.
+4. When introducing an asynchronous frame delay (`await UniTask.Delay(100)`), the avatar's fingers visibly curled for a brief split second, but still recorded the relaxed delta.
+
+### Root Causes
+
+#### 1. Unity PlayableGraph / Animancer Requires Engine Loop Frames
+In Unity, Animancer controls character animation via an active `PlayableGraph`. 
+Calling `animator.Update(0f)` in a single synchronous tick does not propagate bone matrix evaluations to `Transform.position` or `animator.GetBoneTransform()`. Frame progression in the player loop is required.
+
+#### 2. The `OnUpdate` Reset Race Condition
+During asynchronous frame waits (`await UniTask.Delay(150)`), `OnUpdate()` continues executing every frame on the main thread.
+Because the user is not actively pressing keys, `OnUpdate()` Section 6 (`ApplyFingerLayerWeight`) observed `targetFingerWeights[f] == 0.0f` and launched release tweens or immediately zeroed out the Animancer layer weights (`SetAnimancerLayerWeight(..., 0f)`).
+By the time the delay expired and `GetCurledFingerTipContactVector` was sampled, all layers had already been reset to weight $0$.
+
+#### 3. Animancer Looping & `Events.OnEnd` Resets
+When non-looping layers (`Looping = false`) reach `NormalizedTime = 1f` with `IsPlaying = true`, Warudo's `Events.OnEnd` handler triggers and sets `state.IsPlaying = false`, which can rewind or reset the state if not frozen properly.
+
+### Architectural Solution: Batch Protection Guard & Bone-Local Coordinate Invariance
+
+1. **State Protection Guard (`isBatchAutoGenerating`)**:
+   - In `OnUpdate()`, wrap layer weight updates in a guard:
+     ```csharp
+     if (isBatchAutoGenerating) {
+         // Keep all 10 finger weights pinned firmly at 1.0f without tweening
+         for (int f = 0; f < 10; f++) {
+             ...
+             SetAnimancerLayerWeight(animancerLayerIdx, 1.0f);
+         }
+     } else if (Character.OverlappingAnimations != null) {
+         for (int f = 0; f < 10; f++) {
+             ApplyFingerLayerWeight(finger, f, targetFingerWeights[f]);
+         }
+     }
+     ```
+2. **End-Pose Freezing**:
+   - Before awaiting frames, kill all runtime tweens (`fingerTweens[i]?.Kill(false)`).
+   - Set `state.NormalizedTime = 1f; state.IsPlaying = false;` to hold the animation cleanly at the curled end pose without triggering `Events.OnEnd`.
+3. **Bone-Local Coordinate Invariance**:
+   - Sample fingertip contact vectors relative to the humanoid hand bone:
+     $$\vec{d}_{\text{local}} = \mathbf{Q}_{\text{intermediate}} \times \text{handTransform.InverseTransformPoint}(\vec{P}_{\text{tip}})$$
+   - Bone-local evaluation is completely invariant to where the character, workstation, or hand anchors are located in world space, guaranteeing mathematical identity between batch generation and individual key visual calibration.
+4. **Clean Teardown**:
+   - After sampling, set `isBatchAutoGenerating = false`, restore prior weights/states, and call `ResetFingerWeights()` to ensure clean runtime state.
+
+
 
 

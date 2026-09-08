@@ -102,6 +102,7 @@ namespace FlameStream {
                 deltaPosition = value;
                 if (Transform != null) {
                     Transform.Position = value;
+                    Transform.SetDataInput(nameof(Transform.Position), value, true);
                 }
             }
         }
@@ -113,6 +114,7 @@ namespace FlameStream {
                 deltaRotation = value;
                 if (Transform != null) {
                     Transform.Rotation = value;
+                    Transform.SetDataInput(nameof(Transform.Rotation), value, true);
                 }
             }
         }
@@ -566,43 +568,26 @@ Click **[Apply Transform]** when finished.
                       ?? Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == this.Key);
             if (keyDef == null) return false;
 
-            if (keyDef.KeyGameObject != null) {
-                keyCenterWorld = keyDef.KeyGameObject.transform.position;
-                keyNormalWorld = keyDef.KeyGameObject.transform.rotation * Vector3.up;
-                return true;
-            }
-            if (Parent.RootAnchor?.GameObject != null) {
-                var rootTr = Parent.RootAnchor.GameObject.transform;
-                var pos = keyDef.Transform?.Position ?? Vector3.zero;
-                var rot = keyDef.Transform?.Rotation ?? Vector3.zero;
-                keyCenterWorld = rootTr.TransformPoint(pos);
-                keyNormalWorld = rootTr.rotation * Quaternion.Euler(rot) * Vector3.up;
-                return true;
-            }
-            return false;
+            return Parent.TryGetKeyCenterAndNormal(keyDef, out keyCenterWorld, out keyNormalWorld);
         }
 
-        public void AutoAlignKeyBinding() {
-            if (Parent == null || Transform == null || Transform.setupAnchor == null || Transform.setupAnchor.GameObject == null) return;
-            var animator = Parent?.Character?.Animator;
-            if (animator == null) return;
-            if (!TryGetKeyCenterAndNormal(out Vector3 keyCenterWorld, out Vector3 keyNormal)) return;
-
-            var anchorTr = Transform.setupAnchor.GameObject.transform;
-            Vector3 handPos = anchorTr.position;
-            Quaternion handRot = anchorTr.rotation;
-            Vector3 tipWorld = Parent.GetFingerTipWorldPosition(animator, Finger);
-
-            // 1. Measure contact vector in Hand Anchor space
-            Vector3 dLocal = Quaternion.Inverse(handRot) * (tipWorld - handPos);
-
-            // 2. Tilt hand to match button surface normal
+        public static void SolveKeyAlignment(
+            Vector3 handPos,
+            Quaternion handRot,
+            Vector3 keyCenterWorld,
+            Vector3 keyNormal,
+            Vector3 elbowPos,
+            Vector3 dLocal,
+            Transform parentTr,
+            out Vector3 newLocalPos,
+            out Quaternion newLocalRot
+        ) {
+            // 1. Tilt hand to match button surface normal
             Vector3 handNormal = handRot * Vector3.up;
             Quaternion tilt = Quaternion.FromToRotation(handNormal, keyNormal);
             Quaternion surfaceRot = tilt * handRot;
 
-            // 3. Rotate hand around key normal to natural forearm reach (compensating for finger lateral offset)
-            Vector3 elbowPos = recordedElbowPosWorld;
+            // 2. Rotate hand around key normal to natural forearm reach (compensating for finger lateral offset)
             Vector3 toElbow = elbowPos - keyCenterWorld;
             Vector3 toElbowOnPlane = Vector3.ProjectOnPlane(toElbow, keyNormal);
             float D = toElbowOnPlane.magnitude;
@@ -624,13 +609,58 @@ Click **[Apply Transform]** when finished.
             float signedAngle = baseAngle - alphaDeg;
             Quaternion newHandRot = Quaternion.AngleAxis(signedAngle, keyNormal) * surfaceRot;
 
-            // 4. Place wrist so curled fingertip lands exactly on key center: P_hand = P_key - R_hand * dLocal
+            // 3. Place wrist so curled fingertip lands exactly on key center: P_hand = P_key - R_hand * dLocal
             Vector3 newHandPos = keyCenterWorld - (newHandRot * dLocal);
 
-            // 5. Convert to parent local space
-            Transform parentTr = anchorTr.parent;
-            Vector3 newLocalPos = parentTr != null ? parentTr.InverseTransformPoint(newHandPos) : newHandPos;
-            Quaternion newLocalRot = parentTr != null ? Quaternion.Inverse(parentTr.rotation) * newHandRot : newHandRot;
+            // 4. Convert to parent local space
+            newLocalPos = parentTr != null ? parentTr.InverseTransformPoint(newHandPos) : newHandPos;
+            newLocalRot = parentTr != null ? Quaternion.Inverse(parentTr.rotation) * newHandRot : newHandRot;
+        }
+
+        public static void CalculateKeyDelta(
+            Vector3 restPosRig,
+            Vector3 restRotRig,
+            Vector3 solvedPosRig,
+            Quaternion solvedRotRig,
+            Vector3 handScale,
+            out Vector3 deltaPosition,
+            out Vector3 deltaRotation
+        ) {
+            Vector3 deltaHand = solvedPosRig - restPosRig;
+            deltaPosition = new Vector3(
+                handScale.x != 0f ? deltaHand.x / handScale.x : 0f,
+                handScale.y != 0f ? deltaHand.y / handScale.y : 0f,
+                handScale.z != 0f ? deltaHand.z / handScale.z : 0f
+            );
+            deltaRotation = Helper.NormalizeRotationAngles(solvedRotRig.eulerAngles - restRotRig);
+        }
+
+        public void AutoAlignKeyBinding() {
+            if (Parent == null || Transform == null || Transform.setupAnchor == null || Transform.setupAnchor.GameObject == null) return;
+            var animator = Parent?.Character?.Animator;
+            if (animator == null) return;
+            if (!TryGetKeyCenterAndNormal(out Vector3 keyCenterWorld, out Vector3 keyNormal)) return;
+
+            var anchorTr = Transform.setupAnchor.GameObject.transform;
+            Vector3 handPos = anchorTr.position;
+            Quaternion handRot = anchorTr.rotation;
+            Vector3 tipWorld = Parent.GetFingerTipWorldPosition(animator, Finger);
+            Vector3 dLocal = Parent.GetCurledFingerTipContactVector(animator, Finger);
+            if (dLocal == Vector3.zero) {
+                dLocal = Quaternion.Inverse(handRot) * (tipWorld - handPos);
+            }
+
+            SolveKeyAlignment(
+                handPos,
+                handRot,
+                keyCenterWorld,
+                keyNormal,
+                recordedElbowPosWorld,
+                dLocal,
+                anchorTr.parent,
+                out Vector3 newLocalPos,
+                out Quaternion newLocalRot
+            );
 
             Transform.setupAnchor.Transform.Position = newLocalPos;
             Transform.setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles(newLocalRot.eulerAngles);
