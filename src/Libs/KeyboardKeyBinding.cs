@@ -52,7 +52,7 @@ namespace FlameStream {
         [DataInput(30)]
         [Label("TRANSFORM")]
         [Description("KEYBOARD_KEY_BINDING_TRANSFORM_DESC")]
-        public VisualSetupTransform Transform;
+        public KeyBindingVisualSetupTransform Transform;
 
         [Trigger(50)]
         [Label("DEBUG_FORCE_KEY")]
@@ -161,16 +161,18 @@ namespace FlameStream {
         protected override void OnCreate() {
             base.OnCreate();
             if (Transform == null) {
-                Transform = StructuredData.Create<VisualSetupTransform>();
+                Transform = StructuredData.Create<KeyBindingVisualSetupTransform>();
                 Transform.Position = deltaPosition;
                 Transform.Rotation = deltaRotation;
             }
+            Transform.KeyBinding = this;
             Transform.HideScale();
             SetupTransformCallbacks();
             SyncUI();
             UpdateDebugButtonState();
 
             Watch(nameof(Transform), delegate {
+                if (Transform != null) Transform.KeyBinding = this;
                 SetupTransformCallbacks();
             });
             Watch(nameof(Key), delegate {
@@ -197,6 +199,7 @@ namespace FlameStream {
 
         public void SetupTransformCallbacks() {
             if (Transform == null) return;
+            Transform.KeyBinding = this;
             Transform.HideScale();
             Transform.ShowOriginIndicator = false;
             Transform.OriginAlwaysOnTop = VisualGuidesAlwaysOnTop;
@@ -255,21 +258,21 @@ Click **[Apply Transform]** when finished.
                 Transform parentTr = root != null && root.GameObject != null ? root.GameObject.transform : null;
                 CreateDebugVisuals(restPos, parentTr);
 
-                setupAnchor.ShowOrigin = VisualGuidesVisible;
-                setupAnchor.AlwaysOnTop = VisualGuidesAlwaysOnTop;
-                if (setupAnchor.GetDataInputPort(nameof(setupAnchor.AlwaysOnTop))?.Properties != null) {
-                    setupAnchor.GetDataInputPort(nameof(setupAnchor.AlwaysOnTop)).Properties.disabled = !VisualGuidesVisible;
-                    setupAnchor.BroadcastDataInputProperties(nameof(setupAnchor.AlwaysOnTop));
+                var kbAnchor = setupAnchor as KeyBindingVisualSetupAnchorAsset;
+                if (kbAnchor != null) {
+                    kbAnchor.OnAlignHandWithSurface = AlignHandWithButtonSurface;
+                    kbAnchor.OnMoveFingerToButton = MoveFingerToButton;
+                    kbAnchor.OnRotateHandToNaturalRotation = RotateHandToNaturalRotation;
+                    kbAnchor.OnSettingsChanged = () => {
+                        if (VisualGuidesVisible != kbAnchor.ShowVisualGuides || VisualGuidesAlwaysOnTop != kbAnchor.GuidesAlwaysOnTop) {
+                            SetVisualGuidesVisible(kbAnchor.ShowVisualGuides);
+                            SetVisualGuidesAlwaysOnTop(kbAnchor.GuidesAlwaysOnTop);
+                        }
+                        UpdateDebugVisuals();
+                    };
+                    VisualGuidesVisible = kbAnchor.ShowVisualGuides;
+                    VisualGuidesAlwaysOnTop = kbAnchor.GuidesAlwaysOnTop;
                 }
-                setupAnchor.BroadcastDataInput(nameof(setupAnchor.ShowOrigin));
-                setupAnchor.BroadcastDataInput(nameof(setupAnchor.AlwaysOnTop));
-
-                setupAnchor.OnShowOriginChange = (show) => {
-                    SetVisualGuidesVisible(show);
-                };
-                setupAnchor.OnAlwaysOnTopChange = (onTop) => {
-                    SetVisualGuidesAlwaysOnTop(onTop);
-                };
             };
 
             Transform.OnResetAnchor = (tr, setupAnchor) => {
@@ -300,7 +303,7 @@ Click **[Apply Transform]** when finished.
                     handScale.y != 0f ? deltaHand.y / handScale.y : 0f,
                     handScale.z != 0f ? deltaHand.z / handScale.z : 0f
                 );
-                Vector3 deltaRot = anchorRot - restRot;
+                Vector3 deltaRot = Helper.NormalizeRotationAngles(anchorRot - restRot);
 
                 tr.Position = unscaledDelta;
                 tr.Rotation = deltaRot;
@@ -349,7 +352,7 @@ Click **[Apply Transform]** when finished.
             if (col != null) UnityEngine.Object.Destroy(col);
         }
 
-        private Material CreateOverlayMaterial(Color color, bool transparent = false, int queuePriority = 1000) {
+        private Material CreateOverlayMaterial(Color color, bool transparent = true, int queuePriority = 1000) {
             Material mat;
             if (VisualGuidesAlwaysOnTop) {
                 var overlayShader = Shader.Find("GUI/Text Shader") ?? Shader.Find("Hidden/Internal-Colored");
@@ -407,32 +410,40 @@ Click **[Apply Transform]** when finished.
             debugHandPlaneMat = null;
             debugKeyPlaneMat = null;
 
-            // Render order in Always On Top mode:
-            // 3. Lines (background): queuePriority 1000
-            // 2. Planes/Slabs (middle): queuePriority 2000
-            // 1. Spheres (foreground/on top): queuePriority 3000
-            debugElbowLineMat = CreateOverlayMaterial(new Color(0.1f, 0.45f, 0.95f, 0.9f), false, 1000);
-            debugHandLineMat = CreateOverlayMaterial(new Color(0.1f, 0.45f, 0.95f, 0.9f), false, 1000);
-            debugHandPlaneMat = CreateOverlayMaterial(new Color(0.15f, 1f, 0.2f, 0.5f), true, 2000);
-            debugKeyPlaneMat = CreateOverlayMaterial(new Color(1f, 0.15f, 0.15f, 0.5f), true, 2000);
-            debugKeyCenterSphereMat = CreateOverlayMaterial(new Color(1f, 0.1f, 0.1f, 0.8f), true, 3000);
-            debugFingerTipSphereMat = CreateOverlayMaterial(new Color(0.1f, 1f, 0.2f, 0.8f), true, 3000);
+            var kbAnchor = Transform?.setupAnchor as KeyBindingVisualSetupAnchorAsset;
+            Color handSlabColor = kbAnchor?.HandSlab?.Color ?? new Color(0.15f, 0.85f, 0.25f, 0.5f);
+            Color keySlabColor = kbAnchor?.KeySlab?.Color ?? new Color(0.9f, 0.2f, 0.15f, 0.5f);
+            Color elbowLineColor = kbAnchor?.ElbowLine?.Color ?? new Color(0.1f, 0.45f, 0.95f, 0.9f);
+            Color handLineColor = kbAnchor?.HandLine?.Color ?? new Color(0.1f, 0.45f, 0.95f, 0.9f);
+            Color keyCenterColor = kbAnchor?.KeyCenterSphere?.Color ?? new Color(0.95f, 0.15f, 0.15f, 0.9f);
+            Color fingerTipColor = kbAnchor?.FingerTipSphere?.Color ?? new Color(0.1f, 0.95f, 0.2f, 0.9f);
 
-            if (debugElbowLine != null) {
-                var rend = debugElbowLine.GetComponent<Renderer>();
-                if (rend != null) { rend.material = debugElbowLineMat; rend.sortingOrder = 1000; }
-            }
-            if (debugHandLine != null) {
-                var rend = debugHandLine.GetComponent<Renderer>();
-                if (rend != null) { rend.material = debugHandLineMat; rend.sortingOrder = 1000; }
-            }
+            // Render order in Always On Top mode:
+            // 3. Planes/Slabs (background): queuePriority 1000
+            // 2. Lines (middle): queuePriority 2000
+            // 1. Spheres (foreground/on top): queuePriority 3000
+            debugHandPlaneMat = CreateOverlayMaterial(handSlabColor, true, 1000);
+            debugKeyPlaneMat = CreateOverlayMaterial(keySlabColor, true, 1000);
+            debugElbowLineMat = CreateOverlayMaterial(elbowLineColor, true, 2000);
+            debugHandLineMat = CreateOverlayMaterial(handLineColor, true, 2000);
+            debugKeyCenterSphereMat = CreateOverlayMaterial(keyCenterColor, true, 3000);
+            debugFingerTipSphereMat = CreateOverlayMaterial(fingerTipColor, true, 3000);
+
             if (debugHandPlaneQuad != null) {
                 var rend = debugHandPlaneQuad.GetComponent<Renderer>();
-                if (rend != null) { rend.material = debugHandPlaneMat; rend.sortingOrder = 2000; }
+                if (rend != null) { rend.material = debugHandPlaneMat; rend.sortingOrder = 1000; }
             }
             if (debugKeyPlaneQuad != null) {
                 var rend = debugKeyPlaneQuad.GetComponent<Renderer>();
-                if (rend != null) { rend.material = debugKeyPlaneMat; rend.sortingOrder = 2000; }
+                if (rend != null) { rend.material = debugKeyPlaneMat; rend.sortingOrder = 1000; }
+            }
+            if (debugElbowLine != null) {
+                var rend = debugElbowLine.GetComponent<Renderer>();
+                if (rend != null) { rend.material = debugElbowLineMat; rend.sortingOrder = 2000; }
+            }
+            if (debugHandLine != null) {
+                var rend = debugHandLine.GetComponent<Renderer>();
+                if (rend != null) { rend.material = debugHandLineMat; rend.sortingOrder = 2000; }
             }
             if (debugKeyCenterSphere != null) {
                 var rend = debugKeyCenterSphere.GetComponent<Renderer>();
@@ -482,15 +493,11 @@ Click **[Apply Transform]** when finished.
                 recordedElbowPosWorld = fallbackWrist - new Vector3(isLeft ? 0.05f : -0.05f, -0.05f, 0.25f);
             }
 
-            // 1. Target Key Center Sphere (priority 3000: renders over planes/slabs)
+            // 1. Target Key Center Sphere (priority 3000: foreground)
             debugKeyCenterSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             debugKeyCenterSphere.name = "KeyBinding_DebugKeyCenterSphere";
             StripCollider(debugKeyCenterSphere);
-            debugKeyCenterSphere.transform.localScale = new Vector3(0.015f, 0.015f, 0.015f);
-            debugKeyCenterSphereMat = CreateOverlayMaterial(new Color(1f, 0.1f, 0.1f, 0.8f), true, 3000);
-            var rendKeySphere = debugKeyCenterSphere.GetComponent<Renderer>();
-            rendKeySphere.material = debugKeyCenterSphereMat;
-            rendKeySphere.sortingOrder = 3000;
+            debugKeyCenterSphere.transform.localScale = new Vector3(0.0075f, 0.0075f, 0.0075f);
             if (hasRecordedKey) {
                 debugKeyCenterSphere.transform.position = keyCenterWorld;
                 debugKeyCenterSphere.SetActive(VisualGuidesVisible);
@@ -498,40 +505,28 @@ Click **[Apply Transform]** when finished.
                 debugKeyCenterSphere.SetActive(false);
             }
 
-            // 2. Target Fingertip Sphere (priority 3000: renders over planes/slabs)
+            // 2. Target Fingertip Sphere (priority 3000: foreground)
             debugFingerTipSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             debugFingerTipSphere.name = "KeyBinding_DebugFingerTipSphere";
             StripCollider(debugFingerTipSphere);
-            debugFingerTipSphere.transform.localScale = new Vector3(0.015f, 0.015f, 0.015f);
-            debugFingerTipSphereMat = CreateOverlayMaterial(new Color(0.1f, 1f, 0.2f, 0.8f), true, 3000);
-            var rendFingerSphere = debugFingerTipSphere.GetComponent<Renderer>();
-            rendFingerSphere.material = debugFingerTipSphereMat;
-            rendFingerSphere.sortingOrder = 3000;
+            debugFingerTipSphere.transform.localScale = new Vector3(0.0075f, 0.0075f, 0.0075f);
             if (animator != null) {
                 debugFingerTipSphere.transform.position = Parent.GetFingerTipWorldPosition(animator, Finger);
             }
             debugFingerTipSphere.SetActive(VisualGuidesVisible);
 
-            // 3. Hand Surface Slab (priority 2000: renders under spheres, over lines)
+            // 3. Hand Surface Slab (priority 1000: background, renders behind lines)
             debugHandPlaneQuad = GameObject.CreatePrimitive(PrimitiveType.Cube);
             debugHandPlaneQuad.name = "KeyBinding_DebugHandPlane";
             StripCollider(debugHandPlaneQuad);
-            debugHandPlaneQuad.transform.localScale = new Vector3(0.10f, 0.005f, 0.10f);
-            debugHandPlaneMat = CreateOverlayMaterial(new Color(0.15f, 1f, 0.2f, 0.5f), true, 2000);
-            var rendHandPlane = debugHandPlaneQuad.GetComponent<Renderer>();
-            rendHandPlane.material = debugHandPlaneMat;
-            rendHandPlane.sortingOrder = 2000;
+            debugHandPlaneQuad.transform.localScale = new Vector3(0.05f, 0.0025f, 0.05f);
             debugHandPlaneQuad.SetActive(VisualGuidesVisible);
 
-            // 4. Key Surface Slab (priority 2000: renders under spheres, over lines)
+            // 4. Key Surface Slab (priority 1000: background, renders behind lines)
             debugKeyPlaneQuad = GameObject.CreatePrimitive(PrimitiveType.Cube);
             debugKeyPlaneQuad.name = "KeyBinding_DebugKeyPlane";
             StripCollider(debugKeyPlaneQuad);
-            debugKeyPlaneQuad.transform.localScale = new Vector3(0.10f, 0.005f, 0.10f);
-            debugKeyPlaneMat = CreateOverlayMaterial(new Color(1f, 0.15f, 0.15f, 0.5f), true, 2000);
-            var rendKeyPlane = debugKeyPlaneQuad.GetComponent<Renderer>();
-            rendKeyPlane.material = debugKeyPlaneMat;
-            rendKeyPlane.sortingOrder = 2000;
+            debugKeyPlaneQuad.transform.localScale = new Vector3(0.05f, 0.0025f, 0.05f);
             if (hasRecordedKey) {
                 Vector3 keyNormal = keyRotWorld * Vector3.up;
                 debugKeyPlaneQuad.transform.position = keyCenterWorld;
@@ -541,30 +536,118 @@ Click **[Apply Transform]** when finished.
                 debugKeyPlaneQuad.SetActive(false);
             }
 
-            // 5. Elbow Line (priority 1000: renders in background)
+            // 5. Elbow Line (priority 2000: middle)
             debugElbowLine = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             debugElbowLine.name = "KeyBinding_DebugElbowLine";
             StripCollider(debugElbowLine);
-            debugElbowLine.transform.localScale = new Vector3(0.003f, 1.0f, 0.003f);
-            debugElbowLineMat = CreateOverlayMaterial(new Color(0.1f, 0.45f, 0.95f, 0.9f), false, 1000);
-            var rendElbowLine = debugElbowLine.GetComponent<Renderer>();
-            rendElbowLine.material = debugElbowLineMat;
-            rendElbowLine.sortingOrder = 1000;
+            debugElbowLine.transform.localScale = new Vector3(0.0015f, 0.5f, 0.0015f);
             debugElbowLine.transform.position = recordedElbowPosWorld;
             debugElbowLine.transform.rotation = Quaternion.identity;
             debugElbowLine.SetActive(VisualGuidesVisible);
 
-            // 6. Hand Line (priority 1000: renders in background)
+            // 6. Hand Line (priority 2000: middle)
             debugHandLine = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             debugHandLine.name = "KeyBinding_DebugHandLine";
             StripCollider(debugHandLine);
-            debugHandLine.transform.localScale = new Vector3(0.003f, 0.5f, 0.003f);
-            debugHandLineMat = CreateOverlayMaterial(new Color(0.1f, 0.45f, 0.95f, 0.9f), false, 1000);
-            var rendHandLine = debugHandLine.GetComponent<Renderer>();
-            rendHandLine.material = debugHandLineMat;
-            rendHandLine.sortingOrder = 1000;
+            debugHandLine.transform.localScale = new Vector3(0.0015f, 0.25f, 0.0015f);
             debugHandLine.SetActive(VisualGuidesVisible);
 
+            RebuildMaterials();
+            UpdateDebugVisuals();
+        }
+
+        public void AlignHandWithButtonSurface() {
+            if (Parent == null || Transform == null || Transform.setupAnchor == null || Transform.setupAnchor.GameObject == null) return;
+            var anchorTr = Transform.setupAnchor.GameObject.transform;
+            Quaternion handRot = anchorTr.rotation;
+            Vector3 handNormal = handRot * Vector3.up;
+
+            Vector3 keyNormal = Vector3.up;
+            if (Parent?.VirtualKeysCollection?.Keys != null) {
+                var keyDef = Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == this.Key && k.AssignedFinger == this.Finger)
+                          ?? Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == this.Key);
+                if (keyDef != null && keyDef.KeyGameObject != null) {
+                    keyNormal = keyDef.KeyGameObject.transform.rotation * Vector3.up;
+                } else if (keyDef != null && Parent.RootAnchor?.GameObject != null) {
+                    var rootTr = Parent.RootAnchor.GameObject.transform;
+                    var rot = keyDef.Transform?.Rotation ?? Vector3.zero;
+                    keyNormal = rootTr.rotation * Quaternion.Euler(rot) * Vector3.up;
+                }
+            }
+
+            Quaternion tilt = Quaternion.FromToRotation(handNormal, keyNormal);
+            Quaternion newHandRot = tilt * handRot;
+
+            Quaternion newLocalRot = anchorTr.parent != null
+                ? Quaternion.Inverse(anchorTr.parent.rotation) * newHandRot
+                : newHandRot;
+
+            Transform.setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles(newLocalRot.eulerAngles);
+            Transform.setupAnchor.Transform.Broadcast();
+            UpdateDebugVisuals();
+        }
+
+        public void MoveFingerToButton() {
+            if (Parent == null || Transform == null || Transform.setupAnchor == null || Transform.setupAnchor.GameObject == null) return;
+            var animator = Parent?.Character?.Animator;
+            if (animator == null) return;
+
+            Vector3 tipWorld = Parent.GetFingerTipWorldPosition(animator, Finger);
+            Vector3 keyCenterWorld = Vector3.zero;
+            bool foundKey = false;
+            if (Parent?.VirtualKeysCollection?.Keys != null) {
+                var keyDef = Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == this.Key && k.AssignedFinger == this.Finger)
+                          ?? Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == this.Key);
+                if (keyDef != null && keyDef.KeyGameObject != null) {
+                    keyCenterWorld = keyDef.KeyGameObject.transform.position;
+                    foundKey = true;
+                } else if (keyDef != null && Parent.RootAnchor?.GameObject != null) {
+                    var rootTr = Parent.RootAnchor.GameObject.transform;
+                    var pos = keyDef.Transform?.Position ?? Vector3.zero;
+                    keyCenterWorld = rootTr.TransformPoint(pos);
+                    foundKey = true;
+                }
+            }
+            if (!foundKey) return;
+
+            Transform parentTr = Transform.setupAnchor.GameObject.transform.parent;
+            Vector3 tipInParent = parentTr != null ? parentTr.InverseTransformPoint(tipWorld) : tipWorld;
+            Vector3 keyInParent = parentTr != null ? parentTr.InverseTransformPoint(keyCenterWorld) : keyCenterWorld;
+
+            Vector3 delta = keyInParent - tipInParent;
+            Transform.setupAnchor.Transform.Position += delta;
+            Transform.setupAnchor.Transform.Broadcast();
+            UpdateDebugVisuals();
+        }
+
+        public void RotateHandToNaturalRotation() {
+            if (Parent == null || Transform == null || Transform.setupAnchor == null || Transform.setupAnchor.GameObject == null) return;
+            var anchorTr = Transform.setupAnchor.GameObject.transform;
+            Vector3 handPos = anchorTr.position;
+            Quaternion handRot = anchorTr.rotation;
+            Vector3 handNormal = handRot * Vector3.up;
+
+            Vector3 elbowPos = recordedElbowPosWorld;
+            Vector3 toElbow = elbowPos - handPos;
+            Vector3 targetBackOnPlane = Vector3.ProjectOnPlane(toElbow, handNormal).normalized;
+            if (targetBackOnPlane.sqrMagnitude < 0.001f) return;
+
+            // Current backward direction of the hand projected onto the palm/key plane
+            Vector3 currentBack = handRot * Vector3.back;
+            Vector3 currentBackOnPlane = Vector3.ProjectOnPlane(currentBack, handNormal).normalized;
+            if (currentBackOnPlane.sqrMagnitude < 0.001f) currentBackOnPlane = targetBackOnPlane;
+
+            // Compute minimal rotation angle around handNormal (shortest arc in [-180, 180])
+            float signedAngle = Vector3.SignedAngle(currentBackOnPlane, targetBackOnPlane, handNormal);
+            Quaternion rotDelta = Quaternion.AngleAxis(signedAngle, handNormal);
+            Quaternion newRot = rotDelta * handRot;
+
+            Quaternion newLocalRot = anchorTr.parent != null
+                ? Quaternion.Inverse(anchorTr.parent.rotation) * newRot
+                : newRot;
+
+            Transform.setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles(newLocalRot.eulerAngles);
+            Transform.setupAnchor.Transform.Broadcast();
             UpdateDebugVisuals();
         }
 
@@ -581,6 +664,36 @@ Click **[Apply Transform]** when finished.
                 return;
             }
 
+            var kbAnchor = Transform.setupAnchor as KeyBindingVisualSetupAnchorAsset;
+
+            // Guides structured data
+            var fingerSphereData = kbAnchor?.FingerTipSphere;
+            var keySphereData = kbAnchor?.KeyCenterSphere;
+            var handSlabData = kbAnchor?.HandSlab;
+            var keySlabData = kbAnchor?.KeySlab;
+            var handLineData = kbAnchor?.HandLine;
+            var elbowLineData = kbAnchor?.ElbowLine;
+
+            // Thresholds
+            float lineWhiteThresh = kbAnchor?.LineThreshold != null ? kbAnchor.LineThreshold.GetWhiteThreshold() : 0.006f;
+            float lineBrightSpan = kbAnchor?.LineThreshold != null ? kbAnchor.LineThreshold.GetTransitionSpan() : 0.024f;
+            float sphereWhiteThresh = kbAnchor?.SphereThreshold != null ? kbAnchor.SphereThreshold.GetWhiteThreshold() : 0.006f;
+            float sphereBrightSpan = kbAnchor?.SphereThreshold != null ? kbAnchor.SphereThreshold.GetTransitionSpan() : 0.024f;
+            float slabWhiteAngleThresh = kbAnchor?.SlabThreshold != null ? kbAnchor.SlabThreshold.GetWhiteThreshold() : 3.0f;
+            float slabBrightAngleSpan = kbAnchor?.SlabThreshold != null ? kbAnchor.SlabThreshold.GetTransitionSpan() : 12.0f;
+
+            // Factors
+            float fingerSphereRadiusFactor = fingerSphereData != null ? fingerSphereData.RadiusFactor : 1.0f;
+            float keySphereRadiusFactor = keySphereData != null ? keySphereData.RadiusFactor : 1.0f;
+            float handLineLengthFactor = handLineData != null ? handLineData.LengthFactor : 1.0f;
+            float handLineThicknessFactor = handLineData != null ? handLineData.ThicknessFactor : 1.0f;
+            float elbowLineLengthFactor = elbowLineData != null ? elbowLineData.LengthFactor : 1.0f;
+            float elbowLineThicknessFactor = elbowLineData != null ? elbowLineData.ThicknessFactor : 1.0f;
+
+            // Custom slab transforms
+            GuideSlabTransform handSlabTr = handSlabData?.Transform;
+            GuideSlabTransform keySlabTr = keySlabData?.Transform;
+
             var anchorTr = Transform.setupAnchor.GameObject.transform;
             Vector3 handPos = anchorTr.position;
             Quaternion handRot = anchorTr.rotation;
@@ -588,40 +701,67 @@ Click **[Apply Transform]** when finished.
 
             Vector3 keyCenterWorld = Vector3.zero;
             Vector3 keyNormal = Vector3.up;
+            Quaternion keyRotWorld = Quaternion.identity;
             if (Parent?.VirtualKeysCollection?.Keys != null) {
                 var keyDef = Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == this.Key && k.AssignedFinger == this.Finger)
                           ?? Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == this.Key);
                 if (keyDef != null && keyDef.KeyGameObject != null) {
                     keyCenterWorld = keyDef.KeyGameObject.transform.position;
-                    Quaternion keyRot = keyDef.KeyGameObject.transform.rotation;
-                    keyNormal = keyRot * Vector3.up;
+                    keyRotWorld = keyDef.KeyGameObject.transform.rotation;
+                    keyNormal = keyRotWorld * Vector3.up;
                     hasRecordedKey = true;
 
                     if (debugKeyCenterSphere != null) {
                         debugKeyCenterSphere.transform.position = keyCenterWorld;
+                        debugKeyCenterSphere.transform.localScale = new Vector3(0.0075f, 0.0075f, 0.0075f) * keySphereRadiusFactor;
                         if (!debugKeyCenterSphere.activeSelf) debugKeyCenterSphere.SetActive(true);
                     }
                     if (debugKeyPlaneQuad != null) {
-                        debugKeyPlaneQuad.transform.position = keyCenterWorld;
-                        debugKeyPlaneQuad.transform.rotation = Quaternion.FromToRotation(Vector3.up, keyNormal);
+                        Vector3 keySlabOffset = keySlabTr != null ? keySlabTr.Position : Vector3.zero;
+                        Vector3 keySlabRot = keySlabTr != null ? keySlabTr.Rotation : Vector3.zero;
+                        Vector3 keyScaleFactor = keySlabTr != null ? keySlabTr.Scale : Vector3.one;
+                        if (keyScaleFactor.x <= 0.06f && keyScaleFactor.x > 0.0001f && keyScaleFactor.z <= 0.06f) keyScaleFactor = Vector3.one;
+                        Vector3 keySlabScale = Vector3.Scale(new Vector3(0.05f, 0.0025f, 0.05f), keyScaleFactor);
+
+                        Vector3 keyFwdOnPlane = Vector3.ProjectOnPlane(keyRotWorld * Vector3.forward, keyNormal).normalized;
+                        if (keyFwdOnPlane.sqrMagnitude < 0.001f) keyFwdOnPlane = Vector3.forward;
+                        Vector3 keyRightOnPlane = Vector3.Cross(keyNormal, keyFwdOnPlane).normalized;
+
+                        Vector3 keyPlanePos = keyCenterWorld + (keyRightOnPlane * keySlabOffset.x) + (keyNormal * keySlabOffset.y) + (keyFwdOnPlane * keySlabOffset.z);
+                        Quaternion keyPlaneRot = Quaternion.FromToRotation(Vector3.up, keyNormal) * Quaternion.Euler(keySlabRot);
+
+                        debugKeyPlaneQuad.transform.position = keyPlanePos;
+                        debugKeyPlaneQuad.transform.rotation = keyPlaneRot;
+                        debugKeyPlaneQuad.transform.localScale = keySlabScale;
                         if (!debugKeyPlaneQuad.activeSelf) debugKeyPlaneQuad.SetActive(true);
                     }
                 }
             }
 
             if (debugHandPlaneQuad != null) {
+                Vector3 handSlabOffset = handSlabTr != null ? handSlabTr.Position : new Vector3(0f, 0f, 0.025f);
+                Vector3 handSlabRot = handSlabTr != null ? handSlabTr.Rotation : Vector3.zero;
+                Vector3 handScaleFactor = handSlabTr != null ? handSlabTr.Scale : Vector3.one;
+                if (handScaleFactor.x <= 0.06f && handScaleFactor.x > 0.0001f && handScaleFactor.z <= 0.06f) handScaleFactor = Vector3.one;
+                Vector3 handSlabScale = Vector3.Scale(new Vector3(0.05f, 0.0025f, 0.05f), handScaleFactor);
+
                 Vector3 handFwdOnPlane = Vector3.ProjectOnPlane(handRot * Vector3.forward, handNormal).normalized;
                 if (handFwdOnPlane.sqrMagnitude < 0.001f) handFwdOnPlane = Vector3.forward;
-                Vector3 handPlanePos = handPos + handFwdOnPlane * 0.05f;
+                Vector3 handRightOnPlane = Vector3.Cross(handNormal, handFwdOnPlane).normalized;
+
+                Vector3 handPlanePos = handPos + (handRightOnPlane * handSlabOffset.x) + (handNormal * handSlabOffset.y) + (handFwdOnPlane * handSlabOffset.z);
+                Quaternion handPlaneRot = Quaternion.FromToRotation(Vector3.up, handNormal) * Quaternion.Euler(handSlabRot);
 
                 debugHandPlaneQuad.transform.position = handPlanePos;
-                debugHandPlaneQuad.transform.rotation = Quaternion.FromToRotation(Vector3.up, handNormal);
+                debugHandPlaneQuad.transform.rotation = handPlaneRot;
+                debugHandPlaneQuad.transform.localScale = handSlabScale;
                 if (!debugHandPlaneQuad.activeSelf) debugHandPlaneQuad.SetActive(true);
             }
 
             Vector3 backwardDir = handRot * Vector3.back;
+            float handLineHalfLength = 0.25f * handLineLengthFactor;
             if (debugHandLine != null) {
-                debugHandLine.transform.position = handPos + (backwardDir * 0.5f);
+                debugHandLine.transform.position = handPos + (backwardDir * handLineHalfLength);
                 debugHandLine.transform.rotation = Quaternion.LookRotation(backwardDir, handNormal) * Quaternion.Euler(90f, 0f, 0f);
                 if (!debugHandLine.activeSelf) debugHandLine.SetActive(true);
             }
@@ -637,30 +777,64 @@ Click **[Apply Transform]** when finished.
                 lineDist = Mathf.Abs(deltaX * u2D.y - deltaZ * u2D.x);
             }
 
-            float axisGlow = Mathf.Clamp01(1f - (lineDist / 0.025f));
-            float axisWhiteSnap = lineDist <= 0.004f ? Mathf.Pow(Mathf.Clamp01(1f - (lineDist / 0.004f)), 0.5f) : 0f;
+            // Line Proximity (Milestone 3-breakpoint logic)
+            float lineOuter = lineWhiteThresh + lineBrightSpan;
+            float lineBrightBlend = 0f;
+            if (lineDist < lineWhiteThresh) {
+                lineBrightBlend = 1f;
+            } else if (lineDist <= lineOuter && lineBrightSpan > 0.0001f) {
+                lineBrightBlend = Mathf.Clamp01((lineOuter - lineDist) / lineBrightSpan);
+            }
+            float lineWhiteSnap = (lineDist <= lineWhiteThresh && lineWhiteThresh > 0.0001f)
+                ? Mathf.Pow(Mathf.Clamp01((lineWhiteThresh - lineDist) / lineWhiteThresh), 0.5f)
+                : 0f;
 
-            Color normalBlue = new Color(0.1f, 0.45f, 0.95f, 0.9f);
-            Color glowCyan = new Color(0.1f, 1.0f, 1.0f, 1.0f);
-            Color currentLineColor = Color.Lerp(Color.Lerp(normalBlue, glowCyan, axisGlow), Color.white, axisWhiteSnap);
+            Color baseHandLineColor = handLineData != null ? handLineData.Color : new Color(0.1f, 0.45f, 0.95f, 0.9f);
+            Color brightHandLineColor = Color.Lerp(baseHandLineColor, Color.white, 0.5f);
+            brightHandLineColor.a = baseHandLineColor.a;
+            Color whiteHandLineColor = new Color(1f, 1f, 1f, baseHandLineColor.a);
+            Color currentHandLineColor = Color.Lerp(Color.Lerp(baseHandLineColor, brightHandLineColor, lineBrightBlend), whiteHandLineColor, lineWhiteSnap);
 
-            Color normalEmission = new Color(0.05f, 0.25f, 0.7f);
-            Color glowEmission = new Color(0.4f, 2.0f, 2.0f);
-            Color currentLineEmission = Color.Lerp(Color.Lerp(normalEmission, glowEmission, axisGlow), new Color(3.0f, 3.0f, 3.0f), axisWhiteSnap);
+            Color baseElbowLineColor = elbowLineData != null ? elbowLineData.Color : new Color(0.1f, 0.45f, 0.95f, 0.9f);
+            Color brightElbowLineColor = Color.Lerp(baseElbowLineColor, Color.white, 0.5f);
+            brightElbowLineColor.a = baseElbowLineColor.a;
+            Color whiteElbowLineColor = new Color(1f, 1f, 1f, baseElbowLineColor.a);
+            Color currentElbowLineColor = Color.Lerp(Color.Lerp(baseElbowLineColor, brightElbowLineColor, lineBrightBlend), whiteElbowLineColor, lineWhiteSnap);
+
+            if (debugHandLineMat != null) {
+                debugHandLineMat.color = currentHandLineColor;
+                if (handLineData != null && handLineData.Glow) {
+                    debugHandLineMat.EnableKeyword("_EMISSION");
+                    Color handEmission = Color.Lerp(Color.Lerp(baseHandLineColor * 0.7f, brightHandLineColor * 2.0f, lineBrightBlend), new Color(3f, 3f, 3f), lineWhiteSnap);
+                    debugHandLineMat.SetColor("_EmissionColor", handEmission);
+                } else {
+                    debugHandLineMat.DisableKeyword("_EMISSION");
+                    debugHandLineMat.SetColor("_EmissionColor", Color.black);
+                }
+            }
 
             if (debugElbowLineMat != null) {
-                debugElbowLineMat.color = currentLineColor;
-                debugElbowLineMat.SetColor("_EmissionColor", currentLineEmission);
-            }
-            if (debugHandLineMat != null) {
-                debugHandLineMat.color = currentLineColor;
-                debugHandLineMat.SetColor("_EmissionColor", currentLineEmission);
+                debugElbowLineMat.color = currentElbowLineColor;
+                if (elbowLineData != null && elbowLineData.Glow) {
+                    debugElbowLineMat.EnableKeyword("_EMISSION");
+                    Color elbowEmission = Color.Lerp(Color.Lerp(baseElbowLineColor * 0.7f, brightElbowLineColor * 2.0f, lineBrightBlend), new Color(3f, 3f, 3f), lineWhiteSnap);
+                    debugElbowLineMat.SetColor("_EmissionColor", elbowEmission);
+                } else {
+                    debugElbowLineMat.DisableKeyword("_EMISSION");
+                    debugElbowLineMat.SetColor("_EmissionColor", Color.black);
+                }
             }
 
-            float rodThickness = Mathf.Lerp(0.003f, 0.006f, axisGlow);
-            if (axisWhiteSnap > 0f) rodThickness = Mathf.Lerp(0.006f, 0.008f, axisWhiteSnap);
-            if (debugElbowLine != null) debugElbowLine.transform.localScale = new Vector3(rodThickness, 1.0f, rodThickness);
-            if (debugHandLine != null) debugHandLine.transform.localScale = new Vector3(rodThickness, 0.5f, rodThickness);
+            float baseHandRod = 0.0015f * handLineThicknessFactor;
+            float rodThickness = Mathf.Lerp(baseHandRod, baseHandRod * 2f, lineBrightBlend);
+            if (lineWhiteSnap > 0f) rodThickness = Mathf.Lerp(baseHandRod * 2f, baseHandRod * 2.7f, lineWhiteSnap);
+
+            float baseElbowRod = 0.0015f * elbowLineThicknessFactor;
+            float elbowRodThickness = Mathf.Lerp(baseElbowRod, baseElbowRod * 2f, lineBrightBlend);
+            if (lineWhiteSnap > 0f) elbowRodThickness = Mathf.Lerp(baseElbowRod * 2f, baseElbowRod * 2.7f, lineWhiteSnap);
+
+            if (debugElbowLine != null) debugElbowLine.transform.localScale = new Vector3(elbowRodThickness, 0.5f * elbowLineLengthFactor, elbowRodThickness);
+            if (debugHandLine != null) debugHandLine.transform.localScale = new Vector3(rodThickness, handLineHalfLength, rodThickness);
 
             Vector3 tipWorld = Vector3.zero;
             var animator = Parent?.Character?.Animator;
@@ -668,56 +842,107 @@ Click **[Apply Transform]** when finished.
                 tipWorld = Parent.GetFingerTipWorldPosition(animator, Finger);
                 if (debugFingerTipSphere != null) {
                     debugFingerTipSphere.transform.position = tipWorld;
+                    debugFingerTipSphere.transform.localScale = new Vector3(0.0075f, 0.0075f, 0.0075f) * fingerSphereRadiusFactor;
                     if (!debugFingerTipSphere.activeSelf) debugFingerTipSphere.SetActive(true);
                 }
             }
 
+            // Sphere Proximity (Milestone 3-breakpoint logic)
             float sphereDist = (hasRecordedKey && animator != null) ? Vector3.Distance(keyCenterWorld, tipWorld) : float.MaxValue;
-            float sphereGlow = Mathf.Clamp01(1f - (sphereDist / 0.03f));
-            float sphereWhiteSnap = sphereDist <= 0.004f ? Mathf.Pow(Mathf.Clamp01(1f - (sphereDist / 0.004f)), 0.5f) : 0f;
+            float sphereOuter = sphereWhiteThresh + sphereBrightSpan;
+            float sphereBrightBlend = 0f;
+            if (sphereDist < sphereWhiteThresh) {
+                sphereBrightBlend = 1f;
+            } else if (sphereDist <= sphereOuter && sphereBrightSpan > 0.0001f) {
+                sphereBrightBlend = Mathf.Clamp01((sphereOuter - sphereDist) / sphereBrightSpan);
+            }
+            float sphereWhiteSnap = (sphereDist <= sphereWhiteThresh && sphereWhiteThresh > 0.0001f)
+                ? Mathf.Pow(Mathf.Clamp01((sphereWhiteThresh - sphereDist) / sphereWhiteThresh), 0.5f)
+                : 0f;
 
-            Color baseKeySphereColor = new Color(1f, 0.1f, 0.1f, 0.8f);
-            Color glowKeySphereColor = new Color(1f, 0.65f, 0.1f, 0.95f);
-            Color currentKeySphereColor = Color.Lerp(Color.Lerp(baseKeySphereColor, glowKeySphereColor, sphereGlow), Color.white, sphereWhiteSnap);
-            Color currentKeySphereEmission = Color.Lerp(new Color(0.8f, 0.08f, 0.08f), new Color(3.0f, 3.0f, 3.0f), sphereWhiteSnap > 0 ? sphereWhiteSnap : sphereGlow);
+            Color baseKeySphereColor = keySphereData != null ? keySphereData.Color : new Color(0.95f, 0.15f, 0.15f, 0.9f);
+            Color brightKeySphereColor = Color.Lerp(baseKeySphereColor, Color.white, 0.5f);
+            brightKeySphereColor.a = baseKeySphereColor.a;
+            Color whiteKeySphereColor = new Color(1f, 1f, 1f, baseKeySphereColor.a);
+            Color currentKeySphereColor = Color.Lerp(Color.Lerp(baseKeySphereColor, brightKeySphereColor, sphereBrightBlend), whiteKeySphereColor, sphereWhiteSnap);
 
             if (debugKeyCenterSphereMat != null) {
                 debugKeyCenterSphereMat.color = currentKeySphereColor;
-                debugKeyCenterSphereMat.SetColor("_EmissionColor", currentKeySphereEmission);
+                if (keySphereData != null && keySphereData.Glow) {
+                    debugKeyCenterSphereMat.EnableKeyword("_EMISSION");
+                    Color keyEmission = Color.Lerp(Color.Lerp(baseKeySphereColor * 0.8f, brightKeySphereColor * 2.0f, sphereBrightBlend), new Color(3f, 3f, 3f), sphereWhiteSnap);
+                    debugKeyCenterSphereMat.SetColor("_EmissionColor", keyEmission);
+                } else {
+                    debugKeyCenterSphereMat.DisableKeyword("_EMISSION");
+                    debugKeyCenterSphereMat.SetColor("_EmissionColor", Color.black);
+                }
             }
 
-            Color baseFingerSphereColor = new Color(0.1f, 1f, 0.2f, 0.8f);
-            Color glowFingerSphereColor = new Color(0.2f, 1f, 0.8f, 0.95f);
-            Color currentFingerSphereColor = Color.Lerp(Color.Lerp(baseFingerSphereColor, glowFingerSphereColor, sphereGlow), Color.white, sphereWhiteSnap);
-            Color currentFingerSphereEmission = Color.Lerp(new Color(0.08f, 0.8f, 0.16f), new Color(3.0f, 3.0f, 3.0f), sphereWhiteSnap > 0 ? sphereWhiteSnap : sphereGlow);
+            Color baseFingerSphereColor = fingerSphereData != null ? fingerSphereData.Color : new Color(0.1f, 0.95f, 0.2f, 0.9f);
+            Color brightFingerSphereColor = Color.Lerp(baseFingerSphereColor, Color.white, 0.5f);
+            brightFingerSphereColor.a = baseFingerSphereColor.a;
+            Color whiteFingerSphereColor = new Color(1f, 1f, 1f, baseFingerSphereColor.a);
+            Color currentFingerSphereColor = Color.Lerp(Color.Lerp(baseFingerSphereColor, brightFingerSphereColor, sphereBrightBlend), whiteFingerSphereColor, sphereWhiteSnap);
 
             if (debugFingerTipSphereMat != null) {
                 debugFingerTipSphereMat.color = currentFingerSphereColor;
-                debugFingerTipSphereMat.SetColor("_EmissionColor", currentFingerSphereEmission);
+                if (fingerSphereData != null && fingerSphereData.Glow) {
+                    debugFingerTipSphereMat.EnableKeyword("_EMISSION");
+                    Color fingerEmission = Color.Lerp(Color.Lerp(baseFingerSphereColor * 0.8f, brightFingerSphereColor * 2.0f, sphereBrightBlend), new Color(3f, 3f, 3f), sphereWhiteSnap);
+                    debugFingerTipSphereMat.SetColor("_EmissionColor", fingerEmission);
+                } else {
+                    debugFingerTipSphereMat.DisableKeyword("_EMISSION");
+                    debugFingerTipSphereMat.SetColor("_EmissionColor", Color.black);
+                }
             }
 
+            // Slab Parallelism (Milestone 3-breakpoint logic)
             float angleDeg = hasRecordedKey ? Vector3.Angle(handNormal, keyNormal) : 90f;
-            float parallelGlow = Mathf.Clamp01(1f - (angleDeg / 15.0f));
-            float parallelWhiteSnap = angleDeg <= 2.0f ? Mathf.Pow(Mathf.Clamp01(1f - (angleDeg / 2.0f)), 0.5f) : 0f;
+            float slabOuter = slabWhiteAngleThresh + slabBrightAngleSpan;
+            float slabBrightBlend = 0f;
+            if (angleDeg < slabWhiteAngleThresh) {
+                slabBrightBlend = 1f;
+            } else if (angleDeg <= slabOuter && slabBrightAngleSpan > 0.01f) {
+                slabBrightBlend = Mathf.Clamp01((slabOuter - angleDeg) / slabBrightAngleSpan);
+            }
+            float slabWhiteSnap = (angleDeg <= slabWhiteAngleThresh && slabWhiteAngleThresh > 0.01f)
+                ? Mathf.Pow(Mathf.Clamp01((slabWhiteAngleThresh - angleDeg) / slabWhiteAngleThresh), 0.5f)
+                : 0f;
 
-            Color baseHandSlabColor = new Color(0.15f, 1f, 0.2f, 0.5f);
-            Color glowHandSlabColor = new Color(0.2f, 1f, 0.85f, 0.75f);
-            Color currentHandSlabColor = Color.Lerp(Color.Lerp(baseHandSlabColor, glowHandSlabColor, parallelGlow), new Color(1f, 1f, 1f, 0.95f), parallelWhiteSnap);
-            Color currentHandSlabEmission = Color.Lerp(new Color(0.1f, 0.7f, 0.15f), new Color(2.5f, 2.5f, 2.5f), parallelWhiteSnap > 0 ? parallelWhiteSnap : parallelGlow);
+            Color baseHandSlabColor = handSlabData != null ? handSlabData.Color : new Color(0.15f, 0.85f, 0.25f, 0.5f);
+            Color brightHandSlabColor = Color.Lerp(baseHandSlabColor, Color.white, 0.45f);
+            brightHandSlabColor.a = baseHandSlabColor.a;
+            Color whiteHandSlabColor = new Color(1f, 1f, 1f, baseHandSlabColor.a);
+            Color currentHandSlabColor = Color.Lerp(Color.Lerp(baseHandSlabColor, brightHandSlabColor, slabBrightBlend), whiteHandSlabColor, slabWhiteSnap);
 
             if (debugHandPlaneMat != null) {
                 debugHandPlaneMat.color = currentHandSlabColor;
-                debugHandPlaneMat.SetColor("_EmissionColor", currentHandSlabEmission);
+                if (handSlabData != null && handSlabData.Glow) {
+                    debugHandPlaneMat.EnableKeyword("_EMISSION");
+                    Color handEmission = Color.Lerp(Color.Lerp(baseHandSlabColor * 0.4f, brightHandSlabColor * 1.5f, slabBrightBlend), new Color(2f, 2f, 2f), slabWhiteSnap);
+                    debugHandPlaneMat.SetColor("_EmissionColor", handEmission);
+                } else {
+                    debugHandPlaneMat.DisableKeyword("_EMISSION");
+                    debugHandPlaneMat.SetColor("_EmissionColor", Color.black);
+                }
             }
 
-            Color baseKeySlabColor = new Color(1f, 0.15f, 0.15f, 0.5f);
-            Color glowKeySlabColor = new Color(1f, 0.65f, 0.2f, 0.75f);
-            Color currentKeySlabColor = Color.Lerp(Color.Lerp(baseKeySlabColor, glowKeySlabColor, parallelGlow), new Color(1f, 1f, 1f, 0.95f), parallelWhiteSnap);
-            Color currentKeySlabEmission = Color.Lerp(new Color(0.7f, 0.1f, 0.1f), new Color(2.5f, 2.5f, 2.5f), parallelWhiteSnap > 0 ? parallelWhiteSnap : parallelGlow);
+            Color baseKeySlabColor = keySlabData != null ? keySlabData.Color : new Color(0.9f, 0.2f, 0.15f, 0.5f);
+            Color brightKeySlabColor = Color.Lerp(baseKeySlabColor, Color.white, 0.45f);
+            brightKeySlabColor.a = baseKeySlabColor.a;
+            Color whiteKeySlabColor = new Color(1f, 1f, 1f, baseKeySlabColor.a);
+            Color currentKeySlabColor = Color.Lerp(Color.Lerp(baseKeySlabColor, brightKeySlabColor, slabBrightBlend), whiteKeySlabColor, slabWhiteSnap);
 
             if (debugKeyPlaneMat != null) {
                 debugKeyPlaneMat.color = currentKeySlabColor;
-                debugKeyPlaneMat.SetColor("_EmissionColor", currentKeySlabEmission);
+                if (keySlabData != null && keySlabData.Glow) {
+                    debugKeyPlaneMat.EnableKeyword("_EMISSION");
+                    Color keyEmission = Color.Lerp(Color.Lerp(baseKeySlabColor * 0.4f, brightKeySlabColor * 1.5f, slabBrightBlend), new Color(2f, 2f, 2f), slabWhiteSnap);
+                    debugKeyPlaneMat.SetColor("_EmissionColor", keyEmission);
+                } else {
+                    debugKeyPlaneMat.DisableKeyword("_EMISSION");
+                    debugKeyPlaneMat.SetColor("_EmissionColor", Color.black);
+                }
             }
         }
 

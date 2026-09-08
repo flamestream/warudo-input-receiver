@@ -906,14 +906,15 @@ namespace FlameStream
                     existingLayer.Weight = 0f;
                     existingLayer.Speed = 1f;
                     existingLayer.Additive = true;
-                    existingLayer.Looping = true;
+                    existingLayer.Looping = false;
                     existingLayer.Masked = true;
                     existingLayer.MaskedBodyParts = maskedParts;
                 } else {
                     existingLayer.Enabled = true;
                     existingLayer.Animation = animClip;
                     existingLayer.Additive = true;
-                    existingLayer.Looping = true;
+                    existingLayer.Looping = false;
+                    existingLayer.SetDataInput(nameof(existingLayer.Looping), false, true);
                     existingLayer.Speed = 1f;
                     existingLayer.Masked = true;
                     existingLayer.MaskedBodyParts = maskedParts;

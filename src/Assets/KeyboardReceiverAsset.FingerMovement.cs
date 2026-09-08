@@ -1017,12 +1017,13 @@ namespace FlameStream
                 var wristBone = isLeft ? leftWristBone : rightWristBone;
                 Vector3 wrist0Rig = isLeft ? leftWrist0Rig : rightWrist0Rig;
                 Quaternion wristRot0Rig = isLeft ? leftWristRot0Rig : rightWristRot0Rig;
+                Vector3 wristRig = (wristBone != null) ? worldToRig.MultiplyPoint3x4(wristBone.position) : wrist0Rig;
 
-                // 1. Measure neutral fingertip offset (sampling mesh skin apex if readable)
+                // 1. Measure neutral fingertip offset in Hand Reference Space
                 Vector3 fallbackNeutralTipWorld = GetFingerTipWorldPosition(animator, finger);
                 Vector3 neutralTipWorld = GetFingerTipMeshWorldPosition(animator, smrs, finger, fallbackNeutralTipWorld, false, worldToRig, out bool usedMeshNeutral);
                 Vector3 neutralTipRig = worldToRig.MultiplyPoint3x4(neutralTipWorld);
-                Vector3 neutralOffsetRig = neutralTipRig - wrist0Rig;
+                Vector3 neutralOffsetRig = neutralTipRig - wristRig;
                 tipNeutralLocal[f] = Quaternion.Inverse(wristRot0Rig) * neutralOffsetRig;
 
                 // 2. Measure active/pressed fingertip offset using animation clip's final frame & mesh pad surface
@@ -1080,11 +1081,11 @@ namespace FlameStream
 
                 if (sampledWithAnim) {
                     Vector3 pressedTipRig = worldToRig.MultiplyPoint3x4(pressedTipWorld);
-                    Vector3 pressedOffsetRig = pressedTipRig - wrist0Rig;
+                    Vector3 pressedOffsetRig = pressedTipRig - wristRig;
                     tipPressedLocal[f] = Quaternion.Inverse(wristRot0Rig) * pressedOffsetRig;
                 } else {
-                    // Fallback curl displacement: move tip downward (-Y) ~1.5cm and slightly back (-Z) ~0.6cm in Hand Local Space
-                    tipPressedLocal[f] = tipNeutralLocal[f] + new Vector3(0f, -0.015f, -0.006f);
+                    // Fallback curl displacement: move tip downward (-Y) ~2.5cm and slightly back (-Z) ~1.0cm in Hand Local Space
+                    tipPressedLocal[f] = tipNeutralLocal[f] + new Vector3(0f, -0.025f, -0.010f);
                 }
             }
 
@@ -1145,32 +1146,26 @@ namespace FlameStream
                 Quaternion wristRot0Rig = isLeftHand ? leftWristRot0Rig : rightWristRot0Rig;
                 Vector3 elbowRig = isLeftHand ? leftElbowRig : rightElbowRig;
 
-                // 2. Forearm alignment with elbow (Yaw):
-                // Swings the hand's forward axis so the line from the elbow to the hand points at the key
-                Vector3 arm0 = wrist0Rig - elbowRig;
-                Vector3 vReach = keyPosRig - elbowRig;
-                float neutralYaw = Mathf.Atan2(arm0.x, arm0.z) * Mathf.Rad2Deg;
-                float reachYaw = Mathf.Atan2(vReach.x, vReach.z) * Mathf.Rad2Deg;
-                float deltaYaw = Mathf.DeltaAngle(neutralYaw, reachYaw);
-                float effectiveYaw = Mathf.Clamp(deltaYaw, -35f, 35f);
-                Quaternion elbowYawRot = Quaternion.AngleAxis(effectiveYaw, Vector3.up);
-
-                // 3. Match button plane (Pitch & Roll):
-                // Adjusts the hand tilt so fingers land perpendicular to the key surface
+                // 2. Forearm reach alignment & key normal matching:
+                // Align hand surface normal directly to the key's surface normal
                 Vector3 keyNormalRig = keyRotRig * Vector3.up;
-                Quaternion planeTilt = Quaternion.FromToRotation(restKeyNormal, keyNormalRig);
 
-                // Full target hand rotation in Rig Space
-                Quaternion targetHandRotRig = planeTilt * elbowYawRot * wristRot0Rig;
+                // Hand forward axis follows forearm reach direction from elbow projected onto the key plane
+                Vector3 vReach = keyPosRig - elbowRig;
+                Vector3 fwdOnKeyPlane = Vector3.ProjectOnPlane(vReach, keyNormalRig).normalized;
+                if (fwdOnKeyPlane.sqrMagnitude < 0.001f) {
+                    fwdOnKeyPlane = Vector3.ProjectOnPlane(wristRot0Rig * Vector3.forward, keyNormalRig).normalized;
+                }
 
-                // 4. Closed-form wrist position anchored at the contact point:
-                // Horizontally (X, Z): align the pressed fingertip contact pad over the key center.
-                // Vertically (Y): preserve the neutral resting height clearance above the key surface so the hand does not hover.
-                Vector3 contactLocal = new Vector3(tipPressedLocal[fingerIdx].x, tipNeutralLocal[fingerIdx].y, tipPressedLocal[fingerIdx].z);
+                Quaternion targetHandRotRig = Quaternion.LookRotation(fwdOnKeyPlane, keyNormalRig);
+
+                // 3. Closed-form wrist position anchored at pressed finger contact point:
+                // When finger animation is at the end (pressed), the finger tip is exactly at the key center
+                Vector3 contactLocal = tipPressedLocal[fingerIdx];
                 Vector3 activeContactRig = targetHandRotRig * contactLocal;
                 Vector3 targetWristRig = keyPosRig - activeContactRig;
 
-                // 5. Delta Transforms
+                // 4. Delta Transforms
                 Vector3 deltaPos = targetWristRig - wrist0Rig;
 
                 Vector3 handScale = isLeftHand ? GetLeftHandMovementScale() : GetRightHandMovementScale();
@@ -1182,9 +1177,9 @@ namespace FlameStream
                 Vector3 restHandEuler = wristRot0Rig.eulerAngles;
                 Vector3 deltaRot = Helper.NormalizeRotationAngles(targetHandEuler - restHandEuler);
 
-                // 6. Ergonomic neutral check for resting home keys
+                // 5. Ergonomic neutral check for resting home keys
                 bool enableHandMove = true;
-                if (deltaPos.sqrMagnitude < 0.0001f && Mathf.Abs(deltaYaw) < 2.5f) {
+                if (deltaPos.sqrMagnitude < 0.0004f && Vector3.Angle(targetHandRotRig * Vector3.forward, wristRot0Rig * Vector3.forward) < 3.0f) {
                     deltaPos = Vector3.zero;
                     deltaRot = Vector3.zero;
                     enableHandMove = false;

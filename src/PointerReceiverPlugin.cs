@@ -16,6 +16,7 @@ namespace FlameStream {
             typeof(KeyboardReceiverAsset),
             typeof(PointerReceiverAsset),
             typeof(VisualSetupAnchorAsset),
+            typeof(KeyBindingVisualSetupAnchorAsset),
             typeof(XInputReceiverAsset),
         },
         NodeTypes = new[] {

@@ -1,5 +1,7 @@
 using System;
+using UnityEngine;
 using Warudo.Core.Attributes;
+using Warudo.Core.Data;
 using Warudo.Plugins.Core.Assets.Utility;
 
 namespace FlameStream {
@@ -67,22 +69,40 @@ namespace FlameStream {
         [Description("ALWAYS_ON_TOP_DESC")]
         public bool AlwaysOnTop = false;
 
+        [DataInput(120)]
+        [Label("ORIGIN_SPHERE")]
+        public OriginGuideSphere OriginSphere;
+
         public Action<bool> OnShowOriginChange;
         public Action<bool> OnAlwaysOnTopChange;
+        public Action OnOriginSphereChange;
 
         protected override void OnCreate() {
             base.OnCreate();
+
+            if (OriginSphere == null) {
+                OriginSphere = StructuredData.Create<OriginGuideSphere>();
+            }
+            OriginSphere.OnChange = () => OnOriginSphereChange?.Invoke();
+
             Watch(nameof(Animation), delegate {
                 OnAnimationChange?.Invoke(Animation);
             });
             Watch(nameof(ShowOrigin), delegate {
-                GetDataInputPort(nameof(AlwaysOnTop)).Properties.disabled = !ShowOrigin;
-                BroadcastDataInputProperties(nameof(AlwaysOnTop));
+                UpdateOriginPortsVisibility();
                 OnShowOriginChange?.Invoke(ShowOrigin);
             });
             Watch(nameof(AlwaysOnTop), delegate {
                 OnAlwaysOnTopChange?.Invoke(AlwaysOnTop);
             });
+            Watch(nameof(OriginSphere), delegate {
+                if (OriginSphere != null) {
+                    OriginSphere.OnChange = () => OnOriginSphereChange?.Invoke();
+                }
+                OnOriginSphereChange?.Invoke();
+            });
+
+            UpdateOriginPortsVisibility();
             GetDataInputPort(nameof(Enabled)).Properties.alwaysHidden = true;
             GetDataInputPort(nameof(Enabled)).Properties.hidden = true;
             GetDataInputPort(nameof(Attachable.Parent)).Properties.alwaysDisabled = true;
@@ -97,6 +117,19 @@ namespace FlameStream {
             HidePortIfExists(nameof(Attachable.ElasticityStiffness));
             HidePortIfExists(nameof(Attachable.ElasticityDamping));
             HidePortIfExists(nameof(Attachable.ElasticityMaxSpeed));
+        }
+
+        public void UpdateOriginPortsVisibility() {
+            var topPort = GetDataInputPort(nameof(AlwaysOnTop));
+            if (topPort != null && topPort.Properties != null) {
+                topPort.Properties.hidden = !ShowOrigin;
+                BroadcastDataInputProperties(nameof(AlwaysOnTop));
+            }
+            var spherePort = GetDataInputPort(nameof(OriginSphere));
+            if (spherePort != null && spherePort.Properties != null) {
+                spherePort.Properties.hidden = !ShowOrigin;
+                BroadcastDataInputProperties(nameof(OriginSphere));
+            }
         }
 
         public void HidePortIfExists(string portName) {

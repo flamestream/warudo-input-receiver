@@ -1238,10 +1238,59 @@ In Warudo's web client (`warudo-client-electron`):
    ```
    This guarantees that `SHOW_ORIGIN` completely silences the entire visual setup subsystem without per-frame flickering or unintended reactivation.
 
+---
 
+## 36. StructuredData Port Defaults, Constructor Reflection, and Warudo's UI Reset Button
 
+### The Phenomenon
+1. A developer creates a generic `StructuredData` class (e.g. `GuideSphere`) with `public Color Color = Color.white;`.
+2. When creating specialized instances (e.g. `FingerTipSphere`, `KeyCenterSphere`, `HandSlabTransform`), the developer passes a setup lambda or calls a configuration method (e.g. `StructuredData.Create<GuideSphere>(sp => sp.Color = customGreen)`).
+3. In Warudo's UI, the port opens displaying `Color.white` rather than `customGreen`, or if the user clicks the native circular "Reset" button next to the port in the inspector, it resets back to `Color.white`.
 
+### Root Cause
+In Warudo's architecture, `DataInputPortCollection` reflects ports by calling `CreateDataInputPortFromReflectionMeta`. During reflection:
+- It creates an instance getter and invokes it: `getter.Invoke(instance)`.
+- It sets the port's internal `DefaultValue` (`set_DefaultValue(string)`) to the value read at that exact moment.
+- If a class defines `public Color Color = Color.white;`, the field value when `CreateEntity` runs is `Color.white`.
+- Modifying C# fields inside `StructuredData.Create<T>(Action<T> initializer)` or assigning fields afterwards without `SetDataInput` leaves the underlying `DataInputPort` uninitialized. Even if `SetDataInput` is called later, `port.DefaultValue` remains `Color.white`, so Warudo's UI Reset button will revert to white.
 
+### Architectural Solution: Dedicated Subclasses with Constructor Initializers
+Define specialized concrete subclasses for ports that need distinct defaults:
+```csharp
+public class FingerTipGuideSphere : GuideSphere {
+    public FingerTipGuideSphere() {
+        Color = new Color(0.1f, 0.95f, 0.2f, 0.9f);
+        RadiusFactor = 1.0f;
+        Glow = true;
+    }
+}
+```
+Because the subclass constructor runs immediately upon `new FingerTipGuideSphere()` before `CreateDataInputPortFromReflectionMeta` reflects the fields:
+1. `getter.Invoke(instance)` reads the customized color/position.
+2. Warudo captures the customized values directly into `port.DefaultValue`.
+3. The UI immediately displays the intended color, and clicking Warudo's "Reset" button cleanly restores the intended configuration.
+
+---
+
+## 37. Visual Calibration Architecture: Decoupling Anchors, Guides, and Milestone Thresholds
+
+### The Phenomenon
+1. When mixing coordinate reference indicators (e.g. parent anchor origin sphere) with alignment guides (e.g. fingertip tracking sphere, planar contact slabs, line pivots), tying all visuals to a single `ShowOrigin` or `AlwaysOnTop` toggle conflates coordinate debugging with alignment workflow.
+2. In keyboard key binding calibration, users need one-click alignment (pitch/roll planar parallelism, fingertip placement, forearm yaw pivot) and fine-grained distance/angle thresholds.
+3. Placing loose float threshold fields directly on the root asset clutters the UI and lacks visual hierarchy.
+
+### Architectural Solution
+1. **Strictly Decouple Origin Indicator vs. Alignment Guides**:
+   - `ShowOrigin` & `AlwaysOnTop` strictly control the coordinate origin sphere attached to the parent anchor.
+   - `ShowVisualGuides` & `GuidesAlwaysOnTop` control the alignment guides and automatically hide all guide settings and threshold cards when toggled off.
+2. **Subclassing `VisualSetupTransform` & Callback Wiring**:
+   - Subclasses overriding `CreateAnchor()` must explicitly wire `anchor.OnOriginSphereChange` to ensure changes to the origin sphere's radius factor or color immediately rescale and re-render the primitive.
+3. **Structured Milestone Thresholds**:
+   - Group thresholds into collapsible `StructuredData` classes (`DistanceAlignmentThreshold`, `AngleAlignmentThreshold`) with `[FloatSlider(min, max, step)]` attributes.
+   - The milestone system cleanly splits proximity into 3 distinct zones:
+     - **Far $\to$ Approach Span**: Base color.
+     - **Approach Span $\to$ Snap-to-White Threshold**: Smooth blend from base color to bright tint.
+     - **Snap-to-White Threshold $\to$ Contact**: Pure glowing white.
 
 
 

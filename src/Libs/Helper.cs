@@ -144,5 +144,13 @@ namespace FlameStream {
                 character.DataInputPortCollection.SetValueAtPath($"{nameof(character.OverlappingAnimations)}.{index}.Animation", animationClipUri, true);
             }
         }
+        private static readonly System.Reflection.PropertyInfo DataInputPortDefaultValueProp = typeof(Warudo.Core.Graphs.DataInputPort).GetProperty("DefaultValue", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        public static void SetPortDefaultValue<T>(Warudo.Core.Graphs.DataInputPort port, T value) {
+            if (port == null || DataInputPortDefaultValueProp == null) return;
+            try {
+                DataInputPortDefaultValueProp.SetValue(port, Newtonsoft.Json.JsonConvert.SerializeObject(value));
+            } catch { }
+        }
     }
 }

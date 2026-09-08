@@ -50,4 +50,6 @@ This directory contains key architecture notes, integration patterns, build pipe
    - Visual setup reference origin visualization (red sphere indicator) & prop occlusion (`AlwaysOnTop`).
    - Asset versioning lifecycle policy: active development branches vs. production releases.
    - Duplicate `[Section]` attributes cause duplicate section UI banners.
+   - `StructuredData` port defaults, constructor reflection, and Warudo UI "Reset" button mechanics.
+   - Visual calibration architecture: decoupled origin/guides, automation triggers, and milestone thresholds.
 

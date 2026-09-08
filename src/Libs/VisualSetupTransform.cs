@@ -86,24 +86,31 @@ namespace FlameStream {
                 originIndicatorMat = null;
             }
 
+            Color sphereColor = setupAnchor?.OriginSphere?.Color ?? new Color(1f, 0.1f, 0.1f, 0.95f);
+            bool glow = setupAnchor?.OriginSphere?.Glow ?? true;
+
             if (OriginAlwaysOnTop) {
                 var overlayShader = Shader.Find("GUI/Text Shader") ?? Shader.Find("Hidden/Internal-Colored");
                 if (overlayShader != null) {
                     originIndicatorMat = new Material(overlayShader);
-                    originIndicatorMat.color = new Color(1f, 0.1f, 0.1f, 0.95f);
+                    originIndicatorMat.color = sphereColor;
                 } else {
                     originIndicatorMat = new Material(Shader.Find("Standard"));
-                    originIndicatorMat.color = new Color(1f, 0f, 0f, 0.95f);
-                    originIndicatorMat.EnableKeyword("_EMISSION");
-                    originIndicatorMat.SetColor("_EmissionColor", new Color(0.85f, 0.05f, 0.05f));
+                    originIndicatorMat.color = sphereColor;
+                    if (glow) {
+                        originIndicatorMat.EnableKeyword("_EMISSION");
+                        originIndicatorMat.SetColor("_EmissionColor", new Color(sphereColor.r * 0.85f, sphereColor.g * 0.85f, sphereColor.b * 0.85f));
+                    }
                     originIndicatorMat.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
                 }
                 originIndicatorMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Overlay + 1000;
             } else {
                 originIndicatorMat = new Material(Shader.Find("Standard"));
-                originIndicatorMat.color = new Color(1f, 0f, 0f, 0.85f);
-                originIndicatorMat.EnableKeyword("_EMISSION");
-                originIndicatorMat.SetColor("_EmissionColor", new Color(0.85f, 0.05f, 0.05f));
+                originIndicatorMat.color = sphereColor;
+                if (glow) {
+                    originIndicatorMat.EnableKeyword("_EMISSION");
+                    originIndicatorMat.SetColor("_EmissionColor", new Color(sphereColor.r * 0.85f, sphereColor.g * 0.85f, sphereColor.b * 0.85f));
+                }
             }
 
             var rend = originIndicatorGo.GetComponent<Renderer>();
@@ -122,7 +129,8 @@ namespace FlameStream {
             originIndicatorGo.transform.SetParent(parentTransform, false);
             originIndicatorGo.transform.localPosition = localPos ?? OriginIndicatorOffset;
             originIndicatorGo.transform.localRotation = Quaternion.identity;
-            originIndicatorGo.transform.localScale = Vector3.one * OriginIndicatorSize;
+            float radiusFactor = setupAnchor?.OriginSphere?.RadiusFactor ?? 1.0f;
+            originIndicatorGo.transform.localScale = Vector3.one * (OriginIndicatorSize * radiusFactor);
 
             UpdateOriginIndicatorMaterial();
             originIndicatorGo.SetActive(ShowOriginIndicator);
@@ -145,7 +153,7 @@ namespace FlameStream {
             DestroyAnchor();
         }
 
-        public VisualSetupAnchorAsset CreateAnchor() {
+        public virtual VisualSetupAnchorAsset CreateAnchor() {
             DestroyAnchor();
             setupAnchor = Scene.AddAssetToGroup<VisualSetupAnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
             setupAnchor.Parent = this;
@@ -168,6 +176,13 @@ namespace FlameStream {
             };
             setupAnchor.OnAlwaysOnTopChange = (onTop) => {
                 SetOriginAlwaysOnTop(onTop);
+            };
+            setupAnchor.OnOriginSphereChange = () => {
+                if (originIndicatorGo != null) {
+                    float r = setupAnchor?.OriginSphere?.RadiusFactor ?? 1.0f;
+                    originIndicatorGo.transform.localScale = Vector3.one * (OriginIndicatorSize * r);
+                }
+                UpdateOriginIndicatorMaterial();
             };
 
             OnCreateAnchor?.Invoke(this, setupAnchor);
