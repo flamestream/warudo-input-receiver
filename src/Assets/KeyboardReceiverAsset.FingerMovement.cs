@@ -12,19 +12,6 @@ using Cysharp.Threading.Tasks;
 
 namespace FlameStream
 {
-    public enum KeyboardLayoutPreset {
-        [Label("LAYOUT_PRESET_QWERTY_FULL")]
-        StandardQWERTY,
-        [Label("LAYOUT_PRESET_TKL")]
-        StandardTKL,
-        [Label("LAYOUT_PRESET_60PERCENT")]
-        Standard60Percent,
-        [Label("LAYOUT_PRESET_SPLIT_ERGO")]
-        SplitErgonomic,
-        [Label("LAYOUT_PRESET_KEYCHRON_Q11")]
-        KeychronQ11
-    }
-
     public partial class KeyboardReceiverAsset : ReceiverAsset {
 
         [Section("FINGER_MOVEMENT")]
@@ -34,42 +21,34 @@ namespace FlameStream
         public KeyboardFingerAnimations FingerAnimations;
 
         [DataInput(310)]
-        [Label("KEY_TRANSITIONS")]
-        public KeyboardKeyTransitions Transitions;
+        [Label("FINGER_TRANSITIONS")]
+        public KeyboardFingerTransitions FingerTransitions;
 
         [DataInput(320)]
-        [Label("KEY_BINDINGS_LAYOUT")]
-        public KeyboardKeyBindingCollection KeyBindingsCollection;
+        [Label("FINGER_MOVEMENT_DEFINITIONS")]
+        public KeyboardFingerMovementCollection FingerMovementDefinitions;
+
+        public KeyboardKeyBinding[] MovementDefinitions {
+            get => FingerMovementDefinitions?.MovementDefinitions ?? new KeyboardKeyBinding[0];
+            set {
+                if (FingerMovementDefinitions == null) {
+                    FingerMovementDefinitions = StructuredData.Create<KeyboardFingerMovementCollection>();
+                    FingerMovementDefinitions.Parent = this;
+                }
+                FingerMovementDefinitions.MovementDefinitions = value;
+                FingerMovementDefinitions.SetDataInput(nameof(FingerMovementDefinitions.MovementDefinitions), value, true);
+            }
+        }
 
         public KeyboardKeyBinding[] KeyBindings {
-            get => KeyBindingsCollection?.KeyBindings ?? new KeyboardKeyBinding[0];
-            set {
-                if (KeyBindingsCollection == null) {
-                    KeyBindingsCollection = StructuredData.Create<KeyboardKeyBindingCollection>();
-                    KeyBindingsCollection.Parent = this;
-                }
-                KeyBindingsCollection.KeyBindings = value;
-                KeyBindingsCollection.SetDataInput(nameof(KeyBindingsCollection.KeyBindings), value, true);
-            }
+            get => MovementDefinitions;
+            set => MovementDefinitions = value;
         }
 
-        public KeyboardLayoutPreset LayoutPreset {
-            get => KeyBindingsCollection?.Preset ?? KeyboardLayoutPreset.StandardQWERTY;
-            set {
-                if (KeyBindingsCollection != null) {
-                    KeyBindingsCollection.Preset = value;
-                }
-            }
-        }
-
-        public void TriggerApplyLayoutPreset() {
-            ApplyPreset(LayoutPreset);
-        }
-
-        public Transition FingerPressTransition => Transitions?.FingerPress ?? Transitions?.Press;
-        public Transition FingerReleaseTransition => Transitions?.FingerRelease ?? Transitions?.Release;
-        public Transition HandMovementTransition => Transitions?.HandMovement;
-        public Transition HandReturnTransition => Transitions?.HandReturn;
+        public Transition FingerPressTransition => FingerTransitions?.FingerPress ?? FingerTransitions?.Press;
+        public Transition FingerReleaseTransition => FingerTransitions?.FingerRelease ?? FingerTransitions?.Release;
+        public Transition HandMovementTransition => FingerTransitions?.HandMovement;
+        public Transition HandReturnTransition => FingerTransitions?.HandReturn;
 
         public Transition KeyPressTransition => FingerPressTransition;
         public Transition KeyReleaseTransition => FingerReleaseTransition;
@@ -110,17 +89,17 @@ namespace FlameStream
             }
             FingerAnimations.Parent = this;
 
-            if (Transitions == null) {
-                Transitions = StructuredData.Create<KeyboardKeyTransitions>();
-                Transitions.CollapsedSelf = true;
+            if (FingerTransitions == null) {
+                FingerTransitions = StructuredData.Create<KeyboardFingerTransitions>();
+                FingerTransitions.CollapsedSelf = true;
             }
-            Transitions.Parent = this;
+            FingerTransitions.Parent = this;
 
-            if (KeyBindingsCollection == null) {
-                KeyBindingsCollection = StructuredData.Create<KeyboardKeyBindingCollection>();
-                KeyBindingsCollection.CollapsedSelf = true;
+            if (FingerMovementDefinitions == null) {
+                FingerMovementDefinitions = StructuredData.Create<KeyboardFingerMovementCollection>();
+                FingerMovementDefinitions.CollapsedSelf = true;
             }
-            KeyBindingsCollection.Parent = this;
+            FingerMovementDefinitions.Parent = this;
 
             Watch(nameof(FingerAnimations), delegate {
                 if (FingerAnimations != null) {
@@ -129,21 +108,21 @@ namespace FlameStream
                 SynchronizeAllFingerAnimations();
             });
 
-            Watch(nameof(Transitions), delegate {
-                if (Transitions != null) {
-                    Transitions.Parent = this;
+            Watch(nameof(FingerTransitions), delegate {
+                if (FingerTransitions != null) {
+                    FingerTransitions.Parent = this;
                 }
             });
 
-            Watch(nameof(KeyBindingsCollection), delegate {
-                if (KeyBindingsCollection != null) {
-                    KeyBindingsCollection.Parent = this;
+            Watch(nameof(FingerMovementDefinitions), delegate {
+                if (FingerMovementDefinitions != null) {
+                    FingerMovementDefinitions.Parent = this;
                 }
                 RefreshKeyBindingsParent();
             });
 
-            if (KeyBindings == null || KeyBindings.Length == 0) {
-                ApplyPreset(KeyboardLayoutPreset.StandardQWERTY, false);
+            if (MovementDefinitions == null) {
+                MovementDefinitions = new KeyboardKeyBinding[0];
             }
             RefreshKeyBindingsParent();
         }
@@ -606,204 +585,6 @@ namespace FlameStream
             }
         }
 
-        public void ApplyPreset(KeyboardLayoutPreset preset, bool showToast = true) {
-            var list = new List<KeyboardKeyBinding>();
-
-            // Helper to add key definition
-            void AddKey(VKCode key, KeyboardFinger finger, float deltaX, float deltaZ, float rotY = 0f, bool enableHandMove = true) {
-                var binding = StructuredData.Create<KeyboardKeyBinding>(b => {
-                    b.Parent = this;
-                    b.Key = key;
-                    b.Finger = finger;
-                    b.DeltaPosition = new Vector3(deltaX, 0f, deltaZ);
-                    b.DeltaRotation = new Vector3(0f, rotY, 0f);
-                    b.EnableHandMovement = enableHandMove;
-                    b.SetupTransformCallbacks();
-                });
-                list.Add(binding);
-            }
-
-            // Left Hand Rest (ASDF): A=(0,0), S=(0,0), D=(0,0), F=(0,0)
-            // Right Hand Rest (JKL;): J=(0,0), K=(0,0), L=(0,0), ;=(0,0)
-
-            // --- LEFT HAND ---
-            // Left Pinky
-            AddKey(VKCode.ESCAPE, KeyboardFinger.LeftPinky, -0.028f, 0.057f);
-            AddKey(VKCode.OEM_3, KeyboardFinger.LeftPinky, -0.010f, 0.038f); // ~
-            AddKey(VKCode.KEY_1, KeyboardFinger.LeftPinky, 0.0f, 0.038f);
-            AddKey(VKCode.TAB, KeyboardFinger.LeftPinky, -0.028f, 0.019f);
-            AddKey(VKCode.Q, KeyboardFinger.LeftPinky, -0.005f, 0.019f);
-            AddKey(VKCode.CAPITAL, KeyboardFinger.LeftPinky, -0.024f, 0.0f);
-            AddKey(VKCode.A, KeyboardFinger.LeftPinky, 0.0f, 0.0f);
-            AddKey(VKCode.LSHIFT, KeyboardFinger.LeftPinky, -0.028f, -0.019f);
-            AddKey(VKCode.Z, KeyboardFinger.LeftPinky, 0.005f, -0.019f);
-            AddKey(VKCode.LCONTROL, KeyboardFinger.LeftPinky, -0.028f, -0.038f);
-
-            // Left Ring
-            AddKey(VKCode.KEY_2, KeyboardFinger.LeftRing, -0.005f, 0.038f);
-            AddKey(VKCode.W, KeyboardFinger.LeftRing, -0.005f, 0.019f);
-            AddKey(VKCode.S, KeyboardFinger.LeftRing, 0.0f, 0.0f);
-            AddKey(VKCode.X, KeyboardFinger.LeftRing, 0.005f, -0.019f);
-
-            // Left Middle
-            AddKey(VKCode.KEY_3, KeyboardFinger.LeftMiddle, -0.005f, 0.038f);
-            AddKey(VKCode.E, KeyboardFinger.LeftMiddle, -0.005f, 0.019f);
-            AddKey(VKCode.D, KeyboardFinger.LeftMiddle, 0.0f, 0.0f);
-            AddKey(VKCode.C, KeyboardFinger.LeftMiddle, 0.005f, -0.019f);
-
-            // Left Index
-            AddKey(VKCode.KEY_4, KeyboardFinger.LeftIndex, -0.010f, 0.038f);
-            AddKey(VKCode.KEY_5, KeyboardFinger.LeftIndex, 0.009f, 0.038f);
-            AddKey(VKCode.R, KeyboardFinger.LeftIndex, -0.005f, 0.019f);
-            AddKey(VKCode.T, KeyboardFinger.LeftIndex, 0.014f, 0.019f);
-            AddKey(VKCode.F, KeyboardFinger.LeftIndex, 0.0f, 0.0f);
-            AddKey(VKCode.G, KeyboardFinger.LeftIndex, 0.019f, 0.0f);
-            AddKey(VKCode.V, KeyboardFinger.LeftIndex, 0.005f, -0.019f);
-            AddKey(VKCode.B, KeyboardFinger.LeftIndex, 0.024f, -0.019f);
-
-            // Left Thumb
-            AddKey(VKCode.LMENU, KeyboardFinger.LeftThumb, -0.024f, -0.038f); // Alt
-            AddKey(VKCode.SPACE, KeyboardFinger.LeftThumb, 0.0f, -0.038f);
-
-            // --- RIGHT HAND ---
-            // Right Thumb
-            AddKey(VKCode.RMENU, KeyboardFinger.RightThumb, 0.024f, -0.038f); // Alt
-
-            // Right Index
-            AddKey(VKCode.KEY_6, KeyboardFinger.RightIndex, -0.029f, 0.038f);
-            AddKey(VKCode.KEY_7, KeyboardFinger.RightIndex, -0.010f, 0.038f);
-            AddKey(VKCode.Y, KeyboardFinger.RightIndex, -0.024f, 0.019f);
-            AddKey(VKCode.U, KeyboardFinger.RightIndex, -0.005f, 0.019f);
-            AddKey(VKCode.H, KeyboardFinger.RightIndex, -0.019f, 0.0f);
-            AddKey(VKCode.J, KeyboardFinger.RightIndex, 0.0f, 0.0f);
-            AddKey(VKCode.N, KeyboardFinger.RightIndex, -0.014f, -0.019f);
-            AddKey(VKCode.M, KeyboardFinger.RightIndex, 0.005f, -0.019f);
-
-            // Right Middle
-            AddKey(VKCode.KEY_8, KeyboardFinger.RightMiddle, -0.010f, 0.038f);
-            AddKey(VKCode.I, KeyboardFinger.RightMiddle, -0.005f, 0.019f);
-            AddKey(VKCode.K, KeyboardFinger.RightMiddle, 0.0f, 0.0f);
-            AddKey(VKCode.OEM_COMMA, KeyboardFinger.RightMiddle, 0.005f, -0.019f); // ,
-
-            // Right Ring
-            AddKey(VKCode.KEY_9, KeyboardFinger.RightRing, -0.010f, 0.038f);
-            AddKey(VKCode.O, KeyboardFinger.RightRing, -0.005f, 0.019f);
-            AddKey(VKCode.L, KeyboardFinger.RightRing, 0.0f, 0.0f);
-            AddKey(VKCode.OEM_PERIOD, KeyboardFinger.RightRing, 0.005f, -0.019f); // .
-
-            // Right Pinky
-            AddKey(VKCode.KEY_0, KeyboardFinger.RightPinky, -0.010f, 0.038f);
-            AddKey(VKCode.OEM_MINUS, KeyboardFinger.RightPinky, 0.009f, 0.038f); // -
-            AddKey(VKCode.OEM_PLUS, KeyboardFinger.RightPinky, 0.028f, 0.038f); // =
-            AddKey(VKCode.BACK, KeyboardFinger.RightPinky, 0.052f, 0.038f); // Backspace
-            AddKey(VKCode.P, KeyboardFinger.RightPinky, -0.005f, 0.019f);
-            AddKey(VKCode.OEM_4, KeyboardFinger.RightPinky, 0.014f, 0.019f); // [
-            AddKey(VKCode.OEM_6, KeyboardFinger.RightPinky, 0.033f, 0.019f); // ]
-            AddKey(VKCode.OEM_5, KeyboardFinger.RightPinky, 0.052f, 0.019f); // \
-            AddKey(VKCode.OEM_1, KeyboardFinger.RightPinky, 0.0f, 0.0f); // ;
-            AddKey(VKCode.OEM_7, KeyboardFinger.RightPinky, 0.019f, 0.0f); // '
-            AddKey(VKCode.RETURN, KeyboardFinger.RightPinky, 0.043f, 0.0f); // Enter
-            AddKey(VKCode.OEM_2, KeyboardFinger.RightPinky, 0.005f, -0.019f); // /
-            AddKey(VKCode.RSHIFT, KeyboardFinger.RightPinky, 0.038f, -0.019f);
-            AddKey(VKCode.RCONTROL, KeyboardFinger.RightPinky, 0.048f, -0.038f);
-
-            // Function Keys (for Full / TKL / Keychron Q11 presets)
-            if (preset == KeyboardLayoutPreset.StandardQWERTY || preset == KeyboardLayoutPreset.StandardTKL || preset == KeyboardLayoutPreset.KeychronQ11) {
-                AddKey(VKCode.F1, KeyboardFinger.LeftPinky, -0.019f, 0.057f);
-                AddKey(VKCode.F2, KeyboardFinger.LeftRing, -0.005f, 0.057f);
-                AddKey(VKCode.F3, KeyboardFinger.LeftMiddle, -0.005f, 0.057f);
-                AddKey(VKCode.F4, KeyboardFinger.LeftIndex, -0.010f, 0.057f);
-                AddKey(VKCode.F5, KeyboardFinger.LeftIndex, 0.014f, 0.057f);
-                AddKey(VKCode.F6, KeyboardFinger.LeftIndex, 0.033f, 0.057f);
-                AddKey(VKCode.F7, KeyboardFinger.RightIndex, -0.024f, 0.057f);
-                AddKey(VKCode.F8, KeyboardFinger.RightIndex, -0.005f, 0.057f);
-                AddKey(VKCode.F9, KeyboardFinger.RightMiddle, -0.005f, 0.057f);
-                AddKey(VKCode.F10, KeyboardFinger.RightRing, -0.005f, 0.057f);
-                AddKey(VKCode.F11, KeyboardFinger.RightPinky, -0.005f, 0.057f);
-                AddKey(VKCode.F12, KeyboardFinger.RightPinky, 0.014f, 0.057f);
-
-                // Navigation Cluster (Right Pinky)
-                if (preset == KeyboardLayoutPreset.KeychronQ11) {
-                    AddKey(VKCode.SNAPSHOT, KeyboardFinger.RightPinky, 0.033f, 0.057f); // PrtSc
-                    AddKey(VKCode.DELETE, KeyboardFinger.RightPinky, 0.052f, 0.038f);
-                    AddKey(VKCode.PRIOR, KeyboardFinger.RightPinky, 0.052f, 0.019f); // PageUp
-                    AddKey(VKCode.NEXT, KeyboardFinger.RightPinky, 0.052f, 0.0f);   // PageDown
-                    AddKey(VKCode.END, KeyboardFinger.RightPinky, 0.052f, -0.019f);  // End
-
-                    // Keychron Q11 Left Macro Column (M1-M5 via F13-F17)
-                    AddKey(VKCode.F13, KeyboardFinger.LeftPinky, -0.048f, 0.038f); // M1
-                    AddKey(VKCode.F14, KeyboardFinger.LeftPinky, -0.048f, 0.019f); // M2
-                    AddKey(VKCode.F15, KeyboardFinger.LeftPinky, -0.048f, 0.0f);   // M3
-                    AddKey(VKCode.F16, KeyboardFinger.LeftPinky, -0.048f, -0.019f); // M4
-                    AddKey(VKCode.F17, KeyboardFinger.LeftPinky, -0.048f, -0.038f); // M5
-
-                    // Arrow Cluster (compact 75%)
-                    AddKey(VKCode.UP, KeyboardFinger.RightPinky, 0.033f, -0.019f);
-                    AddKey(VKCode.LEFT, KeyboardFinger.RightPinky, 0.014f, -0.038f);
-                    AddKey(VKCode.DOWN, KeyboardFinger.RightPinky, 0.033f, -0.038f);
-                    AddKey(VKCode.RIGHT, KeyboardFinger.RightPinky, 0.052f, -0.038f);
-                } else {
-                    AddKey(VKCode.INSERT, KeyboardFinger.RightPinky, 0.075f, 0.038f);
-                    AddKey(VKCode.HOME, KeyboardFinger.RightPinky, 0.094f, 0.038f);
-                    AddKey(VKCode.PRIOR, KeyboardFinger.RightPinky, 0.113f, 0.038f); // PageUp
-                    AddKey(VKCode.DELETE, KeyboardFinger.RightPinky, 0.075f, 0.019f);
-                    AddKey(VKCode.END, KeyboardFinger.RightPinky, 0.094f, 0.019f);
-                    AddKey(VKCode.NEXT, KeyboardFinger.RightPinky, 0.113f, 0.019f); // PageDown
-                    AddKey(VKCode.UP, KeyboardFinger.RightPinky, 0.094f, -0.019f);
-                    AddKey(VKCode.LEFT, KeyboardFinger.RightPinky, 0.075f, -0.038f);
-                    AddKey(VKCode.DOWN, KeyboardFinger.RightPinky, 0.094f, -0.038f);
-                    AddKey(VKCode.RIGHT, KeyboardFinger.RightPinky, 0.113f, -0.038f);
-                }
-            }
-
-            // Adjustments for Split presets
-            if (preset == KeyboardLayoutPreset.KeychronQ11) {
-                LeftHandRestPosition = new Vector3(-0.11f, 0.02f, 0f);
-                LeftHandRestRotation = new Vector3(0f, -10f, 0f);
-                RightHandRestPosition = new Vector3(0.11f, 0.02f, 0f);
-                RightHandRestRotation = new Vector3(0f, 10f, 0f);
-
-                foreach (var b in list) {
-                    b.DeltaRotation = Vector3.zero;
-                }
-            } else if (preset == KeyboardLayoutPreset.SplitErgonomic) {
-                LeftHandRestPosition = new Vector3(-0.09f, 0.02f, 0f);
-                LeftHandRestRotation = new Vector3(0f, -12f, 0f);
-                RightHandRestPosition = new Vector3(0.09f, 0.02f, 0f);
-                RightHandRestRotation = new Vector3(0f, 12f, 0f);
-
-                foreach (var b in list) {
-                    b.DeltaRotation = Vector3.zero;
-                }
-            } else {
-                LeftHandRestPosition = new Vector3(-0.07f, 0.02f, 0f);
-                LeftHandRestRotation = Vector3.zero;
-                RightHandRestPosition = new Vector3(0.07f, 0.02f, 0f);
-                RightHandRestRotation = Vector3.zero;
-            }
-
-            if (LeftHandRestTransform != null && LeftHandRestTransform.Scale == Vector3.zero) {
-                LeftHandRestTransform.Scale = Vector3.one;
-                LeftHandRestTransform.SetDataInput(nameof(LeftHandRestTransform.Scale), Vector3.one, true);
-            }
-            if (RightHandRestTransform != null && RightHandRestTransform.Scale == Vector3.zero) {
-                RightHandRestTransform.Scale = Vector3.one;
-                RightHandRestTransform.SetDataInput(nameof(RightHandRestTransform.Scale), Vector3.one, true);
-            }
-
-            KeyBindings = list.ToArray();
-            KeyBindingsCollection?.BroadcastDataInput(nameof(KeyBindingsCollection.KeyBindings));
-            BroadcastDataInput(nameof(KeyBindingsCollection));
-            BroadcastDataInput(nameof(HandRestSetup));
-
-            if (showToast) {
-                Context.Service?.Toast(
-                    Warudo.Core.Server.ToastSeverity.Success,
-                    Name,
-                    $"Applied keyboard layout preset [{preset}] with {KeyBindings.Length} keys."
-                );
-            }
-        }
 
         #region Auto-Generate Key Bindings from Floating Keys
 
@@ -1079,9 +860,9 @@ namespace FlameStream
                 list.Add(binding);
             }
 
-            KeyBindings = list.ToArray();
-            KeyBindingsCollection?.BroadcastDataInput(nameof(KeyBindingsCollection.KeyBindings));
-            BroadcastDataInput(nameof(KeyBindingsCollection));
+            MovementDefinitions = list.ToArray();
+            FingerMovementDefinitions?.BroadcastDataInput(nameof(FingerMovementDefinitions.MovementDefinitions));
+            BroadcastDataInput(nameof(FingerMovementDefinitions));
             RequestUiRefresh();
 
             Context.Service?.Toast(

@@ -197,8 +197,8 @@ namespace FlameStream
         }
 
         public void UpdateAllDebugButtonStates() {
-            if (KeyBindingsCollection?.KeyBindings != null) {
-                foreach (var b in KeyBindingsCollection.KeyBindings) {
+            if (FingerMovementDefinitions?.MovementDefinitions != null) {
+                foreach (var b in FingerMovementDefinitions.MovementDefinitions) {
                     b?.UpdateDebugButtonState();
                 }
             }

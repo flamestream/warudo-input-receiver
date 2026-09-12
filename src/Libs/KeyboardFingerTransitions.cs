@@ -6,7 +6,7 @@ using Warudo.Core.Localization;
 
 namespace FlameStream
 {
-    public class KeyboardKeyTransitions : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData
+    public class KeyboardFingerTransitions : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData
     {
         [DataInput(10)]
         [Label("FINGER_PRESS_TRANSITION")]
@@ -97,7 +97,7 @@ namespace FlameStream
             var fp = FingerPress != null ? $"{FingerPress.Time:0.##}s" : "0.05s";
             var hm = HandMovement != null ? $"{HandMovement.Time:0.##}s" : "0.12s";
             var hr = HandReturn != null ? $"{HandReturn.Time:0.##}s" : "0.3s";
-            return $"{"KEY_TRANSITIONS".Localized()} (Finger: {fp}, Move: {hm}, Return: {hr})";
+            return $"{"FINGER_TRANSITIONS".Localized()} (Finger: {fp}, Move: {hm}, Return: {hr})";
         }
 
         protected override void OnCreate() {
