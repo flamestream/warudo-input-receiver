@@ -590,28 +590,41 @@ Click **[Apply Transform]** when finished.
             Vector3 dLocal,
             Transform parentTr,
             out Vector3 newLocalPos,
-            out Quaternion newLocalRot
+            out Quaternion newLocalRot,
+            bool tiltToKeySurface = true,
+            Vector3? bedNormalWorld = null
         ) {
-            // 1. Tilt hand to match button surface normal (referenced to resting hand orientation)
-            // The hand at rest is assumed properly aligned over the keyboard, so deltaRot relative to rest dictates tilt.
-            Quaternion deltaRotFromRest = handRot * Quaternion.Inverse(handRot0);
-            Vector3 handNormal = deltaRotFromRest * keyNormal;
-            Quaternion tilt = Quaternion.FromToRotation(handNormal, keyNormal);
-            Quaternion surfaceRot = tilt * handRot;
+            Vector3 bedNormal = bedNormalWorld.HasValue && bedNormalWorld.Value.sqrMagnitude > 0.001f
+                ? bedNormalWorld.Value.normalized
+                : Vector3.up;
 
-            // 2. Rotate hand around key normal to natural forearm reach (compensating for finger lateral offset)
+            Quaternion surfaceRot;
+            Vector3 normalAxis;
+
+            if (tiltToKeySurface) {
+                // 1. Tilt hand to match button surface normal relative to the keyboard bed
+                Quaternion tilt = Quaternion.FromToRotation(bedNormal, keyNormal);
+                surfaceRot = tilt * handRot;
+                normalAxis = keyNormal;
+            } else {
+                // 1. Keep hand in resting tilt (flat to keyboard bed)
+                surfaceRot = handRot;
+                normalAxis = bedNormal;
+            }
+
+            // 2. Rotate hand around normalAxis to natural forearm reach (compensating for finger lateral offset)
             Vector3 toElbow = elbowPos - keyCenterWorld;
-            Vector3 toElbowOnPlane = Vector3.ProjectOnPlane(toElbow, keyNormal);
+            Vector3 toElbowOnPlane = Vector3.ProjectOnPlane(toElbow, normalAxis);
             float D = toElbowOnPlane.magnitude;
             Vector3 targetBackOnPlane = D > 0.001f ? (toElbowOnPlane / D) : Vector3.back;
             if (targetBackOnPlane.sqrMagnitude < 0.001f) {
-                targetBackOnPlane = Vector3.ProjectOnPlane(surfaceRot * Vector3.back, keyNormal).normalized;
+                targetBackOnPlane = Vector3.ProjectOnPlane(surfaceRot * Vector3.back, normalAxis).normalized;
             }
 
-            Vector3 currentBackOnPlane = Vector3.ProjectOnPlane(surfaceRot * Vector3.back, keyNormal).normalized;
+            Vector3 currentBackOnPlane = Vector3.ProjectOnPlane(surfaceRot * Vector3.back, normalAxis).normalized;
             if (currentBackOnPlane.sqrMagnitude < 0.001f) currentBackOnPlane = targetBackOnPlane;
 
-            float baseAngle = Vector3.SignedAngle(currentBackOnPlane, targetBackOnPlane, keyNormal);
+            float baseAngle = Vector3.SignedAngle(currentBackOnPlane, targetBackOnPlane, normalAxis);
             float alphaDeg = 0f;
             if (D > 0.001f) {
                 float dx = dLocal.x;
@@ -619,7 +632,7 @@ Click **[Apply Transform]** when finished.
                 alphaDeg = Mathf.Asin(sinAlpha) * Mathf.Rad2Deg;
             }
             float signedAngle = baseAngle - alphaDeg;
-            Quaternion newHandRot = Quaternion.AngleAxis(signedAngle, keyNormal) * surfaceRot;
+            Quaternion newHandRot = Quaternion.AngleAxis(signedAngle, normalAxis) * surfaceRot;
 
             // 3. Place wrist so curled fingertip lands exactly on key center: P_hand = P_key - R_hand * dLocal
             Vector3 newHandPos = keyCenterWorld - (newHandRot * dLocal);
@@ -663,6 +676,11 @@ Click **[Apply Transform]** when finished.
                 dLocal = Quaternion.Inverse(handRot) * (tipWorld - handPos);
             }
 
+            bool tiltMode = (Parent?.FingerMovementDefinitions?.GenerationMode ?? KeyGenerationMode.TiltToKeySurface) == KeyGenerationMode.TiltToKeySurface;
+            var keyDef = Parent?.VirtualKeysCollection?.Keys?.FirstOrDefault(k => k != null && k.Key == this.Key && k.AssignedFinger == this.Finger)
+                      ?? Parent?.VirtualKeysCollection?.Keys?.FirstOrDefault(k => k != null && k.Key == this.Key);
+            Vector3 bedNormal = Parent?.GetKeyboardBedNormalWorld(keyDef?.AttachmentAnchor ?? VirtualKeyAnchor.KeyboardRoot) ?? Vector3.up;
+
             SolveKeyAlignment(
                 handPos,
                 handRot,
@@ -673,7 +691,9 @@ Click **[Apply Transform]** when finished.
                 dLocal,
                 anchorTr.parent,
                 out Vector3 newLocalPos,
-                out Quaternion newLocalRot
+                out Quaternion newLocalRot,
+                tiltMode,
+                bedNormal
             );
 
             Transform.setupAnchor.Transform.Position = newLocalPos;

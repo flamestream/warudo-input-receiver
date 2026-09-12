@@ -621,25 +621,59 @@ namespace FlameStream
         }
 
         public Vector3 GetFingerTipWorldPosition(Animator anim, KeyboardFinger finger) {
+            Vector3 offset = FingerMovementDefinitions?.FingertipOffsets?.GetOffset(finger) ?? new Vector3(0f, 0f, 0.012f);
             var distalBone = GetDistalBoneForFinger(finger);
-            var distalTransform = anim.GetBoneTransform(distalBone);
+            var distalTransform = anim != null ? anim.GetBoneTransform(distalBone) : null;
             if (distalTransform != null) {
-                if (distalTransform.childCount > 0) {
-                    return distalTransform.GetChild(0).position;
-                }
+                Vector3 basePos = distalTransform.position;
                 var interBone = GetIntermediateBoneForFinger(finger);
                 var interTransform = anim.GetBoneTransform(interBone);
+
+                Vector3 F = Vector3.forward;
                 if (interTransform != null) {
-                    var delta = distalTransform.position - interTransform.position;
+                    Vector3 delta = basePos - interTransform.position;
                     if (delta.sqrMagnitude > 0.00001f) {
-                        return distalTransform.position + delta.normalized * (delta.magnitude * 0.75f);
+                        F = delta.normalized;
+                    }
+                } else if (distalTransform.childCount > 0) {
+                    Vector3 delta = distalTransform.GetChild(0).position - basePos;
+                    if (delta.sqrMagnitude > 0.00001f) {
+                        F = delta.normalized;
                     }
                 }
-                return distalTransform.position;
+
+                var handBone = finger.IsLeftHand() ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand;
+                var handTransform = anim.GetBoneTransform(handBone);
+                Vector3 palmDown = handTransform != null ? -handTransform.up : Vector3.down;
+                Vector3 D = Vector3.ProjectOnPlane(palmDown, F).normalized;
+                if (D.sqrMagnitude < 0.001f) {
+                    D = Vector3.ProjectOnPlane(Vector3.down, F).normalized;
+                }
+                if (D.sqrMagnitude < 0.001f) {
+                    D = Vector3.down;
+                }
+                Vector3 L = Vector3.Cross(F, D).normalized;
+
+                return basePos + (offset.x * L) + (offset.y * D) + (offset.z * F);
             }
-            var handBone = finger.IsLeftHand() ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand;
-            var handTransform = anim.GetBoneTransform(handBone);
-            return handTransform != null ? handTransform.position : Vector3.zero;
+
+            var fallbackHandBone = finger.IsLeftHand() ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand;
+            var fallbackHandTransform = anim != null ? anim.GetBoneTransform(fallbackHandBone) : null;
+            return fallbackHandTransform != null ? fallbackHandTransform.position : Vector3.zero;
+        }
+
+        public Vector3 GetKeyboardBedNormalWorld(VirtualKeyAnchor anchor = VirtualKeyAnchor.KeyboardRoot) {
+            Transform rootTr = RootAnchor?.GameObject != null ? RootAnchor.GameObject.transform : null;
+            Quaternion rot = Quaternion.identity;
+            if (anchor == VirtualKeyAnchor.LeftHand) {
+                rot = Quaternion.Euler(LeftHandRestRotation) * Quaternion.Euler(LeftKeysetTransform?.Rotation ?? Vector3.zero);
+            } else if (anchor == VirtualKeyAnchor.RightHand) {
+                rot = Quaternion.Euler(RightHandRestRotation) * Quaternion.Euler(RightKeysetTransform?.Rotation ?? Vector3.zero);
+            } else {
+                rot = Quaternion.Euler(RootKeysetTransform?.Rotation ?? Vector3.zero);
+            }
+            Vector3 normal = rot * Vector3.up;
+            return rootTr != null ? rootTr.rotation * normal : normal;
         }
 
         public Vector3 GetCurledFingerTipContactVector(Animator anim, KeyboardFinger finger) {
@@ -797,6 +831,8 @@ namespace FlameStream
 
             var list = new List<KeyboardKeyBinding>();
 
+            bool tiltMode = (FingerMovementDefinitions?.GenerationMode ?? KeyGenerationMode.TiltToKeySurface) == KeyGenerationMode.TiltToKeySurface;
+
             foreach (var k in VirtualKeysCollection.Keys) {
                 if (k == null) continue;
 
@@ -814,8 +850,9 @@ namespace FlameStream
                 Vector3 elbowPosWorld = isLeftHand ? leftElbowWorld : rightElbowWorld;
                 Vector3 dLocal = tipCurledLocal[fingerIdx];
                 Vector3 handScale = isLeftHand ? GetLeftHandMovementScale() : GetRightHandMovementScale();
+                Vector3 bedNormalWorld = GetKeyboardBedNormalWorld(k.AttachmentAnchor);
 
-                // 2. Execute the exact same alignment math as individual key setup
+                // 2. Execute alignment math
                 KeyboardKeyBinding.SolveKeyAlignment(
                     handPos0,
                     handRot0,
@@ -826,7 +863,9 @@ namespace FlameStream
                     dLocal,
                     rootTr,
                     out Vector3 solvedPosRig,
-                    out Quaternion solvedRotRig
+                    out Quaternion solvedRotRig,
+                    tiltMode,
+                    bedNormalWorld
                 );
 
                 KeyboardKeyBinding.CalculateKeyDelta(
