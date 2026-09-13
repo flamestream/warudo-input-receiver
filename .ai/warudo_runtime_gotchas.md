@@ -1379,3 +1379,107 @@ The avatar's hand at rest is calibrated by the user to be properly aligned over 
 
 
 
+
+---
+
+## 40. `SetCharacterOverlappingAnimations` Crashes to Desktop in Playground Mode When Adding New Layers
+
+### The Phenomenon
+When assigning finger animations to a `KeyboardReceiverAsset` for the first time in Warudo Playground mode, Warudo crashes to desktop. The same operation works correctly as a compiled `.warudo` mod.
+
+**Key observations:**
+- No crash if layer already exists on the character before our code runs (animation mod already loaded)
+- No crash in packaged mod mode under any circumstances
+- Crash does NOT happen if no FingerAnimations are configured
+
+### Root Cause — Three-way Race Condition
+The crash is caused by **three simultaneous conditions**, all of which must be true:
+
+1. **`BroadcastDataInput(character.OverlappingAnimations)` cascades into Watch(FingerAnimations).**  
+   The blueprint graph connects `character.OverlappingAnimations` → downstream nodes → eventually sets `keyboardAsset.FingerAnimations` port. This triggers a **second sync** (`ExecuteSynchronizeAllFingerAnimations`) immediately after the first completes.
+
+2. **The second sync creates a new `OverlappingAnimationData` entry with an animation URI**, triggering `SetupOverlappingAnimations` → **`ModHost.Load <animation>.warudo`** (async animation mod loading).
+
+3. **`OVRLipSyncNode._outputBlendshapeList()` throws `NullReferenceException` every frame** from the face tracking blueprint's `OnUpdateNode` graph (service not fully initialized). Normally Warudo recovers from this gracefully, but when it fires **concurrently with animation mod loading**, the two together crash Warudo to desktop.
+
+### Failed Approaches (for reference)
+- `SetDataInput` → immediate `RecursivelySetData` crash via graph traversal
+- `BroadcastDataInput` alone → cascades into Watch(FingerAnimations) → infinite sync loop → crash
+- `SetValueAtPath` → triggers same graph traversal, same crash
+- Direct assign + `await UniTask.Yield()` + `BroadcastDataInput` → mod loads during yield, crash still happens
+- Direct assign + `BroadcastDataInput` (even with loaded mods) → Watch re-trigger → infinite sync loop → crash
+- Checking loaded mods via `character.OverlappingAnimations?.Animation` → unreliable (field can be stale after mutations)
+
+### Final Solution: No-Op with Warning Toast in Playground Mode
+
+Overlapping animation activation in Playground mode is fundamentally unsafe due to the race condition between UMod animation mod loading, blueprint graph watchers, and face-tracking node initialization. Rather than attempting complex workarounds that can still trigger crashes under various user operations, `Helper.SetCharacterOverlappingAnimations` simply shows a warning toast and no-ops in Playground mode.
+
+```csharp
+public static UniTask SetCharacterOverlappingAnimations(CharacterAsset character, CharacterAsset.OverlappingAnimationData[] layers) {
+    if (character == null) return UniTask.CompletedTask;
+
+    try {
+        if (IsPlaygroundMode) {
+            Warudo.Core.Context.Service?.Toast(
+                ToastSeverity.Warning,
+                "FINGER_ANIM_PLAYGROUND_UNSUPPORTED".Localized(),
+                "FINGER_ANIM_PLAYGROUND_UNSUPPORTED_BODY".Localized());
+            return UniTask.CompletedTask;
+        }
+
+        character.SetDataInput(nameof(character.OverlappingAnimations), layers, true);
+    } catch (Exception ex) {
+        Log.Error($"[Helper] SetCharacterOverlappingAnimations failed: {ex}");
+    }
+    return UniTask.CompletedTask;
+}
+```
+
+**Why this works:**
+- In Playground mode: displays a non-intrusive warning toast informing the user to use the compiled mod, and cleanly aborts without mutating `character.OverlappingAnimations`, touching Animancer, or invoking `ModHost.Load`. Zero crash risk.
+- In compiled mod mode: standard `character.SetDataInput(...)` executes, updating Animancer layers normally.
+
+### Rule
+Always use `Helper.SetCharacterOverlappingAnimations(character, layers)`. Overlapping animations cannot be modified in Playground mode — the user must build and install the compiled mod package (`build-mod.ps1`).
+
+---
+
+## 41. UMod Security Scanner Blocks `System.Reflection` in Packaged Mods
+
+### The Phenomenon
+Building a `.warudo` packaged mod fails with:
+```
+[UMod.BuildEngine.BuildEngineService]: Illegal reference to disallowed namespace: System.Reflection (N)
+```
+The build succeeds in Playground (Roslyn) mode but is rejected by UMod's `CodeSecurityReport` pipeline during mod packaging.
+
+### Root Cause
+UMod's `BuildEngineService` scans all compiled IL for references to the `System.Reflection` namespace and rejects the build if any are found, **regardless of whether the code path is exercised at runtime**.
+
+### Solution: Marked Playground-Only Comment Blocks via `sync.ps1`
+
+Rather than relying on preprocessor defines (which RoslynCSharp in Warudo Playground does not define without custom compiler settings), code that needs reflection in Playground mode is marked with comment delimiters:
+
+```csharp
+// [PLAYGROUND_ONLY_START]
+if (port != null && IsPlaygroundMode) {
+    try {
+        var prop = typeof(Warudo.Core.Graphs.DataInputPort).GetProperty("DefaultValue");
+        prop?.SetValue(port, value, null);
+    } catch {}
+}
+// [PLAYGROUND_ONLY_END]
+```
+
+When [`personal-tools/sync.ps1`](file:///d:/Code/FS%20Input%20Receiver/personal-tools/sync.ps1) mirrors `src` to `unity` (`sync.bat src unity`):
+- It scans `.cs` files in Unity.
+- Any lines inside `[PLAYGROUND_ONLY_START]` ... `[PLAYGROUND_ONLY_END]` are automatically commented out (`// [OMIT_MOD] ...`).
+- When Unity builds the mod package, no `System.Reflection` exists in the compiled IL, passing UMod's security scanner with zero warnings.
+- When syncing back from `unity` to `src` (`sync.bat unity src`), `sync.ps1` automatically uncomments `// [OMIT_MOD] ` lines to restore them in source.
+
+### Rule
+- Avoid `System.Reflection` whenever possible (e.g. `CharacterAsset.SetupOverlappingAnimations` is public, no reflection needed).
+- `SetPortDefaultValue` was removed entirely from the codebase because modifying `DataInputPort.DefaultValue` is impossible without reflection. Port defaults must be specified via standard C# property/field initializers on the class.
+- If Playground-only reflection is ever needed in the future, always wrap it in `// [PLAYGROUND_ONLY_START]` and `// [PLAYGROUND_ONLY_END]`.
+- Always use `sync.bat src unity` before running `build-mod.ps1` or packaging in Unity.
+

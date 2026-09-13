@@ -18,19 +18,24 @@ namespace FlameStream
 
         [DataInput(200)]
         [Label("ENABLE_FLOATING_KEYS")]
+        [Description("ENABLE_FLOATING_KEYS_DESC")]
+        [DisabledIf(nameof(IsFloatingKeysDisabled))]
         public bool EnableFloatingKeys = false;
 
-        // Base Look & Feel
+        public bool AreKeyDefinitionsEmpty() => VirtualKeys == null || VirtualKeys.Length == 0;
+        public bool IsFloatingKeysDisabled() => IsCharacterMissing() || AreKeyDefinitionsEmpty();
+
+        // Floating Key Layout (Collapsible StructuredData)
         [DataInput(210)]
+        [Label("FLOATING_KEY_LAYOUT")]
+        public VirtualKeyCollection VirtualKeysCollection;
+
+        // Base Look & Feel
+        [DataInput(220)]
         [Label("DEFAULT_KEY_APPEARANCE")]
         public VirtualKeyAppearance DefaultAppearance;
 
         public Vector2 BaseKeySize => DefaultAppearance?.Shape?.Normal?.Size ?? new Vector2(0.032f, 0.032f);
-
-        // Floating Key Layout (Collapsible StructuredData)
-        [DataInput(220)]
-        [Label("FLOATING_KEY_LAYOUT")]
-        public VirtualKeyCollection VirtualKeysCollection;
 
         public IKeyListeningTarget ActiveKeyListeningTarget { get; private set; }
 
@@ -71,6 +76,8 @@ namespace FlameStream
                     VirtualKeysCollection.Parent = this;
                 }
                 VirtualKeysCollection.Keys = value;
+                VirtualKeysCollection.SetDataInput(nameof(VirtualKeysCollection.Keys), value, true);
+                UpdateInputEnableDescriptions();
             }
         }
 
@@ -123,6 +130,7 @@ namespace FlameStream
 
             if (DefaultAppearance == null) {
                 DefaultAppearance = VirtualKeyAppearance.CreateDefault();
+                SetDataInput(nameof(DefaultAppearance), DefaultAppearance, true);
             }
             DefaultAppearance.OnAppearanceChanged = () => {
                 RebuildAllVirtualKeyMeshes();
@@ -130,9 +138,11 @@ namespace FlameStream
 
             Watch(nameof(EnableFloatingKeys), delegate {
                 UpdateFloatingKeysState();
+                UpdateInputEnableDescriptions();
             });
             Watch(nameof(IsEnabled), delegate {
                 UpdateFloatingKeysState();
+                UpdateInputEnableDescriptions();
             });
             Watch(nameof(VirtualKeysCollection), delegate {
                 if (VirtualKeysCollection != null) {
@@ -140,6 +150,7 @@ namespace FlameStream
                 }
                 RefreshVirtualKeysParent();
                 RebuildAllVirtualKeyMeshes();
+                UpdateInputEnableDescriptions();
             });
             Watch(nameof(KeysetTransforms), delegate {
                 if (KeysetTransforms != null) {
@@ -156,9 +167,6 @@ namespace FlameStream
             });
 
             RefreshVirtualKeysParent();
-            if (VirtualKeys == null || VirtualKeys.Length == 0) {
-                ApplyVirtualKeyPreset(KeysLayoutPreset, false);
-            }
 
             if (EnableFloatingKeys && IsEnabled) {
                 UpdateFloatingKeysState();
@@ -168,6 +176,7 @@ namespace FlameStream
         public void OnVirtualKeysChanged() {
             RefreshVirtualKeysParent();
             RebuildAllVirtualKeyMeshes();
+            UpdateInputEnableDescriptions();
         }
 
         void OnDestroyVirtualKeys() {
@@ -625,7 +634,7 @@ namespace FlameStream
         }
 
         void UpdateFloatingKeysState() {
-            if (EnableFloatingKeys && IsEnabled) {
+            if (EnableFloatingKeys && IsEnabled && Character != null) {
                 EnsureAnchors();
                 UpdateGroupTransforms();
                 RebuildAllVirtualKeyMeshes();
@@ -1646,6 +1655,7 @@ namespace FlameStream
             VirtualKeysCollection?.BroadcastDataInput(nameof(VirtualKeysCollection.Keys));
             BroadcastDataInput(nameof(VirtualKeysCollection));
             BindingGenerator?.UpdateStatus();
+            UpdateInputEnableDescriptions();
 
             if (EnableFloatingKeys && IsEnabled) {
                 UpdateFloatingKeysState();

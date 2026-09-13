@@ -1,5 +1,6 @@
 using Warudo.Core.Attributes;
 using Warudo.Core.Scenes;
+using Warudo.Core.Serializations;
 
 namespace FlameStream
 {
@@ -47,6 +48,7 @@ namespace FlameStream
             OnCreateBasicSetup();
             OnCreateFingerMovement();
             OnCreateVirtualKeys();
+            UpdateInputEnableDescriptions();
         }
 
         protected override void OnDestroy() {
@@ -66,6 +68,33 @@ namespace FlameStream
             OnUpdateBasicSetup();
             OnUpdateFingerMovement();
             OnUpdateVirtualKeys();
+        }
+
+        public override void Deserialize(SerializedAsset serialized) {
+            base.Deserialize(serialized);
+            if (serialized.dataInputs != null && serialized.dataInputs.TryGetValue("HandRestSetup", out var legacyPort) && !string.IsNullOrEmpty(legacyPort?.value)) {
+                try {
+                    var legacySetup = Newtonsoft.Json.JsonConvert.DeserializeObject<SerializedStructuredData>(legacyPort.value);
+                    if (legacySetup?.dataInputs != null) {
+                        if (LeftHandRestTransform == null && legacySetup.dataInputs.TryGetValue("Left", out var leftData) && !string.IsNullOrEmpty(leftData?.value)) {
+                            LeftHandRestTransform = Warudo.Core.Data.StructuredData.Create<CollapsibleVisualSetupTransform>();
+                            LeftHandRestTransform.Deserialize(Newtonsoft.Json.JsonConvert.DeserializeObject<SerializedStructuredData>(leftData.value));
+                        }
+                        if (RightHandRestTransform == null && legacySetup.dataInputs.TryGetValue("Right", out var rightData) && !string.IsNullOrEmpty(rightData?.value)) {
+                            RightHandRestTransform = Warudo.Core.Data.StructuredData.Create<CollapsibleVisualSetupTransform>();
+                            RightHandRestTransform.Deserialize(Newtonsoft.Json.JsonConvert.DeserializeObject<SerializedStructuredData>(rightData.value));
+                        }
+                        if (FingerTransitions != null) {
+                            if (legacySetup.dataInputs.TryGetValue("ReturnToRest", out var rtr) && rtr?.value != null && bool.TryParse(rtr.value, out bool b)) {
+                                FingerTransitions.ReturnToRest = b;
+                            }
+                            if (legacySetup.dataInputs.TryGetValue("RestTimeout", out var rto) && rto?.value != null && float.TryParse(rto.value, out float f)) {
+                                FingerTransitions.RestTimeout = f;
+                            }
+                        }
+                    }
+                } catch { }
+            }
         }
     }
 }

@@ -94,10 +94,14 @@ namespace FlameStream
             if (FingerTransitions == null) {
                 FingerTransitions = StructuredData.Create<KeyboardFingerTransitions>();
                 FingerTransitions.CollapsedSelf = true;
+                SetDataInput(nameof(FingerTransitions), FingerTransitions, true);
             }
+            FingerTransitions.Parent = this;
+
             if (FingerMovementDefinitions == null) {
                 FingerMovementDefinitions = StructuredData.Create<KeyboardFingerMovementCollection>();
                 FingerMovementDefinitions.CollapsedSelf = true;
+                SetDataInput(nameof(FingerMovementDefinitions), FingerMovementDefinitions, true);
             }
             FingerMovementDefinitions.Parent = this;
             if (FingerMovementDefinitions.Generator != null) {
@@ -238,9 +242,7 @@ namespace FlameStream
                 leftKeyReleaseTime = -1f;
             } else if (activeLeftKey != null) {
                 if (activeLeftKey.EnableHandMovement) {
-                    Vector3 leftScale = GetLeftHandMovementScale();
-                    Vector3 deltaPos = Vector3.Scale(activeLeftKey.DeltaPosition, leftScale);
-                    targetLeftPos = restLeftPos + deltaPos;
+                    targetLeftPos = restLeftPos + activeLeftKey.DeltaPosition;
                     targetLeftRot = restLeftRot + activeLeftKey.DeltaRotation;
                 } else {
                     targetLeftPos = hasLeftKeyBeenPressed ? lastLeftKeyPos : restLeftPos;
@@ -311,9 +313,7 @@ namespace FlameStream
                 rightKeyReleaseTime = -1f;
             } else if (activeRightKey != null) {
                 if (activeRightKey.EnableHandMovement) {
-                    Vector3 rightScale = GetRightHandMovementScale();
-                    Vector3 deltaPos = Vector3.Scale(activeRightKey.DeltaPosition, rightScale);
-                    targetRightPos = restRightPos + deltaPos;
+                    targetRightPos = restRightPos + activeRightKey.DeltaPosition;
                     targetRightRot = restRightRot + activeRightKey.DeltaRotation;
                 } else {
                     targetRightPos = hasRightKeyBeenPressed ? lastRightKeyPos : restRightPos;
@@ -1003,7 +1003,7 @@ namespace FlameStream
                     restRotRig,
                     solvedPosRig,
                     solvedRotRig,
-                    handScale,
+                    Vector3.one,
                     out Vector3 deltaPos,
                     out Vector3 deltaRot
                 );

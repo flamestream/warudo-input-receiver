@@ -41,37 +41,43 @@ namespace FlameStream
                     FingertipOffsets.Parent = Parent;
                 }
             });
+            Watch(nameof(GenerationMode), delegate {
+                UpdateStatus();
+            });
             UpdateStatus();
         }
 
         public void UpdateStatus() {
             if (Parent == null) return;
 
-            var leftRef = Parent.GetHandAlignmentReferenceKey(true);
-            var rightRef = Parent.GetHandAlignmentReferenceKey(false);
+            if (GenerationMode == KeyGenerationMode.TiltToKeySurface) {
+                var leftRef = Parent.GetHandAlignmentReferenceKey(true);
+                var rightRef = Parent.GetHandAlignmentReferenceKey(false);
 
-            string leftText;
-            if (leftRef != null) {
-                leftText = leftRef.IsHandAlignmentReference
-                    ? $"**`[{leftRef.Key}]`**"
-                    : $"**`[{leftRef.Key}]`** ({"GENERATION_REF_DEFAULT_FIRST_LEFT".Localized()})";
+                string leftText;
+                if (leftRef != null) {
+                    leftText = leftRef.IsHandAlignmentReference
+                        ? $"**`[{leftRef.Key}]`**"
+                        : $"**`[{leftRef.Key}]`** ({"GENERATION_REF_DEFAULT_FIRST_LEFT".Localized()})";
+                } else {
+                    leftText = $"*{"GENERATION_REF_NONE_BED".Localized()}*";
+                }
+
+                string rightText;
+                if (rightRef != null) {
+                    rightText = rightRef.IsHandAlignmentReference
+                        ? $"**`[{rightRef.Key}]`**"
+                        : $"**`[{rightRef.Key}]`** ({"GENERATION_REF_DEFAULT_FIRST_RIGHT".Localized()})";
+                } else {
+                    rightText = $"*{"GENERATION_REF_NONE_BED".Localized()}*";
+                }
+
+                ReferenceStatus = $"{"GENERATION_INFO_TILT_TO_SURFACE".Localized()}\n\n" +
+                                  $"- 🫲 **{"LEFT_HAND".Localized()}**: {leftText}\n" +
+                                  $"- 🫱 **{"RIGHT_HAND".Localized()}**: {rightText}";
             } else {
-                leftText = $"*{"GENERATION_REF_NONE_BED".Localized()}*";
+                ReferenceStatus = "GENERATION_INFO_MAINTAIN_REST".Localized();
             }
-
-            string rightText;
-            if (rightRef != null) {
-                rightText = rightRef.IsHandAlignmentReference
-                    ? $"**`[{rightRef.Key}]`**"
-                    : $"**`[{rightRef.Key}]`** ({"GENERATION_REF_DEFAULT_FIRST_RIGHT".Localized()})";
-            } else {
-                rightText = $"*{"GENERATION_REF_NONE_BED".Localized()}*";
-            }
-
-            ReferenceStatus = $"### 📐 {"GENERATION_REF_HEADER".Localized()}\n" +
-                              $"- 🫲 **{"LEFT_HAND".Localized()}**: {leftText}\n" +
-                              $"- 🫱 **{"RIGHT_HAND".Localized()}**: {rightText}\n\n" +
-                              $"*{"GENERATION_REF_FOOTNOTE".Localized()}*";
 
             try {
                 var mdPort = GetDataInputPort(nameof(ReferenceStatus));

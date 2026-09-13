@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using Warudo.Core;
 using Warudo.Core.Attributes;
@@ -186,7 +187,7 @@ namespace FlameStream
                     list.Add(idleLayer);
                 }
 
-                Helper.SetCharacterOverlappingAnimations(Character, list.ToArray());
+                Helper.SetCharacterOverlappingAnimations(Character, list.ToArray()).Forget();
 
             } else {
 

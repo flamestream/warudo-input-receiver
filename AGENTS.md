@@ -1,208 +1,118 @@
-# AGENTS.md - Developer & AI Assistant Guide for FS Input Receiver
+# AGENTS.md — AI Assistant Guide for FS Input Receiver
 
-Welcome to the **FS Input Receiver** repository. This guide provides architecture overview, development workflows, hot-reload instructions, and coding standards for AI agents and developers.
+> **For detailed architecture, runtime gotchas, and troubleshooting, read the [`.ai/` knowledge base](.ai/README.md) first.**
 
 ---
 
 ## 1. Repository Overview
 
-**FS Input Receiver** is a C# plugin for the 3D VTubing application **Warudo**. It provides real-time tracking and animation systems for pen tablets, mice, keyboards, game controllers (GameInput, XInput, DirectInput), steering wheels, and flight sticks by receiving and translating UDP streams emitted by **FS Input Device Emitter**.
+**FS Input Receiver** is a C# Warudo plugin providing real-time tracking and animation for pen tablets, mice, keyboards, and game controllers via UDP streams from **FS Input Device Emitter**.
 
-- **Language & Runtime**: C# 8.0, target framework `.NET Framework 4.8` (Unity Mono/Roslyn environment).
-- **Core Dependencies**: Warudo Core SDK (`Warudo.Core.dll`), Unity Engine (`UnityEngine.dll`), Animancer (`Animancer.dll`), DOTween (`DOTween.dll`), UniTask (`UniTask.dll`), Newtonsoft.Json (`Newtonsoft.Json.dll`).
-- **Available Assemblies**: Pre-shipped inside Warudo's `Warudo_Data/Managed/` directory (400 DLLs).
-
----
-
-## 2. Directory Structure
+- **Language & Runtime**: C# 8.0, `.NET Framework 4.8` (Unity Mono/Roslyn)
+- **Core Dependencies**: `Warudo.Core.dll`, `UnityEngine.dll`, `Animancer.dll`, `DOTween.dll`, `UniTask.dll`, `Newtonsoft.Json.dll`
+- **Available Assemblies**: `Warudo_Data/Managed/` (~400 DLLs)
 
 ```
 FS Input Receiver/
-├── src/                          # Plugin C# source code
-│   ├── PointerReceiverPlugin.cs  # Main plugin entrypoint ([PluginType])
-│   ├── Assets/                   # Warudo Asset classes (ReceiverAsset, PointerReceiverAsset, etc.)
-│   ├── Nodes/                    # Warudo Blueprint Nodes (Animators, Trackers, Triggers)
-│   ├── Libs/                     # Helper classes (VKCode, DynamicVector3, MathExpression, etc.)
-│   ├── Localizations/            # Localization JSON dictionaries (en.json, ja.json, etc.)
-│   ├── PlaygroundPlugin.csproj   # MSBuild SDK project configured with Managed DLL references
-│   └── FSInputReceiver.sln       # Visual Studio Solution
-├── personal-tools/               # Hot-reload sync & verification tooling
-│   ├── sync.bat / sync.ps1       # Robocopy-based mirror sync between src/ and Warudo Playground
-│   ├── verify-build.ps1          # One-step compilation test against Warudo Managed DLLs
-│   └── UNIFIED-SYNC-README.md   # Sync tool documentation
-├── docs/                         # Architectural documentation
-│   └── architecture-and-development.md # Complete system architecture guide
-├── wiki/                         # User guides and controller animation setup tutorials
-├── AGENTS.md                     # AI Assistant instructions (this file)
-└── README.md                     # User-facing project overview
+├── src/                        # Plugin C# source code
+│   ├── PointerReceiverPlugin.cs  # [PluginType] entrypoint — register Assets & Nodes here
+│   ├── Assets/                 # ReceiverAsset subclasses
+│   ├── Nodes/                  # Blueprint Node classes
+│   ├── Libs/                   # Helpers (VKCode, Helper.cs, Guide*, etc.)
+│   ├── Localizations/          # en.json, ja.json, ...
+│   └── PlaygroundPlugin.csproj / FSInputReceiver.sln
+├── personal-tools/             # Sync & build tooling
+│   ├── sync.bat / sync.ps1     # Robocopy mirror: src ↔ warudo | unity | clear warudo
+│   ├── verify-build.ps1        # dotnet build check (use -Sync to also push)
+│   └── build-mod.ps1           # Headless Unity mod package builder
+├── .ai/                        # Knowledge base (read before making changes)
+├── docs/                       # Architecture deep-dives
+└── wiki/                       # User guides
 ```
 
 ---
 
-## 3. Development & Hot-Reload Workflow
+## 2. Development Workflow
 
-Testing does **not** require packaging the plugin into `.warudo` mod files. Warudo provides a **Playground** feature that compiles `.cs` files on-the-fly inside `Warudo_Data/StreamingAssets/Playground/`.
+Warudo Playground hot-reloads `.cs` files from `Warudo_Data/StreamingAssets/Playground/` without packaging.
 
-### 3.1 Recommended Development Cycle
-
-```
-┌─────────────────────────┐
-│ 1. Edit code in src/   │
-└────────────┬────────────┘
-             │
-┌────────────▼─────────────────────────┐
-│ 2. Run verify-build.ps1 (Type check) │
-└────────────┬─────────────────────────┘
-             │
-┌────────────▼─────────────────────────┐
-│ 3. Run sync.bat src warudo           │
-└────────────┬─────────────────────────┘
-             │
-┌────────────▼─────────────────────────┐
-│ 4. Warudo Playground hot-reloads live│
-└──────────────────────────────────────┘
-```
-
-### 3.2 Key Commands
 ```powershell
-# 1. Compile & verify without pushing:
-dotnet build src/PlaygroundPlugin.csproj
-
-# 2. Compile & verify via helper script:
-.\personal-tools\verify-build.ps1
-
-# 3. Compile, verify, AND automatically push to Warudo:
-.\personal-tools\verify-build.ps1 -Sync
-
-# 4. Manual sync commands:
-.\personal-tools\sync.bat src warudo          # Push to Warudo
-.\personal-tools\sync.bat warudo src          # Pull from Warudo
-.\personal-tools\sync.bat src warudo --dry-run# Preview changes
+dotnet build src/PlaygroundPlugin.csproj          # Compile-check only
+.\personal-tools\verify-build.ps1                 # Compile-check with summary
+.\personal-tools\verify-build.ps1 -Sync           # Compile-check + push to Warudo Playground
+.\personal-tools\sync.bat src warudo              # Manual push to Warudo
+.\personal-tools\sync.bat warudo src              # Manual pull from Warudo
+.\personal-tools\sync.bat clear warudo            # Remove all plugin files from Playground
+.\personal-tools\sync.bat src unity               # Sync to Unity SDK project (before mod build)
 ```
 
----
-
-## 4. Architectural Rules & Best Practices
-
-### 4.1 Plugin Registrations
-When creating new `Asset` or `Node` classes, you **MUST** register them in [`src/PointerReceiverPlugin.cs`](file:///d:/Code/FS%20Input%20Receiver/src/PointerReceiverPlugin.cs) under the `AssetTypes` or `NodeTypes` arrays in the `[PluginType]` attribute.
-
-### 4.2 Asset Architecture (`ReceiverAsset`)
-All input receivers inherit from `ReceiverAsset`:
-- `ReceiverAsset` runs a background task `Task.Run(() => Listen(udpClient))` using `UdpClient.Receive()`.
-- The background thread writes the raw packet string to `protected string lastState`.
-- **CRITICAL THREAD SAFETY RULE**: Never touch Unity objects (`GameObject`, `Transform`, `Vector3`, `Time`) or Warudo services on the `Listen()` thread. All packet decoding and state changes must occur on the main thread inside `OnUpdate()`.
-- Check packet version using `CheckValidProtocolVersion(inputString, PROTOCOL_VERSION, PROTOCOL_ID)`.
-
-### 4.3 Node Architecture
-- Nodes inherit from `Warudo.Core.Nodes.Node`.
-- Decorate classes with `[NodeType(Id = "...", Title = "...", Category = "...")]`.
-- Input ports: `[DataInput]` or `[TriggerInput]`.
-- Output ports: `[DataOutput]` or `[TriggerOutput]`.
-- Use `Watch(nameof(PortName), callback)` in `OnCreate()` to react to data input changes.
-
-### 4.4 Animancer & Character Animation
-- Animations are layered over the character's base animator using Warudo's Animancer integration.
-- Always use `CHARACTER_ANIM_LAYER_ID_PREFIX` to isolate plugin layers.
-- Check if character assets are valid and active before querying bones or playing animations.
-
-### 4.5 Localization
-- Never hardcode user-facing strings in UI attributes or logs.
-- Define keys in `src/Localizations/en.json` (and other languages if applicable).
-- Call `"MY_STRING_KEY".Localized()` to retrieve translated text.
-
-### 4.6 Retaining Compatibility
-- Do not rename existing node IDs or data port names as this breaks existing user scenes and graphs in Warudo.
-
-### 4.7 Enum Declarations for DataInput Ports & StructuredData
-- **CRITICAL**: Any `enum` used as a `[DataInput]` port or inside a `StructuredData` class **MUST** be defined directly at the `namespace` level (top-level type).
-- Do **NOT** declare enums nested inside a class (e.g. `class MyData { public enum MyEnum ... }`), because the CLR type reflection name becomes `Namespace.MyData+MyEnum`, which Warudo's type resolver cannot find, causing runtime log errors such as `Enum type ... does not exist`.
-
-### 4.8 Limb IK Hand Orientation Standards
-- In Warudo, humanoid avatar wrist/hand IK targets use the following rotation standards when facing straight forward in front of the avatar (relative to the Character or a forward-facing Root anchor):
-  - **Left Hand (Straight Forward)**: `Vector3(0f, 90f, 0f)` (rotates left palm/fingers forward toward a keyboard, desk, or prop).
-  - **Right Hand (Straight Forward)**: `Vector3(0f, -90f, 0f)` (rotates right palm/fingers forward toward a keyboard, desk, or prop).
-  - *Note*: An IK rotation of `(0, 0, 0)` causes humanoid hands to point sideways (T-pose/A-pose resting angle) rather than forward.
-
-### 4.9 Overlapping Animations: Playground Mode vs Plugin (uMod) Mode
-- **Updating Character Overlapping Animations**:
-  Always use [`Helper.SetCharacterOverlappingAnimations(character, layers)`](file:///d:/Code/FS%20Input%20Receiver/src/Libs/Helper.cs). This internally calls `character.SetDataInput(nameof(character.OverlappingAnimations), layers, true)`.
-  - **CRITICAL**: Never modify `character.OverlappingAnimations` directly via C# property assignment without `SetDataInput`. Direct assignment completely bypasses `DataInputPortCollection.SetPortValue()`, so `CharacterAsset`'s `WatchAll` never fires, and Warudo will never create Animancer layers on `Character.Animancer` for the new animations.
-- **Action Playback & Looping**:
-  Overlapping animation layers dynamically driven by weight blending or key inputs must have `Looping = true`. If `Looping = false`, Warudo's `Events.OnEnd` handler sets `state.IsPlaying = false` once the clip reaches the end, freezing the state even if weight is subsequently increased. When activating an action animation on button press, explicitly rewind and play: `var state = layer.Play(layer.CurrentState); state.Time = 0f;`.
-- **CRITICAL Avatar Masking Rule**:
-  Any `OverlappingAnimationData` layer created with `Masked = true` **MUST** have `MaskedBodyParts` populated with a non-null array (e.g. `new[] { AnimationMaskedBodyPart.LeftFingers }`). In Warudo's internal `CharacterAsset.SetupOverlappingAnimations()`, `CreateAvatarMask()` iterates `layer.GetMaskedBodyParts()` without a null check; leaving `MaskedBodyParts = null` throws an unhandled `NullReferenceException` that crashes Warudo immediately when an animation clip is loaded.
-
-### 4.10 Scene Destruction: Never Call `Scene.RemoveAsset()` Inside `OnDestroy()`
-- **CRITICAL**: Never call `Scene.RemoveAsset()` inside an asset's `OnDestroy()` method.
-- When Warudo restarts a scene or loads a new scene, `Scene.Destroy()` enumerates its internal `List<Asset> assetList` using `List<T>.Enumerator`.
-- Calling `Scene.RemoveAsset()` inside `OnDestroy()` calls `this.assetList.Remove(asset)`, modifying the collection during enumeration and throwing `InvalidOperationException: Collection was modified`.
-- During scene teardown, Warudo already calls `Destroy()` on every asset in the scene automatically. Reserve `Scene.RemoveAsset()` strictly for explicit user-triggered cleanup actions while the scene remains active.
-
-### 4.11 `StructuredData` Port Assignment & Zero Values
-- **Always use `SetDataInput` for Programmatic Changes**: Never assign directly to C# fields on a `StructuredData` (e.g. `transform.Scale = ...`) without calling `SetDataInput(nameof(transform.Scale), value, true)`. Direct field assignment bypasses Warudo's `DataInputPortCollection`, so values are lost or silently overwritten on domain reload or UI sync.
-- **Never Overwrite User Input Per-Frame**: Do not place fallback checks (`if (scale == Vector3.zero) scale = Vector3.one;`) inside `OnUpdate()`. This blocks legitimate user configurations (such as setting displacement scale to `0` to freeze hand movement). Restrict fallback initialization strictly to object instantiation or explicit user actions (such as `ApplyPreset()`).
-
-### 4.12 Ergonomic Neutral Keys vs Reach Displacement
-- In ergonomic keyboard tracking models, resting home row keys (`A`, `S`, `D`, `F` and `J`, `K`, `L`, `;`) have $\Delta\text{Pos} = (0, 0, 0)$ because the resting hand pose is already anchored directly over them. Only finger curling animations trigger. Hand reach displacement only activates for non-neutral reach keys (`Q`, `W`, `E`, `R`, `T`, `Space`, etc.) where $\Delta\text{Pos} \neq 0$. Always test hand movement with reach keys.
-
-### 4.13 Asset Versioning & Auto-Migration Framework
-- **Two-Phase Migration Pipeline**: All input receivers inherit from [`ReceiverAsset`](file:///d:/Code/FS%20Input%20Receiver/src/Assets/ReceiverAsset.cs), which defines `CURRENT_ASSET_VERSION` and `AssetVersion` (`[Hidden] [DataInput]`).
-- **Scene Deserialization Interception**: `ReceiverAsset` overrides `public override void Deserialize(SerializedAsset serialized)`:
-  - **`OnPreMigrateAsset(fromVersion, toVersion, serialized)`**: Intercepts the raw serialized port dictionary before Warudo loads ports into memory. Use `MigrateRenamePort` or `MigrateRemovePort` to clean up obsolete ports or translate port keys.
-  - **`base.Deserialize(serialized)`**: Standard Warudo port deserialization.
-  - **`OnPostMigrateAsset(fromVersion, toVersion)`**: Runs on typed C# objects after deserialization. Use to heal uninitialized fields or migrate data structures via `SetDataInput(..., true)`.
-- **Automatic Clean Persistence**: Once auto-migrated, `AssetVersion` updates to `CURRENT_ASSET_VERSION` and broadcasts. Saving the scene (`Ctrl+S`) writes the clean modern schema to disk, permanently retiring legacy data.
-
-### 4.14 Collapsible StructuredData, Default States (`CollapsedSelf`), & Avoiding Accordion Recursion
-- **Default Collapsed State**: Classes implementing `ICollapsibleStructuredData` default to expanded (`CollapsedSelf == false`). Always set `CollapsedSelf = true;` inside `OnCreate()` or after `StructuredData.Create<T>()` if the card should be collapsed by default.
-- **Preventing Accordion Recursion**: Never implement `ICollapsibleStructuredData` on basic data primitives (like `VisualSetupTransform`) if they are meant to be embedded inside a parent collapsible structured data. Instead, keep the base primitive non-collapsible (so it renders inline) and subclass it (e.g. `CollapsibleVisualSetupTransform : VisualSetupTransform, ICollapsibleStructuredData`) for standalone top-level ports.
-
-### 4.15 Visual Setup Calibration & Non-Destructive Actions
-- **Anchor-Only Manipulation**: Interactive calibration gizmos (`VisualSetupAnchorAsset`) and modal actions (such as `RESET_TO_ORIGIN`) must only mutate the temporary calibration anchor (`setupAnchor.Transform`) and live preview GameObjects.
-- **Never Prematurely Mutate Asset Data**: Never call `SetDataInput` or modify `Position`, `Rotation`, or `Scale` on the parent asset during calibration. Modifying asset fields prematurely corrupts the previous state and breaks `[Cancel Transform]` rollback.
-- **Exclusively on Anchor Asset**: Calibration-specific triggers (e.g. `[Trigger(2)] RESET_TO_ORIGIN`) belong exclusively on `VisualSetupAnchorAsset` (in visual setup mode), not on the base `VisualSetupTransform` inspector.
-
-### 4.16 Decoupling Prop & Keyset Rigs from Humanoid Hand IK Rotations
-- Avatar Hand IK targets require intermediate wrist rotations (`Vector3(0, 90, 0)` / `Vector3(0, -90, 0)`) to face palms forward/downward.
-- Never parent props or virtual key clusters directly to Hand IK targets. Instead, parent clusters to the workstation root (`RootAnchor`) and offset them relative to resting hand positions using resting hand Euler angles.
-### 4.17 Section Boundaries: `[Section]` Attributes & Dynamic `sectionTitle` Broadcasting
-- **Single Section Declaration**: Only annotate the **first** member of a section with `[Section("SECTION_NAME")]`. Subsequent members automatically inherit the active section until a new section is declared. Decorating multiple sibling members with `[Section]` causes Warudo to close and reopen duplicate section containers with identical headers.
-- **Dynamic `port.Properties.sectionTitle` Rule**: Setting `sectionTitle` dynamically on a port and broadcasting it does **not** group items by tag; it designates that specific port as the **start boundary** of a section container. Never broadcast `sectionTitle` on multiple sibling ports in the same section. The section title must always be owned by a **permanent, visible port** in that section (e.g. `TriggerResetAnchors`). Never transfer `sectionTitle` to a port that can become hidden, as hiding it leaves the section container stranded with the previous title in Warudo's Vue UI. Dynamically hide/show child ports without assigning them a `sectionTitle`.
-
-### 4.18 Dynamic Section Header Updating & Inspector Re-rendering via `GetVersion()`
-- **The Issue**: When changing `port.Properties.sectionTitle` or trigger button `port.Properties.label` dynamically in C#, neither `BroadcastTriggerProperties` nor `Broadcast()` will update the section header or button text on the screen unless the user navigates away and back or clicks another control. Conversely, calling `BroadcastOpenedScene()` causes a disruptive modal "Waiting..." loading overlay.
-- **Root Cause**: In Warudo's web client (`warudo-client-electron`), `createSections` and `TriggerInterface` instantiation only run when `props.entityId` changes or when `entity.value?.version` changes. Because `Entity.GetVersion()` returns a constant `0L` (and `StructuredData.Serialize()` omits assigning `version`), Vue never sees the version change.
-- **Rule**:
-  - In `ReceiverAsset`, `GetVersion()` is overridden to return `base.GetVersion() + uiVersion`.
-  - In `StructuredData` classes (e.g. `KeyboardKeyBinding`, `VirtualKeyDefinition`), override both `GetVersion()` and `Serialize()` to assign `serialized.version = GetVersion()`.
-  - Implement an async `RequestUiRefresh()` (`await UniTask.Yield(); uiVersion++; Broadcast();`). Yielding before broadcasting ensures Vue has completed processing the active click event before receiving the version bump, smoothly re-rendering section titles and button labels in-place without any "Waiting..." overlay.
-
-### 4.19 Batch Sampling Animancer Poses & Preventing `OnUpdate` Reset Races
-- **Synchronous vs Asynchronous Evaluation**: Calling `animator.Update(0f)` synchronously within a single frame does not flush Animancer/PlayableGraph layer weight changes into humanoid bone positions. Unity requires player loop frame progression. Use `await UniTask.Delay(150)` to allow the avatar's bones to physically reach the blended/curled pose.
-- **`OnUpdate` Race Condition Guard**: When batch-sampling active poses (such as all 10 curled fingertips during batch key binding auto-generation), `OnUpdate()` continues executing on subsequent main thread frames during the async delay. If no keys are actively pressed, normal runtime logic (e.g. `ApplyFingerLayerWeight`) will command weights back to 0, uncurling the fingers before the delay finishes.
-- **The Rule**:
-  - Always guard runtime weight updates with a flag (e.g. `isBatchAutoGenerating`).
-  - While active, pin layer weights at target values (e.g. `1.0f`) in `OnUpdate()` and kill any active release tweens.
-  - Set `state.NormalizedTime = 1f; state.IsPlaying = false;` to freeze Animancer states at the end pose without triggering `Events.OnEnd` or looping resets.
-### 4.20 Rest-Relative Hand Slab & Surface Normal Orientation
-- **Never Use Raw Hand Anchor Axes**: Do not compute hand surface normal using `handRot * Vector3.up`. Humanoid avatar wrist IK targets require intermediate Euler rotations (`Vector3(0, 90, 0)` / `Vector3(0, -90, 0)`), which skews the local Y-axis by $8^\circ\text{–}10^\circ$ relative to the keyboard plane.
-- **The Rest-Relative Standard**: The avatar's hand at rest is calibrated by the user to be properly aligned over the keyboard. Therefore, hand surface normal and slab orientation must always be computed relative to resting rotation $\mathbf{R}_{\text{hand0}}$:
-  $$\Delta \mathbf{R} = \mathbf{R}_{\text{hand}} \mathbf{R}_{\text{hand0}}^{-1}$$
-  $$\vec{N}_{\text{hand}} = \Delta \mathbf{R} \times \vec{N}_{\text{key}}$$
-  $$\mathbf{R}_{\text{handSlab}} = \Delta \mathbf{R} \times \mathbf{R}_{\text{keyBase}} \times \mathbf{R}_{\text{handSlabRot}}$$
-- **Eliminating False Tilt**: At resting pose ($\Delta \mathbf{R} = \mathbf{I}$), $\vec{N}_{\text{hand}} = \vec{N}_{\text{key}}$, guaranteeing that the hand slab is automatically parallel ($0.0^\circ$ angle) to the key slab. In `SolveKeyAlignment()`, `tilt = FromToRotation(handNormal, keyNormal)` evaluates to identity for all keys on the keyboard surface, preventing artificial pitch/roll wrist twisting on both resting keys and reach keys.
+**Building a `.warudo` mod package:** Sync to Unity SDK (`sync.bat src unity`), then open `D:\Unity Projects\Warudo SDK 0.14.5.1 Modding Project` → **Warudo SDK → Build Mod**.
 
 ---
 
-## 5. Troubleshooting & Runtime Logs
+## 3. Critical Rules (Quick Reference)
+
+These are the most commonly violated rules. Full explanations are in the `.ai/` files.
+
+### 3.1 Plugin Registration
+New `Asset` or `Node` classes **must** be registered in [`PointerReceiverPlugin.cs`](src/PointerReceiverPlugin.cs) under `AssetTypes`/`NodeTypes` in the `[PluginType]` attribute.
+
+### 3.2 Thread Safety (UDP Receivers)
+Never touch Unity objects or Warudo services on the `Listen()` background thread. Buffer raw packets in `protected string lastState` and decode on the main thread in `OnUpdate()`. → [Gotcha #9](.ai/warudo_runtime_gotchas.md)
+
+### 3.3 Localization
+Never hardcode user-facing strings. Define keys in `src/Localizations/en.json` and call `"KEY".Localized()`. → [Plugin Cheatsheet](.ai/plugin_development_cheatsheet.md)
+
+### 3.4 Compatibility
+Never rename existing node IDs or `[DataInput]` port field names — this breaks saved user scenes.
+
+### 3.5 Enums in DataInput / StructuredData
+Enums used as `[DataInput]` ports or inside `StructuredData` **must** be top-level namespace types. Nested enums (`class Foo { enum Bar }`) produce `Foo+Bar` CLR names that Warudo's type resolver cannot find. → [Gotcha #6](.ai/warudo_runtime_gotchas.md)
+
+### 3.6 StructuredData Field Assignment
+Always use `SetDataInput(nameof(field), value, true)` — never assign C# fields directly without it, as direct assignment bypasses Warudo's port collection and loses values on reload. Never set fallback values per-frame in `OnUpdate()`. → [Gotcha #27](.ai/warudo_runtime_gotchas.md)
+
+### 3.7 Overlapping Animations (Playground vs Mod)
+Always use [`Helper.SetCharacterOverlappingAnimations(character, layers)`](src/Libs/Helper.cs) — never call `SetDataInput` or assign `character.OverlappingAnimations` directly outside this helper.
+- **Playground**: Overlapping animations cannot be activated in Playground mode (concurrent UMod loading races with graph updates, crashing Warudo to desktop). `Helper.SetCharacterOverlappingAnimations` simply displays a warning toast and safely no-ops.
+- **Mod**: `SetDataInput` (required so `WatchAll` fires and Animancer layers are created).
+→ [Gotcha #40](.ai/warudo_runtime_gotchas.md)
+
+### 3.8 Avatar Masking
+Any `OverlappingAnimationData` with `Masked = true` **must** have a non-null `MaskedBodyParts` array or `CreateAvatarMask()` throws a `NullReferenceException` that crashes Warudo. → [Gotcha #5](.ai/warudo_runtime_gotchas.md)
+
+### 3.9 Scene Teardown
+Never call `Scene.RemoveAsset()` inside `OnDestroy()` — Warudo enumerates its asset list during teardown; modifying it causes `InvalidOperationException: Collection was modified`. → [Gotcha #10](.ai/warudo_runtime_gotchas.md)
+
+### 3.10 UMod Security (`System.Reflection` banned)
+UMod's security scanner blocks all `System.Reflection` usage in packaged mods. The codebase contains zero reflection calls (`SetPortDefaultValue` was removed as default port values cannot be mutated without reflection). If Playground-only reflection is ever needed, wrap it in `// [PLAYGROUND_ONLY_START]` and `// [PLAYGROUND_ONLY_END]`. `personal-tools/sync.ps1` automatically comments these blocks out (`// [OMIT_MOD] ...`) when syncing to `unity`, passing UMod's scanner cleanly. → [Gotcha #41](.ai/warudo_runtime_gotchas.md)
+
+### 3.11 Humanoid Hand IK Orientation
+Straight-forward facing: Left hand `Vector3(0, 90, 0)`, Right hand `Vector3(0, -90, 0)`. `(0, 0, 0)` points hands sideways (T-pose). Never use raw hand anchor axes for palm normals; use rest-relative deltas. → [Gotcha #12, #39](.ai/warudo_runtime_gotchas.md)
+
+### 3.12 Section Attributes & Dynamic UI
+Only the **first** member of a section gets `[Section("NAME")]`. For dynamic section titles/button labels, bump `uiVersion` and call `BroadcastDataInput` after `await UniTask.Yield()` — never use `BroadcastOpenedScene()`. → [Gotcha #33, #34](.ai/warudo_runtime_gotchas.md)
+
+### 3.13 Asset Auto-Migration
+Use the two-phase pipeline in `ReceiverAsset.Deserialize()`: `OnPreMigrateAsset` (rename/remove raw port keys before deserialization) → `base.Deserialize()` → `OnPostMigrateAsset` (heal typed C# objects via `SetDataInput`). → [Gotcha #29](.ai/warudo_runtime_gotchas.md)
+
+---
+
+## 4. Knowledge Base Index
+
+| File | Covers |
+|------|--------|
+| [warudo_runtime_gotchas.md](.ai/warudo_runtime_gotchas.md) | All runtime quirks, crash bugs, and serialization traps (41 entries) |
+| [plugin_development_cheatsheet.md](.ai/plugin_development_cheatsheet.md) | Plugin/Node/Asset patterns, port attributes, UniTask, toasts |
+| [animancer_integration_guide.md](.ai/animancer_integration_guide.md) | Animancer Pro/Lite conflict, assembly identity, layer blending patterns |
+| [warudo_modding_architecture.md](.ai/warudo_modding_architecture.md) | UMod build pipeline, `.warudo` package structure, SDK vs runtime env |
+| [debugging_and_troubleshooting.md](.ai/debugging_and_troubleshooting.md) | Log paths, headless build, scene JSON inspection, assembly inspection |
+
+---
+
+## 5. Troubleshooting
 
 - **Warudo Runtime Log**: `C:\Users\flame\AppData\LocalLow\HakuyaLabs\Warudo\Player.log`
-  - Inspect `Player.log` when debugging hot-reload compilation errors, missing types, deserialization issues, or scene loading exceptions.
-- **Scene JSON Inspection (Evaluated Runtime State)**:
-  - When diagnosing whether a port, `StructuredData`, or transform value is correctly evaluated or serialized, ask the user to save the scene (`Ctrl+S`).
-  - Warudo logs the save event (`POST /api/openedScene/save`) and writes the full, evaluated JSON state of all scene assets, nodes, and ports to the active scene file.
-  - This provides definitive verification of active port values without guessing or speculative debugging.
-
-
-
+- **Inspect evaluated port values**: Ask user to `Ctrl+S` save scene → Warudo writes full JSON state to the scene file.
+- **Playground compilation errors**: Silent fallback to stale code — always check `Player.log` for Roslyn errors. → [Gotcha #16](.ai/warudo_runtime_gotchas.md)
+- **Detailed troubleshooting workflows**: See [debugging_and_troubleshooting.md](.ai/debugging_and_troubleshooting.md)

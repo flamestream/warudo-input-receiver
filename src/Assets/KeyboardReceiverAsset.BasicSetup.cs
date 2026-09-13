@@ -10,6 +10,7 @@ using Warudo.Core.Scenes;
 using Warudo.Plugins.Core.Assets.Character;
 using Warudo.Plugins.Core.Assets.Utility;
 using static Warudo.Plugins.Core.Assets.Character.CharacterAsset;
+using Cysharp.Threading.Tasks;
 
 namespace FlameStream
 {
@@ -19,11 +20,14 @@ namespace FlameStream
 
         [DataInput(10)]
         [Label("ENABLE")]
+        [Description("KEYBOARD_ENABLE_DESC")]
+        [DisabledIf(nameof(IsCharacterMissing))]
         public bool IsHandEnabled;
+
+        public bool IsCharacterMissing() => Character == null;
 
         [DataInput(20)]
         [Label("CHARACTER")]
-        [Description("CHARACTER_DESC")]
         public CharacterAsset Character;
 
         [DataInput(25)]
@@ -35,38 +39,33 @@ namespace FlameStream
         [Description("KEYBOARD_RIG_ORIGIN_DESC")]
         public CollapsibleVisualSetupTransform RootTransform;
 
-        public Vector3 GetLeftHandMovementScale() {
-            return (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode && LeftHandRestTransform.setupAnchor != null)
-                ? LeftHandRestTransform.setupAnchor.Transform.Scale
-                : (LeftHandRestTransform?.Scale ?? Vector3.one);
-        }
-
-        public Vector3 GetRightHandMovementScale() {
-            return (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode && RightHandRestTransform.setupAnchor != null)
-                ? RightHandRestTransform.setupAnchor.Transform.Scale
-                : (RightHandRestTransform?.Scale ?? Vector3.one);
-        }
-
         [DataInput(40)]
-        [Label("HAND_REST_POSES")]
-        public KeyboardHandRestSetup HandRestSetup;
+        [Label("LEFT_HAND_REST")]
+        [Description("LEFT_HAND_REST_DESC")]
+        public CollapsibleVisualSetupTransform LeftHandRestTransform;
+
+        [DataInput(50)]
+        [Label("RIGHT_HAND_REST")]
+        [Description("RIGHT_HAND_REST_DESC")]
+        public CollapsibleVisualSetupTransform RightHandRestTransform;
+
+        public Vector3 GetLeftHandMovementScale() => Vector3.one;
+
+        public Vector3 GetRightHandMovementScale() => Vector3.one;
 
         public bool ReturnToRest {
-            get => HandRestSetup?.ReturnToRest ?? true;
+            get => FingerTransitions?.ReturnToRest ?? true;
             set {
-                if (HandRestSetup != null) HandRestSetup.ReturnToRest = value;
+                if (FingerTransitions != null) FingerTransitions.ReturnToRest = value;
             }
         }
 
         public float RestTimeout {
-            get => HandRestSetup?.RestTimeout ?? 3.0f;
+            get => FingerTransitions?.RestTimeout ?? 3.0f;
             set {
-                if (HandRestSetup != null) HandRestSetup.RestTimeout = value;
+                if (FingerTransitions != null) FingerTransitions.RestTimeout = value;
             }
         }
-
-        public CollapsibleVisualSetupTransform LeftHandRestTransform => HandRestSetup?.Left;
-        public CollapsibleVisualSetupTransform RightHandRestTransform => HandRestSetup?.Right;
 
         public Vector3 KeyboardRootPosition {
             get => RootTransform?.Position ?? new Vector3(0f, 0.6218f, 0.1484f);
@@ -152,8 +151,21 @@ namespace FlameStream
         [Label("RESET_ANCHORS")]
         [Description("RESET_ANCHORS_DESC")]
         public void TriggerResetAnchors() {
-            ClearAnchors();
-            Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Info, Name, "Anchors reset and character IK detached. Fresh anchors will regenerate when enabled.");
+            var root = RootAnchor;
+            if (root != null) {
+                root.Transform.Position = KeyboardRootPosition;
+                root.Transform.Rotation = KeyboardRootRotation;
+                root.Transform.Scale = RootTransform?.Scale ?? Vector3.one;
+                root.Transform.Broadcast();
+                if (root.GameObject != null) {
+                    root.GameObject.transform.localPosition = KeyboardRootPosition;
+                    root.GameObject.transform.localRotation = Quaternion.Euler(KeyboardRootRotation);
+                    root.GameObject.transform.localScale = RootTransform?.Scale ?? Vector3.one;
+                }
+                Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Info, Name, "RESET_ANCHORS_SUCCESS".Localized());
+            } else {
+                Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Warning, Name, "RESET_ANCHORS_NO_ROOT".Localized());
+            }
         }
 
         [Trigger(1015)]
@@ -316,11 +328,6 @@ namespace FlameStream
         }
 
         public void SetupHandRestTransforms() {
-            if (HandRestSetup == null) {
-                HandRestSetup = StructuredData.Create<KeyboardHandRestSetup>();
-                HandRestSetup.Parent = this;
-            }
-            HandRestSetup.CollapsedSelf = true;
             SetupLeftHandRestTransform();
             SetupRightHandRestTransform();
         }
@@ -369,17 +376,15 @@ namespace FlameStream
         }
 
         public void SetupLeftHandRestTransform() {
-            var rest = HandRestSetup;
-            if (rest == null) return;
-            rest.CollapsedSelf = true;
-            if (rest.Left == null) {
-                rest.Left = StructuredData.Create<CollapsibleVisualSetupTransform>();
-                rest.Left.Position = new Vector3(-0.07f, 0.02f, 0f);
-                rest.Left.Rotation = Vector3.zero;
-                rest.Left.Scale = Vector3.one;
-                rest.Left.SetDataInput(nameof(rest.Left.Scale), Vector3.one, true);
+            if (LeftHandRestTransform == null) {
+                LeftHandRestTransform = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                LeftHandRestTransform.Position = new Vector3(-0.07f, 0.02f, 0f);
+                LeftHandRestTransform.Rotation = Vector3.zero;
+                LeftHandRestTransform.Scale = Vector3.one;
+                LeftHandRestTransform.SetDataInput(nameof(LeftHandRestTransform.Scale), Vector3.one, true);
             }
-            rest.Left.CollapsedSelf = true;
+            LeftHandRestTransform.HideScale();
+            LeftHandRestTransform.CollapsedSelf = true;
             LeftHandRestTransform.LocalizationKey = "LEFT_HAND_REST";
             LeftHandRestTransform.OnEnterVisualSetup = (tr) => {
                 EnsureAnchors();
@@ -394,9 +399,9 @@ namespace FlameStream
                 }
                 setupAnchor.Transform.Position = tr.Position;
                 setupAnchor.Transform.Rotation = tr.Rotation;
-                setupAnchor.Transform.Scale = tr.Scale;
+                setupAnchor.Transform.Scale = Vector3.one;
                 setupAnchor.Name = "⌛⚓-Left Hand Rest Pose";
-                setupAnchor.Instructions = "Position, rotate, and scale the **Left Hand Rest Pose** (resting over ASDF), relative to the **Keyboard Rig Origin**.\nThe red sphere indicates the origin location (Keyboard Rig Origin).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Instructions = "Position and rotate the **Left Hand Rest Pose** (resting over ASDF), relative to the **Keyboard Rig Origin**.\nThe red sphere indicates the origin location (Keyboard Rig Origin).\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             LeftHandRestTransform.OnResetAnchor = (tr, setupAnchor) => {
@@ -408,7 +413,7 @@ namespace FlameStream
             LeftHandRestTransform.OnApplyAnchor = (tr, setupAnchor) => {
                 tr.Position = setupAnchor.Transform.Position;
                 tr.Rotation = setupAnchor.Transform.Rotation;
-                tr.Scale = setupAnchor.Transform.Scale;
+                tr.Scale = Vector3.one;
                 UpdateHandRestTransforms();
             };
             LeftHandRestTransform.OnExitVisualSetup = (isApplied) => {
@@ -420,17 +425,15 @@ namespace FlameStream
         }
 
         public void SetupRightHandRestTransform() {
-            var rest = HandRestSetup;
-            if (rest == null) return;
-            rest.CollapsedSelf = true;
-            if (rest.Right == null) {
-                rest.Right = StructuredData.Create<CollapsibleVisualSetupTransform>();
-                rest.Right.Position = new Vector3(0.07f, 0.02f, 0f);
-                rest.Right.Rotation = Vector3.zero;
-                rest.Right.Scale = Vector3.one;
-                rest.Right.SetDataInput(nameof(rest.Right.Scale), Vector3.one, true);
+            if (RightHandRestTransform == null) {
+                RightHandRestTransform = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                RightHandRestTransform.Position = new Vector3(0.07f, 0.02f, 0f);
+                RightHandRestTransform.Rotation = Vector3.zero;
+                RightHandRestTransform.Scale = Vector3.one;
+                RightHandRestTransform.SetDataInput(nameof(RightHandRestTransform.Scale), Vector3.one, true);
             }
-            rest.Right.CollapsedSelf = true;
+            RightHandRestTransform.HideScale();
+            RightHandRestTransform.CollapsedSelf = true;
             RightHandRestTransform.LocalizationKey = "RIGHT_HAND_REST";
             RightHandRestTransform.OnEnterVisualSetup = (tr) => {
                 EnsureAnchors();
@@ -445,9 +448,9 @@ namespace FlameStream
                 }
                 setupAnchor.Transform.Position = tr.Position;
                 setupAnchor.Transform.Rotation = tr.Rotation;
-                setupAnchor.Transform.Scale = tr.Scale;
+                setupAnchor.Transform.Scale = Vector3.one;
                 setupAnchor.Name = "⌛⚓-Right Hand Rest Pose";
-                setupAnchor.Instructions = "Position, rotate, and scale the **Right Hand Rest Pose** (resting over JKL;), relative to the **Keyboard Rig Origin**.\nThe red sphere indicates the origin location (Keyboard Rig Origin).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Instructions = "Position and rotate the **Right Hand Rest Pose** (resting over JKL;), relative to the **Keyboard Rig Origin**.\nThe red sphere indicates the origin location (Keyboard Rig Origin).\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             RightHandRestTransform.OnResetAnchor = (tr, setupAnchor) => {
@@ -459,7 +462,7 @@ namespace FlameStream
             RightHandRestTransform.OnApplyAnchor = (tr, setupAnchor) => {
                 tr.Position = setupAnchor.Transform.Position;
                 tr.Rotation = setupAnchor.Transform.Rotation;
-                tr.Scale = setupAnchor.Transform.Scale;
+                tr.Scale = Vector3.one;
                 UpdateHandRestTransforms();
             };
             RightHandRestTransform.OnExitVisualSetup = (isApplied) => {
@@ -477,12 +480,6 @@ namespace FlameStream
             AutoSetup.Parent = this;
             AutoSetup.CollapsedSelf = true;
 
-            if (HandRestSetup == null) {
-                HandRestSetup = StructuredData.Create<KeyboardHandRestSetup>();
-                HandRestSetup.CollapsedSelf = true;
-            }
-            HandRestSetup.Parent = this;
-
             SetupVisualTransforms();
 
             Watch(nameof(AutoSetup), delegate {
@@ -492,27 +489,72 @@ namespace FlameStream
                 AutoSetup?.UpdateButtonState();
             });
             Watch(nameof(RootTransform), delegate { SetupRootTransform(); });
-            Watch(nameof(HandRestSetup), delegate {
-                if (HandRestSetup != null) {
-                    HandRestSetup.Parent = this;
-                }
-                SetupHandRestTransforms();
-            });
+            Watch(nameof(LeftHandRestTransform), delegate { SetupLeftHandRestTransform(); });
+            Watch(nameof(RightHandRestTransform), delegate { SetupRightHandRestTransform(); });
 
             Watch(nameof(IsEnabled), delegate { 
                 UpdateHandTrackingState(); 
                 AutoSetup?.UpdateButtonState();
+                UpdateInputEnableDescriptions();
             });
             Watch(nameof(IsHandEnabled), delegate { 
                 UpdateHandTrackingState(); 
                 AutoSetup?.UpdateButtonState();
             });
             Watch(nameof(Character), delegate { 
+                if (Character == null) {
+                    if (IsHandEnabled) {
+                        SetDataInput(nameof(IsHandEnabled), false, true);
+                        BroadcastDataInput(nameof(IsHandEnabled));
+                    }
+                    if (EnableFloatingKeys) {
+                        SetDataInput(nameof(EnableFloatingKeys), false, true);
+                        BroadcastDataInput(nameof(EnableFloatingKeys));
+                    }
+                }
                 UpdateHandTrackingState(); 
+                UpdateFloatingKeysState();
                 AutoSetup?.UpdateButtonState();
+                UpdateInputEnableDescriptions();
             });
 
+            UpdateInputEnableDescriptions();
             UpdateAdvancedSectionDebugState();
+        }
+
+        public void UpdateInputEnableDescriptions() {
+            try {
+                var handPort = GetDataInputPort(nameof(IsHandEnabled));
+                if (handPort?.Properties != null) {
+                    handPort.Properties.description = "KEYBOARD_ENABLE_DESC".Localized();
+                    BroadcastDataInputProperties(nameof(IsHandEnabled));
+                }
+
+                var keysPort = GetDataInputPort(nameof(EnableFloatingKeys));
+                if (keysPort?.Properties != null) {
+                    if (Character == null) {
+                        keysPort.Properties.description = "ENABLE_FLOATING_KEYS_DESC".Localized();
+                        if (EnableFloatingKeys) {
+                            EnableFloatingKeys = false;
+                            SetDataInput(nameof(EnableFloatingKeys), false, true);
+                            BroadcastDataInput(nameof(EnableFloatingKeys));
+                        }
+                    } else if (AreKeyDefinitionsEmpty()) {
+                        keysPort.Properties.description = "ENABLE_FLOATING_KEYS_NO_PRESET_DESC".Localized();
+                        if (EnableFloatingKeys) {
+                            EnableFloatingKeys = false;
+                            SetDataInput(nameof(EnableFloatingKeys), false, true);
+                            BroadcastDataInput(nameof(EnableFloatingKeys));
+                        }
+                    } else if (!IsEnabled) {
+                        keysPort.Properties.description = "ENABLE_FLOATING_KEYS_DISABLED_ASSET_DESC".Localized();
+                    } else {
+                        keysPort.Properties.description = "";
+                    }
+                    BroadcastDataInputProperties(nameof(EnableFloatingKeys));
+                }
+                RequestUiRefresh();
+            } catch { }
         }
 
         public KeyboardKeyBinding ActiveKeyBindingInVisualSetup;
@@ -524,7 +566,7 @@ namespace FlameStream
             try {
                 if (Character != null && Character.Active && Character.OverlappingAnimations != null) {
                     var userLayers = Character.OverlappingAnimations.Where(d => !(d.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false)).ToArray();
-                    Helper.SetCharacterOverlappingAnimations(Character, userLayers);
+                    Helper.SetCharacterOverlappingAnimations(Character, userLayers).Forget();
                 }
             } catch {}
         }
@@ -604,7 +646,7 @@ namespace FlameStream
         public void ClearFingerAnimations() {
             if (Character == null || Character.OverlappingAnimations == null) return;
             var userLayers = Character.OverlappingAnimations.Where(d => !(d.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false)).ToArray();
-            Helper.SetCharacterOverlappingAnimations(Character, userLayers);
+            Helper.SetCharacterOverlappingAnimations(Character, userLayers).Forget();
         }
 
         void UpdateRootTransform() {
@@ -657,11 +699,14 @@ namespace FlameStream
             // 2. Left Hand IK Anchor
             AnchorAsset leftHandAnchor = LeftHandAnchor;
             if (leftHandAnchor == null) {
-                leftHandAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
-                leftHandAnchor.Name = "⚓-🔥⌨️🫲 Left Hand";
+                leftHandAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INTERNAL".Localized());
+                leftHandAnchor.Name = "🔒⚓-🔥⌨️🫲 Left Hand";
                 Scene.UpdateNewAssetName(leftHandAnchor);
                 LeftHandAnchorAssetId = leftHandAnchor.Id;
                 BroadcastDataInput(nameof(LeftHandAnchorAssetId));
+            } else if (leftHandAnchor.Name == "⚓-🔥⌨️🫲 Left Hand") {
+                leftHandAnchor.Name = "🔒⚓-🔥⌨️🫲 Left Hand";
+                Scene.UpdateNewAssetName(leftHandAnchor);
             }
             leftHandAnchor.Attachable.Parent = rootAnchor;
             if (rootAnchor.GameObject != null) {
@@ -675,11 +720,14 @@ namespace FlameStream
             // 3. Right Hand IK Anchor
             AnchorAsset rightHandAnchor = RightHandAnchor;
             if (rightHandAnchor == null) {
-                rightHandAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
-                rightHandAnchor.Name = "⚓-🔥⌨️🫱 Right Hand";
+                rightHandAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INTERNAL".Localized());
+                rightHandAnchor.Name = "🔒⚓-🔥⌨️🫱 Right Hand";
                 Scene.UpdateNewAssetName(rightHandAnchor);
                 RightHandAnchorAssetId = rightHandAnchor.Id;
                 BroadcastDataInput(nameof(RightHandAnchorAssetId));
+            } else if (rightHandAnchor.Name == "⚓-🔥⌨️🫱 Right Hand") {
+                rightHandAnchor.Name = "🔒⚓-🔥⌨️🫱 Right Hand";
+                Scene.UpdateNewAssetName(rightHandAnchor);
             }
             rightHandAnchor.Attachable.Parent = rootAnchor;
             if (rootAnchor.GameObject != null) {
@@ -923,7 +971,7 @@ namespace FlameStream
             }
 
             userLayers.AddRange(newPluginLayers);
-            Helper.SetCharacterOverlappingAnimations(Character, userLayers.ToArray());
+            Helper.SetCharacterOverlappingAnimations(Character, userLayers.ToArray()).Forget();
             ResetFingerWeights();
         }
     }

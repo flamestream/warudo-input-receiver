@@ -28,6 +28,7 @@ namespace FlameStream
             set {
                 if (Generator != null) {
                     Generator.GenerationMode = value;
+                    Generator.UpdateStatus();
                 }
             }
         }

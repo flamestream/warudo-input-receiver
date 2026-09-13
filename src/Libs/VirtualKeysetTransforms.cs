@@ -8,19 +8,19 @@ namespace FlameStream
     public class VirtualKeysetTransforms : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData
     {
         [DataInput(10)]
+        [Label("CENTER_KEY_ORIGIN")]
+        [Description("CENTER_KEY_ORIGIN_DESC")]
+        public CollapsibleVisualSetupTransform Root;
+
+        [DataInput(20)]
         [Label("LEFT_KEY_ORIGIN")]
         [Description("LEFT_KEY_ORIGIN_DESC")]
         public CollapsibleVisualSetupTransform Left;
 
-        [DataInput(20)]
+        [DataInput(30)]
         [Label("RIGHT_KEY_ORIGIN")]
         [Description("RIGHT_KEY_ORIGIN_DESC")]
         public CollapsibleVisualSetupTransform Right;
-
-        [DataInput(30)]
-        [Label("CENTER_KEY_ORIGIN")]
-        [Description("CENTER_KEY_ORIGIN_DESC")]
-        public CollapsibleVisualSetupTransform Root;
 
         public string GetHeader() => "KEY_ORIGINS".Localized();
 

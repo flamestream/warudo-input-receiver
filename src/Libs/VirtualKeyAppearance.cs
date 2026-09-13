@@ -291,6 +291,37 @@ namespace FlameStream
             Borders.CopyFrom(other.Borders);
         }
 
+        public void SetState(bool enabled, Vector2 size, float cornerRadius, float borderWidth) {
+            Enabled = enabled;
+            Size = size;
+            SetDataInput(nameof(Enabled), enabled, true);
+            SetDataInput(nameof(Size), size, true);
+            BroadcastDataInput(nameof(Enabled));
+            BroadcastDataInput(nameof(Size));
+
+            if (Corners == null) Corners = StructuredData.Create<CornerRadiiData>();
+            Corners.Radius = cornerRadius;
+            Corners.UseIndividualCorners = false;
+            Corners.TopCorners = new Vector2(cornerRadius, cornerRadius);
+            Corners.BottomCorners = new Vector2(cornerRadius, cornerRadius);
+            Corners.SetDataInput(nameof(Corners.Radius), cornerRadius, true);
+            Corners.SetDataInput(nameof(Corners.UseIndividualCorners), false, true);
+            Corners.SetDataInput(nameof(Corners.TopCorners), new Vector2(cornerRadius, cornerRadius), true);
+            Corners.SetDataInput(nameof(Corners.BottomCorners), new Vector2(cornerRadius, cornerRadius), true);
+            Corners.BroadcastAll();
+
+            if (Borders == null) Borders = StructuredData.Create<BorderThicknessData>();
+            Borders.Width = borderWidth;
+            Borders.UseIndividualBorders = false;
+            Borders.TopBottomBorders = new Vector2(borderWidth, borderWidth);
+            Borders.LeftRightBorders = new Vector2(borderWidth, borderWidth);
+            Borders.SetDataInput(nameof(Borders.Width), borderWidth, true);
+            Borders.SetDataInput(nameof(Borders.UseIndividualBorders), false, true);
+            Borders.SetDataInput(nameof(Borders.TopBottomBorders), new Vector2(borderWidth, borderWidth), true);
+            Borders.SetDataInput(nameof(Borders.LeftRightBorders), new Vector2(borderWidth, borderWidth), true);
+            Borders.BroadcastAll();
+        }
+
         public VirtualKeyShapeStateStyle Clone() {
             var clone = StructuredData.Create<VirtualKeyShapeStateStyle>();
             clone.CopyFrom(this);
@@ -508,6 +539,26 @@ namespace FlameStream
             GlowIntensity = other.GlowIntensity;
         }
 
+        public void SetState(bool enabled, Color color, float selfIllumination, Color glowColor, float glowIntensity) {
+            Enabled = enabled;
+            Color = color;
+            SelfIllumination = selfIllumination;
+            GlowColor = glowColor;
+            GlowIntensity = glowIntensity;
+
+            SetDataInput(nameof(Enabled), enabled, true);
+            SetDataInput(nameof(Color), color, true);
+            SetDataInput(nameof(SelfIllumination), selfIllumination, true);
+            SetDataInput(nameof(GlowColor), glowColor, true);
+            SetDataInput(nameof(GlowIntensity), glowIntensity, true);
+
+            BroadcastDataInput(nameof(Enabled));
+            BroadcastDataInput(nameof(Color));
+            BroadcastDataInput(nameof(SelfIllumination));
+            BroadcastDataInput(nameof(GlowColor));
+            BroadcastDataInput(nameof(GlowIntensity));
+        }
+
         public VirtualKeyMaterialStateStyle Clone() {
             var clone = StructuredData.Create<VirtualKeyMaterialStateStyle>();
             clone.CopyFrom(this);
@@ -690,7 +741,9 @@ namespace FlameStream
 
         protected override void OnCreate() {
             base.OnCreate();
-            if (Shape == null || Body == null || Border == null || PressInTransition == null || PressOutTransition == null) {
+            bool isUninitialized = Shape == null || Body == null || Border == null || PressInTransition == null || PressOutTransition == null ||
+                (IsBaseAppearance && Body?.Normal?.Color == Color.white && Body?.Pressed?.Color == Color.white);
+            if (isUninitialized) {
                 ResetToDefaultTheme();
             }
             ConfigureElements();
@@ -753,89 +806,69 @@ namespace FlameStream
             Shape.IsBaseAppearance = IsBaseAppearance;
             Shape.Enabled = true;
             Shape.EnablePressedState = true;
+            Shape.SetDataInput(nameof(Shape.Enabled), true, true);
+            Shape.SetDataInput(nameof(Shape.EnablePressedState), true, true);
+            Shape.BroadcastDataInput(nameof(Shape.Enabled));
+            Shape.BroadcastDataInput(nameof(Shape.EnablePressedState));
 
             if (Shape.Normal == null) Shape.Normal = StructuredData.Create<VirtualKeyShapeStateStyle>();
-            Shape.Normal.Enabled = true;
-            Shape.Normal.Size = new Vector2(0.032f, 0.032f);
-            if (Shape.Normal.Corners == null) Shape.Normal.Corners = StructuredData.Create<CornerRadiiData>();
-            Shape.Normal.Corners.Radius = 0.25f;
-            Shape.Normal.Corners.UseIndividualCorners = false;
-            Shape.Normal.Corners.TopCorners = new Vector2(0.25f, 0.25f);
-            Shape.Normal.Corners.BottomCorners = new Vector2(0.25f, 0.25f);
-
-            if (Shape.Normal.Borders == null) Shape.Normal.Borders = StructuredData.Create<BorderThicknessData>();
-            Shape.Normal.Borders.Width = 0.0025f;
-            Shape.Normal.Borders.UseIndividualBorders = false;
-            Shape.Normal.Borders.TopBottomBorders = new Vector2(0.0025f, 0.0025f);
-            Shape.Normal.Borders.LeftRightBorders = new Vector2(0.0025f, 0.0025f);
+            Shape.Normal.SetState(true, new Vector2(0.032f, 0.032f), 0.25f, 0.0025f);
 
             if (Shape.Pressed == null) Shape.Pressed = StructuredData.Create<VirtualKeyShapeStateStyle>();
-            Shape.Pressed.Enabled = true;
-            Shape.Pressed.Size = new Vector2(0.032f, 0.032f);
-            if (Shape.Pressed.Corners == null) Shape.Pressed.Corners = StructuredData.Create<CornerRadiiData>();
-            Shape.Pressed.Corners.Radius = 0.25f;
-            Shape.Pressed.Corners.UseIndividualCorners = false;
-            Shape.Pressed.Corners.TopCorners = new Vector2(0.25f, 0.25f);
-            Shape.Pressed.Corners.BottomCorners = new Vector2(0.25f, 0.25f);
-
-            if (Shape.Pressed.Borders == null) Shape.Pressed.Borders = StructuredData.Create<BorderThicknessData>();
-            Shape.Pressed.Borders.Width = 0.0025f; // Same border width as normal by default (2.5mm)
-            Shape.Pressed.Borders.UseIndividualBorders = false;
-            Shape.Pressed.Borders.TopBottomBorders = new Vector2(0.0025f, 0.0025f);
-            Shape.Pressed.Borders.LeftRightBorders = new Vector2(0.0025f, 0.0025f);
+            Shape.Pressed.SetState(true, new Vector2(0.032f, 0.032f), 0.25f, 0.0025f);
 
             // 2. Body: Surface Fill Material
             if (Body == null) Body = StructuredData.Create<VirtualKeyMaterialStyle>();
             Body.IsBaseAppearance = IsBaseAppearance;
             Body.Enabled = true;
             Body.EnablePressedState = true;
+            Body.SetDataInput(nameof(Body.Enabled), true, true);
+            Body.SetDataInput(nameof(Body.EnablePressedState), true, true);
+            Body.BroadcastDataInput(nameof(Body.Enabled));
+            Body.BroadcastDataInput(nameof(Body.EnablePressedState));
 
             if (Body.Normal == null) Body.Normal = StructuredData.Create<VirtualKeyMaterialStateStyle>();
-            Body.Normal.Enabled = true;
             // Warudo HologramTrackpad fill (#0032DB80) with 0 glow for unlit look
-            Body.Normal.Color = new Color(0.0000f, 0.1961f, 0.8588f, 0.5020f);
-            Body.Normal.SelfIllumination = 1.0f;
-            Body.Normal.GlowColor = new Color(0.0000f, 0.1961f, 0.8588f, 1.0f);
-            Body.Normal.GlowIntensity = 0.0f;
+            Body.Normal.SetState(true, new Color(0.0000f, 0.1961f, 0.8588f, 0.5020f), 1.0f, new Color(0.0000f, 0.1961f, 0.8588f, 1.0f), 0.0f);
 
             if (Body.Pressed == null) Body.Pressed = StructuredData.Create<VirtualKeyMaterialStateStyle>();
-            Body.Pressed.Enabled = true;
             // Slightly brighter electric azure body with glow on press
-            Body.Pressed.Color = new Color(0.12f, 0.35f, 0.98f, 0.80f);
-            Body.Pressed.SelfIllumination = 1.0f;
-            Body.Pressed.GlowColor = new Color(0.15f, 0.45f, 1.0f, 1.0f);
-            Body.Pressed.GlowIntensity = 1.5f;
+            Body.Pressed.SetState(true, new Color(0.12f, 0.35f, 0.98f, 0.80f), 1.0f, new Color(0.15f, 0.45f, 1.0f, 1.0f), 1.5f);
 
             // 3. Border: Frame Stroke Material
             if (Border == null) Border = StructuredData.Create<VirtualKeyMaterialStyle>();
             Border.IsBaseAppearance = IsBaseAppearance;
             Border.Enabled = true;
             Border.EnablePressedState = true;
+            Border.SetDataInput(nameof(Border.Enabled), true, true);
+            Border.SetDataInput(nameof(Border.EnablePressedState), true, true);
+            Border.BroadcastDataInput(nameof(Border.Enabled));
+            Border.BroadcastDataInput(nameof(Border.EnablePressedState));
 
             if (Border.Normal == null) Border.Normal = StructuredData.Create<VirtualKeyMaterialStateStyle>();
-            Border.Normal.Enabled = true;
             // Warudo HologramTrackpad border (#56FFFFFF)
-            Border.Normal.Color = new Color(0.3373f, 1.0000f, 1.0000f, 1.0000f);
-            Border.Normal.SelfIllumination = 1.0f;
-            Border.Normal.GlowColor = new Color(0.3373f, 1.0000f, 1.0000f, 1.0000f);
-            Border.Normal.GlowIntensity = 0.0f;
+            Border.Normal.SetState(true, new Color(0.3373f, 1.0000f, 1.0000f, 1.0000f), 1.0f, new Color(0.3373f, 1.0000f, 1.0000f, 1.0000f), 0.0f);
 
             if (Border.Pressed == null) Border.Pressed = StructuredData.Create<VirtualKeyMaterialStateStyle>();
-            Border.Pressed.Enabled = true;
             // Glowing white border on press
-            Border.Pressed.Color = new Color(1.0f, 1.0f, 1.0f, 1.0f);
-            Border.Pressed.SelfIllumination = 1.0f;
-            Border.Pressed.GlowColor = new Color(1.0f, 1.0f, 1.0f, 1.0f);
-            Border.Pressed.GlowIntensity = 2.5f;
+            Border.Pressed.SetState(true, new Color(1.0f, 1.0f, 1.0f, 1.0f), 1.0f, new Color(1.0f, 1.0f, 1.0f, 1.0f), 2.5f);
 
             // 4. Transitions
             if (PressInTransition == null) PressInTransition = StructuredData.Create<Transition>();
             PressInTransition.Time = 0.02f;
             PressInTransition.Ease = Ease.Linear;
+            PressInTransition.SetDataInput(nameof(PressInTransition.Time), 0.02f, true);
+            PressInTransition.SetDataInput(nameof(PressInTransition.Ease), Ease.Linear, true);
+            PressInTransition.BroadcastDataInput(nameof(PressInTransition.Time));
+            PressInTransition.BroadcastDataInput(nameof(PressInTransition.Ease));
 
             if (PressOutTransition == null) PressOutTransition = StructuredData.Create<Transition>();
             PressOutTransition.Time = 0.12f;
             PressOutTransition.Ease = Ease.OutCubic;
+            PressOutTransition.SetDataInput(nameof(PressOutTransition.Time), 0.12f, true);
+            PressOutTransition.SetDataInput(nameof(PressOutTransition.Ease), Ease.OutCubic, true);
+            PressOutTransition.BroadcastDataInput(nameof(PressOutTransition.Time));
+            PressOutTransition.BroadcastDataInput(nameof(PressOutTransition.Ease));
 
             ConfigureElements();
         }

@@ -1,5 +1,7 @@
+using System.Linq;
 using System.Text;
 using UnityEngine;
+using Warudo.Core.Localization;
 using Warudo.Plugins.Core.Assets;
 using Warudo.Plugins.Core.Assets.Character;
 using Warudo.Plugins.Core.Assets.Prop;
@@ -124,10 +126,23 @@ namespace FlameStream {
             }
         }
 
-        public static void SetCharacterOverlappingAnimations(CharacterAsset character, CharacterAsset.OverlappingAnimationData[] layers) {
-            if (character == null) return;
+        public static Cysharp.Threading.Tasks.UniTask SetCharacterOverlappingAnimations(CharacterAsset character, CharacterAsset.OverlappingAnimationData[] layers) {
+            if (character == null) return Cysharp.Threading.Tasks.UniTask.CompletedTask;
 
-            character.SetDataInput(nameof(character.OverlappingAnimations), layers, true);
+            try {
+                if (IsPlaygroundMode) {
+                    Warudo.Core.Context.Service?.Toast(
+                        Warudo.Core.Server.ToastSeverity.Warning,
+                        "FINGER_ANIM_PLAYGROUND_UNSUPPORTED".Localized(),
+                        "FINGER_ANIM_PLAYGROUND_UNSUPPORTED_BODY".Localized());
+                    return Cysharp.Threading.Tasks.UniTask.CompletedTask;
+                }
+
+                character.SetDataInput(nameof(character.OverlappingAnimations), layers, true);
+            } catch (System.Exception ex) {
+                Warudo.Core.Utils.Log.Error($"[Helper] SetCharacterOverlappingAnimations failed: {ex}");
+            }
+            return Cysharp.Threading.Tasks.UniTask.CompletedTask;
         }
 
         /// <summary>
@@ -138,19 +153,14 @@ namespace FlameStream {
             if (character == null || character.OverlappingAnimations == null || index < 0 || index >= character.OverlappingAnimations.Length) return;
 
             if (IsPlaygroundMode) {
-                character.OverlappingAnimations[index].Animation = animationClipUri;
-                character.BroadcastDataInput(nameof(character.OverlappingAnimations));
-            } else {
-                character.DataInputPortCollection.SetValueAtPath($"{nameof(character.OverlappingAnimations)}.{index}.Animation", animationClipUri, true);
+                Warudo.Core.Context.Service?.Toast(
+                    Warudo.Core.Server.ToastSeverity.Warning,
+                    "FINGER_ANIM_PLAYGROUND_UNSUPPORTED".Localized(),
+                    "FINGER_ANIM_PLAYGROUND_UNSUPPORTED_BODY".Localized());
+                return;
             }
-        }
-        private static readonly System.Reflection.PropertyInfo DataInputPortDefaultValueProp = typeof(Warudo.Core.Graphs.DataInputPort).GetProperty("DefaultValue", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-        public static void SetPortDefaultValue<T>(Warudo.Core.Graphs.DataInputPort port, T value) {
-            if (port == null || DataInputPortDefaultValueProp == null) return;
-            try {
-                DataInputPortDefaultValueProp.SetValue(port, Newtonsoft.Json.JsonConvert.SerializeObject(value));
-            } catch { }
+            character.DataInputPortCollection.SetValueAtPath($"{nameof(character.OverlappingAnimations)}.{index}.Animation", animationClipUri, true);
         }
     }
 }

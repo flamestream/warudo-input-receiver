@@ -53,12 +53,6 @@ namespace FlameStream {
             SetDataInput(nameof(Color), defaultColor, true);
             SetDataInput(nameof(Glow), defaultGlow, true);
 
-            var colPort = GetDataInputPort(nameof(Color));
-            if (colPort != null) Helper.SetPortDefaultValue(colPort, defaultColor);
-
-            var glowPort = GetDataInputPort(nameof(Glow));
-            if (glowPort != null) Helper.SetPortDefaultValue(glowPort, defaultGlow);
-
             if (Transform == null) {
                 Transform = StructuredData.Create<GuideSlabTransform>();
             }
@@ -69,15 +63,6 @@ namespace FlameStream {
             Transform.SetDataInput(nameof(Transform.Position), defaultPos, true);
             Transform.SetDataInput(nameof(Transform.Rotation), defaultRot, true);
             Transform.SetDataInput(nameof(Transform.Scale), defaultScale, true);
-
-            var posPort = Transform.GetDataInputPort(nameof(Transform.Position));
-            if (posPort != null) Helper.SetPortDefaultValue(posPort, defaultPos);
-
-            var rotPort = Transform.GetDataInputPort(nameof(Transform.Rotation));
-            if (rotPort != null) Helper.SetPortDefaultValue(rotPort, defaultRot);
-
-            var scaPort = Transform.GetDataInputPort(nameof(Transform.Scale));
-            if (scaPort != null) Helper.SetPortDefaultValue(scaPort, defaultScale);
         }
     }
 

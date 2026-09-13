@@ -37,6 +37,7 @@ namespace FlameStream
                 Left.Rotation = Vector3.zero;
                 Left.Scale = Vector3.one;
             }
+            Left.HideScale();
             Left.CollapsedSelf = true;
 
             if (Right == null) {
@@ -45,6 +46,7 @@ namespace FlameStream
                 Right.Rotation = Vector3.zero;
                 Right.Scale = Vector3.one;
             }
+            Right.HideScale();
             Right.CollapsedSelf = true;
 
             Watch(nameof(Left), delegate {

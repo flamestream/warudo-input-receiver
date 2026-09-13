@@ -251,8 +251,7 @@ namespace FlameStream {
                 Vector3 restPos = isLeft ? Parent.LeftHandRestPosition : Parent.RightHandRestPosition;
                 Vector3 restRot = isLeft ? Parent.LeftHandRestRotation : Parent.RightHandRestRotation;
 
-                Vector3 handScale = isLeft ? Parent.GetLeftHandMovementScale() : Parent.GetRightHandMovementScale();
-                Vector3 deltaHand = Vector3.Scale(tr.Position, handScale);
+                Vector3 deltaHand = tr.Position;
                 Vector3 initialPos = restPos + deltaHand;
                 Vector3 initialRot = restRot + tr.Rotation;
 
@@ -322,15 +321,9 @@ Click **[Apply Transform]** when finished.
                 Vector3 anchorRot = setupAnchor.Transform.Rotation;
                 Vector3 deltaHand = anchorPos - restPos;
 
-                Vector3 handScale = isLeft ? Parent.GetLeftHandMovementScale() : Parent.GetRightHandMovementScale();
-                Vector3 unscaledDelta = new Vector3(
-                    handScale.x != 0f ? deltaHand.x / handScale.x : 0f,
-                    handScale.y != 0f ? deltaHand.y / handScale.y : 0f,
-                    handScale.z != 0f ? deltaHand.z / handScale.z : 0f
-                );
                 Vector3 deltaRot = Helper.NormalizeRotationAngles(anchorRot - restRot);
 
-                tr.Position = unscaledDelta;
+                tr.Position = deltaHand;
                 tr.Rotation = deltaRot;
                 deltaPosition = tr.Position;
                 deltaRotation = tr.Rotation;
@@ -673,12 +666,7 @@ Click **[Apply Transform]** when finished.
             out Vector3 deltaPosition,
             out Vector3 deltaRotation
         ) {
-            Vector3 deltaHand = solvedPosRig - restPosRig;
-            deltaPosition = new Vector3(
-                handScale.x != 0f ? deltaHand.x / handScale.x : 0f,
-                handScale.y != 0f ? deltaHand.y / handScale.y : 0f,
-                handScale.z != 0f ? deltaHand.z / handScale.z : 0f
-            );
+            deltaPosition = solvedPosRig - restPosRig;
             deltaRotation = Helper.NormalizeRotationAngles(solvedRotRig.eulerAngles - restRotRig);
         }
 

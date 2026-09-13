@@ -54,18 +54,6 @@ namespace FlameStream {
             SetDataInput(nameof(LengthFactor), defaultLength, true);
             SetDataInput(nameof(ThicknessFactor), defaultThickness, true);
             SetDataInput(nameof(Glow), defaultGlow, true);
-
-            var colPort = GetDataInputPort(nameof(Color));
-            if (colPort != null) Helper.SetPortDefaultValue(colPort, defaultColor);
-
-            var lenPort = GetDataInputPort(nameof(LengthFactor));
-            if (lenPort != null) Helper.SetPortDefaultValue(lenPort, defaultLength);
-
-            var thkPort = GetDataInputPort(nameof(ThicknessFactor));
-            if (thkPort != null) Helper.SetPortDefaultValue(thkPort, defaultThickness);
-
-            var glowPort = GetDataInputPort(nameof(Glow));
-            if (glowPort != null) Helper.SetPortDefaultValue(glowPort, defaultGlow);
         }
     }
 

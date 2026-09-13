@@ -52,4 +52,6 @@ This directory contains key architecture notes, integration patterns, build pipe
    - Duplicate `[Section]` attributes cause duplicate section UI banners.
    - `StructuredData` port defaults, constructor reflection, and Warudo UI "Reset" button mechanics.
    - Visual calibration architecture: decoupled origin/guides, automation triggers, and milestone thresholds.
-
+   - Rest-relative hand slab & surface normal orientation (Gotcha #39).
+   - `SetCharacterOverlappingAnimations` crash in Playground mode (Roslyn `RecursivelySetData` failure) and `IsPlaygroundMode` branch fix (Gotcha #40).
+   - UMod security scanner blocks `System.Reflection`; `SetPortDefaultValue` removed entirely (Gotcha #41).

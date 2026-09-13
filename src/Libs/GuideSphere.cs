@@ -45,15 +45,6 @@ namespace FlameStream {
             SetDataInput(nameof(Color), defaultColor, true);
             SetDataInput(nameof(RadiusFactor), defaultRadius, true);
             SetDataInput(nameof(Glow), defaultGlow, true);
-
-            var colPort = GetDataInputPort(nameof(Color));
-            if (colPort != null) Helper.SetPortDefaultValue(colPort, defaultColor);
-
-            var radPort = GetDataInputPort(nameof(RadiusFactor));
-            if (radPort != null) Helper.SetPortDefaultValue(radPort, defaultRadius);
-
-            var glowPort = GetDataInputPort(nameof(Glow));
-            if (glowPort != null) Helper.SetPortDefaultValue(glowPort, defaultGlow);
         }
     }
 
