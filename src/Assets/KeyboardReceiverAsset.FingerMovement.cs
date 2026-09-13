@@ -28,6 +28,8 @@ namespace FlameStream
         [Label("FINGER_MOVEMENT_DEFINITIONS")]
         public KeyboardFingerMovementCollection FingerMovementDefinitions;
 
+        public KeyboardKeyBindingGenerator BindingGenerator => FingerMovementDefinitions?.Generator;
+
         public KeyboardKeyBinding[] MovementDefinitions {
             get => FingerMovementDefinitions?.MovementDefinitions ?? new KeyboardKeyBinding[0];
             set {
@@ -93,13 +95,15 @@ namespace FlameStream
                 FingerTransitions = StructuredData.Create<KeyboardFingerTransitions>();
                 FingerTransitions.CollapsedSelf = true;
             }
-            FingerTransitions.Parent = this;
-
             if (FingerMovementDefinitions == null) {
                 FingerMovementDefinitions = StructuredData.Create<KeyboardFingerMovementCollection>();
                 FingerMovementDefinitions.CollapsedSelf = true;
             }
             FingerMovementDefinitions.Parent = this;
+            if (FingerMovementDefinitions.Generator != null) {
+                FingerMovementDefinitions.Generator.Parent = this;
+                FingerMovementDefinitions.Generator.UpdateStatus();
+            }
 
             Watch(nameof(FingerAnimations), delegate {
                 if (FingerAnimations != null) {
@@ -117,6 +121,10 @@ namespace FlameStream
             Watch(nameof(FingerMovementDefinitions), delegate {
                 if (FingerMovementDefinitions != null) {
                     FingerMovementDefinitions.Parent = this;
+                    if (FingerMovementDefinitions.Generator != null) {
+                        FingerMovementDefinitions.Generator.Parent = this;
+                        FingerMovementDefinitions.Generator.UpdateStatus();
+                    }
                 }
                 RefreshKeyBindingsParent();
             });
@@ -672,6 +680,39 @@ namespace FlameStream
             return rootTr != null ? rootTr.rotation * normal : normal;
         }
 
+        public void OnVirtualKeyHandAlignmentReferenceChanged(VirtualKeyDefinition changedKey) {
+            if (changedKey == null || !changedKey.IsHandAlignmentReference) return;
+            bool isLeft = changedKey.AssignedFinger.IsLeftHand();
+            if (VirtualKeysCollection?.Keys == null) return;
+            foreach (var other in VirtualKeysCollection.Keys) {
+                if (other == null || other == changedKey) continue;
+                if (other.AssignedFinger.IsLeftHand() == isLeft && other.IsHandAlignmentReference) {
+                    other.IsHandAlignmentReference = false;
+                    other.SetDataInput(nameof(other.IsHandAlignmentReference), false, true);
+                    other.BroadcastDataInput(nameof(other.IsHandAlignmentReference));
+                    other.RequestUiRefresh();
+                }
+            }
+            BindingGenerator?.UpdateStatus();
+        }
+
+        public VirtualKeyDefinition GetHandAlignmentReferenceKey(bool isLeftHand) {
+            if (VirtualKeysCollection?.Keys == null) return null;
+            // 1. Look for explicit reference key
+            var refKey = VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.AssignedFinger.IsLeftHand() == isLeftHand && k.IsHandAlignmentReference);
+            if (refKey != null) return refKey;
+            // 2. Fallback to first key in list for that hand
+            return VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.AssignedFinger.IsLeftHand() == isLeftHand);
+        }
+
+        public Vector3 GetHandAlignmentReferenceBedNormalWorld(bool isLeftHand, VirtualKeyAnchor fallbackAnchor = VirtualKeyAnchor.KeyboardRoot) {
+            var refKey = GetHandAlignmentReferenceKey(isLeftHand);
+            if (refKey != null && TryGetKeyCenterAndNormal(refKey, out _, out Vector3 refNormal)) {
+                return refNormal;
+            }
+            return GetKeyboardBedNormalWorld(fallbackAnchor);
+        }
+
         public void SetupAllFingertipVisualSetupTransforms() {
             var offsets = FingerMovementDefinitions?.FingertipOffsets;
             if (offsets == null) return;
@@ -917,7 +958,10 @@ namespace FlameStream
 
             var list = new List<KeyboardKeyBinding>();
 
-            bool tiltMode = (FingerMovementDefinitions?.GenerationMode ?? KeyGenerationMode.TiltToKeySurface) == KeyGenerationMode.TiltToKeySurface;
+            bool tiltMode = (BindingGenerator?.GenerationMode ?? KeyGenerationMode.TiltToKeySurface) == KeyGenerationMode.TiltToKeySurface;
+
+            Vector3 leftBedNormal = GetHandAlignmentReferenceBedNormalWorld(true, VirtualKeyAnchor.LeftHand);
+            Vector3 rightBedNormal = GetHandAlignmentReferenceBedNormalWorld(false, VirtualKeyAnchor.RightHand);
 
             foreach (var k in VirtualKeysCollection.Keys) {
                 if (k == null) continue;
@@ -936,7 +980,7 @@ namespace FlameStream
                 Vector3 elbowPosWorld = isLeftHand ? leftElbowWorld : rightElbowWorld;
                 Vector3 dLocal = tipCurledLocal[fingerIdx];
                 Vector3 handScale = isLeftHand ? GetLeftHandMovementScale() : GetRightHandMovementScale();
-                Vector3 bedNormalWorld = GetKeyboardBedNormalWorld(k.AttachmentAnchor);
+                Vector3 bedNormalWorld = isLeftHand ? leftBedNormal : rightBedNormal;
 
                 // 2. Execute alignment math
                 KeyboardKeyBinding.SolveKeyAlignment(

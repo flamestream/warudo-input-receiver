@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using DG.Tweening;
 using UnityEngine;
 using Warudo.Core;
@@ -1626,10 +1627,25 @@ namespace FlameStream
                 }
             }
 
+            // Set default hand alignment reference keys (F for Left, J for Right, or W/K fallback)
+            var defaultLeftRef = list.FirstOrDefault(k => k.AssignedFinger.IsLeftHand() && k.Key == VKCode.F)
+                              ?? list.FirstOrDefault(k => k.AssignedFinger.IsLeftHand() && k.Key == VKCode.W)
+                              ?? list.FirstOrDefault(k => k.AssignedFinger.IsLeftHand() && k.Key == VKCode.D);
+            if (defaultLeftRef != null) {
+                defaultLeftRef.IsHandAlignmentReference = true;
+            }
+
+            var defaultRightRef = list.FirstOrDefault(k => !k.AssignedFinger.IsLeftHand() && k.Key == VKCode.J)
+                               ?? list.FirstOrDefault(k => !k.AssignedFinger.IsLeftHand() && k.Key == VKCode.K);
+            if (defaultRightRef != null) {
+                defaultRightRef.IsHandAlignmentReference = true;
+            }
+
             DestroyAllVirtualKeyVisuals();
             VirtualKeys = list.ToArray();
             VirtualKeysCollection?.BroadcastDataInput(nameof(VirtualKeysCollection.Keys));
             BroadcastDataInput(nameof(VirtualKeysCollection));
+            BindingGenerator?.UpdateStatus();
 
             if (EnableFloatingKeys && IsEnabled) {
                 UpdateFloatingKeysState();

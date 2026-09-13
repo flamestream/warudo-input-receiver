@@ -698,10 +698,10 @@ Click **[Apply Transform]** when finished.
                 dLocal = Quaternion.Inverse(handRot) * (tipWorld - handPos);
             }
 
-            bool tiltMode = (Parent?.FingerMovementDefinitions?.GenerationMode ?? KeyGenerationMode.TiltToKeySurface) == KeyGenerationMode.TiltToKeySurface;
+            bool tiltMode = (Parent?.BindingGenerator?.GenerationMode ?? KeyGenerationMode.TiltToKeySurface) == KeyGenerationMode.TiltToKeySurface;
             var keyDef = Parent?.VirtualKeysCollection?.Keys?.FirstOrDefault(k => k != null && k.Key == this.Key && k.AssignedFinger == this.Finger)
                       ?? Parent?.VirtualKeysCollection?.Keys?.FirstOrDefault(k => k != null && k.Key == this.Key);
-            Vector3 bedNormal = Parent?.GetKeyboardBedNormalWorld(keyDef?.AttachmentAnchor ?? VirtualKeyAnchor.KeyboardRoot) ?? Vector3.up;
+            Vector3 bedNormal = Parent?.GetHandAlignmentReferenceBedNormalWorld(Finger.IsLeftHand(), keyDef?.AttachmentAnchor ?? VirtualKeyAnchor.KeyboardRoot) ?? Vector3.up;
 
             SolveKeyAlignment(
                 handPos,

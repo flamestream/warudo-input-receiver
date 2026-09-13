@@ -14,24 +14,29 @@ namespace FlameStream
 
     public class KeyboardFingerMovementCollection : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData
     {
-        [DataInput(5)]
-        [Label("KEY_GENERATION_MODE")]
-        public KeyGenerationMode GenerationMode = KeyGenerationMode.TiltToKeySurface;
-
-        [DataInput(6)]
-        [Label("FINGERTIP_OFFSETS")]
-        public KeyboardFingertipOffsets FingertipOffsets;
-
-        [Trigger(10)]
-        [Label("AUTO_GENERATE_KEY_BINDINGS")]
-        [Description("AUTO_GENERATE_KEY_BINDINGS_DESC")]
-        public void TriggerAutoGenerateKeyBindings() {
-            Parent?.AutoGenerateKeyBindingsFromFloatingKeys();
-        }
+        [DataInput(10)]
+        [Label("KEY_BINDING_GENERATOR")]
+        public KeyboardKeyBindingGenerator Generator;
 
         [DataInput(20)]
         [Label("KEY_MOVEMENT_DEFINITIONS")]
         public KeyboardKeyBinding[] MovementDefinitions = new KeyboardKeyBinding[0];
+
+        // Compatibility forwarding to Generator
+        public KeyGenerationMode GenerationMode {
+            get => Generator?.GenerationMode ?? KeyGenerationMode.TiltToKeySurface;
+            set {
+                if (Generator != null) {
+                    Generator.GenerationMode = value;
+                }
+            }
+        }
+
+        public KeyboardFingertipOffsets FingertipOffsets => Generator?.FingertipOffsets;
+
+        public void TriggerAutoGenerateKeyBindings() {
+            Generator?.TriggerAutoGenerateKeyBindings();
+        }
 
         public string GetHeader() {
             int count = MovementDefinitions != null ? MovementDefinitions.Length : 0;
@@ -41,18 +46,19 @@ namespace FlameStream
         protected override void OnCreate() {
             base.OnCreate();
             CollapsedSelf = true;
-            if (FingertipOffsets == null) {
-                FingertipOffsets = StructuredData.Create<KeyboardFingertipOffsets>();
-                FingertipOffsets.Parent = Parent;
-                FingertipOffsets.CollapsedSelf = true;
+            if (Generator == null) {
+                Generator = StructuredData.Create<KeyboardKeyBindingGenerator>();
+                Generator.Parent = Parent;
+                Generator.CollapsedSelf = true;
             }
+            Watch(nameof(Generator), delegate {
+                if (Generator != null) {
+                    Generator.Parent = Parent;
+                    Generator.UpdateStatus();
+                }
+            });
             Watch(nameof(MovementDefinitions), delegate {
                 Parent?.RefreshKeyBindingsParent();
-            });
-            Watch(nameof(FingertipOffsets), delegate {
-                if (FingertipOffsets != null) {
-                    FingertipOffsets.Parent = Parent;
-                }
             });
         }
     }

@@ -65,6 +65,11 @@ namespace FlameStream
         [Label("ASSIGNED_FINGER")]
         public KeyboardFinger AssignedFinger = KeyboardFinger.LeftIndex;
 
+        [DataInput(38)]
+        [Label("HAND_ALIGNMENT_REFERENCE")]
+        [Description("HAND_ALIGNMENT_REFERENCE_DESC")]
+        public bool IsHandAlignmentReference = false;
+
         [DataInput(40)]
         [Label("TRANSFORM")]
         [Description("VIRTUAL_KEY_TRANSFORM_DESC")]
@@ -175,8 +180,11 @@ namespace FlameStream
 
         public string GetHeader() {
             var label = string.IsNullOrEmpty(DisplayLabel) ? Key.ToString() : $"{Key} (\"{DisplayLabel}\")";
-            var anchorTag = AttachmentAnchor == VirtualKeyAnchor.LeftHand ? "🫲 L" :
-                            AttachmentAnchor == VirtualKeyAnchor.RightHand ? "🫱 R" : "⌨️ Root";
+            var anchorTag = AttachmentAnchor == VirtualKeyAnchor.LeftHand ? "🫲" :
+                            AttachmentAnchor == VirtualKeyAnchor.RightHand ? "🫱" : "⌨️";
+            if (IsHandAlignmentReference) {
+                anchorTag += "🎯";
+            }
             var pos = Transform != null ? Transform.Position : Vector3.zero;
             var listeningTag = IsListeningForKey ? " ⏳[LISTENING]" : "";
             var locateTag = IsLocating ? " ✨[LOCATING]" : "";
@@ -250,6 +258,21 @@ namespace FlameStream
                     Parent.RebuildVirtualKeyMesh(this);
                 }
             });
+            Watch(nameof(IsHandAlignmentReference), delegate {
+                if (IsHandAlignmentReference && Parent != null) {
+                    Parent.OnVirtualKeyHandAlignmentReferenceChanged(this);
+                }
+                UpdateDebugButtonState();
+                BroadcastDataInput(nameof(Transform));
+                Parent?.BindingGenerator?.UpdateStatus();
+                RequestUiRefresh();
+            });
+            Watch(nameof(AssignedFinger), delegate {
+                if (IsHandAlignmentReference && Parent != null) {
+                    Parent.OnVirtualKeyHandAlignmentReferenceChanged(this);
+                }
+                Parent?.BindingGenerator?.UpdateStatus();
+            });
         }
 
         public void SyncUI() {
@@ -275,6 +298,9 @@ namespace FlameStream
             base.OnDestroy();
             if (Parent != null && KeyInput != null && Parent.ActiveKeyListeningTarget == (IKeyListeningTarget)KeyInput) {
                 Parent.CancelKeyListening();
+            }
+            if (Parent != null && IsHandAlignmentReference) {
+                Parent.BindingGenerator?.UpdateStatus();
             }
             Transform?.DestroyAnchor();
             DestroyVisuals();

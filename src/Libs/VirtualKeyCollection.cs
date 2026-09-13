@@ -7,13 +7,15 @@ namespace FlameStream
 {
     public class VirtualKeyPresetConfig : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData
     {
+        [Markdown(5)]
+        public string Notice = $"⚠️ *{"APPLY_KEYS_LAYOUT_PRESET_NOTICE".Localized()}*";
+
         [DataInput(10)]
         [Label("KEYS_LAYOUT_PRESET")]
         public VirtualKeyLayoutPreset Preset = VirtualKeyLayoutPreset.GamingWASDExtended;
 
         [Trigger(20)]
         [Label("APPLY_KEYS_LAYOUT_PRESET")]
-        [Description("APPLY_KEYS_LAYOUT_PRESET_DESC")]
         public void TriggerApplyKeysLayoutPreset() {
             Parent?.ApplyVirtualKeyPreset(Preset);
         }
@@ -23,6 +25,7 @@ namespace FlameStream
         protected override void OnCreate() {
             base.OnCreate();
             CollapsedSelf = true;
+            Notice = $"⚠️ *{"APPLY_KEYS_LAYOUT_PRESET_NOTICE".Localized()}*";
         }
     }
 
