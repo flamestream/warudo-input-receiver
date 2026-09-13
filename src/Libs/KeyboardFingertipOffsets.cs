@@ -39,47 +39,47 @@ namespace FlameStream
         [DataInput(20)]
         [Label("UNIFIED_FINGERTIP_OFFSET")]
         [Description("FINGERTIP_OFFSET_DESC")]
-        public Vector3 UnifiedOffset = new Vector3(0f, 0f, 0.012f);
+        public FingertipOffsetVisualSetupTransform UnifiedOffset;
 
         [DataInput(30)]
         [Label("LEFT_THUMB_OFFSET")]
-        public Vector3 LeftThumb = new Vector3(0f, 0f, 0.012f);
+        public FingertipOffsetVisualSetupTransform LeftThumb;
 
         [DataInput(31)]
         [Label("LEFT_INDEX_OFFSET")]
-        public Vector3 LeftIndex = new Vector3(0f, 0f, 0.012f);
+        public FingertipOffsetVisualSetupTransform LeftIndex;
 
         [DataInput(32)]
         [Label("LEFT_MIDDLE_OFFSET")]
-        public Vector3 LeftMiddle = new Vector3(0f, 0f, 0.012f);
+        public FingertipOffsetVisualSetupTransform LeftMiddle;
 
         [DataInput(33)]
         [Label("LEFT_RING_OFFSET")]
-        public Vector3 LeftRing = new Vector3(0f, 0f, 0.012f);
+        public FingertipOffsetVisualSetupTransform LeftRing;
 
         [DataInput(34)]
         [Label("LEFT_PINKY_OFFSET")]
-        public Vector3 LeftPinky = new Vector3(0f, 0f, 0.012f);
+        public FingertipOffsetVisualSetupTransform LeftPinky;
 
         [DataInput(40)]
         [Label("RIGHT_THUMB_OFFSET")]
-        public Vector3 RightThumb = new Vector3(0f, 0f, 0.012f);
+        public FingertipOffsetVisualSetupTransform RightThumb;
 
         [DataInput(41)]
         [Label("RIGHT_INDEX_OFFSET")]
-        public Vector3 RightIndex = new Vector3(0f, 0f, 0.012f);
+        public FingertipOffsetVisualSetupTransform RightIndex;
 
         [DataInput(42)]
         [Label("RIGHT_MIDDLE_OFFSET")]
-        public Vector3 RightMiddle = new Vector3(0f, 0f, 0.012f);
+        public FingertipOffsetVisualSetupTransform RightMiddle;
 
         [DataInput(43)]
         [Label("RIGHT_RING_OFFSET")]
-        public Vector3 RightRing = new Vector3(0f, 0f, 0.012f);
+        public FingertipOffsetVisualSetupTransform RightRing;
 
         [DataInput(44)]
         [Label("RIGHT_PINKY_OFFSET")]
-        public Vector3 RightPinky = new Vector3(0f, 0f, 0.012f);
+        public FingertipOffsetVisualSetupTransform RightPinky;
 
         private static readonly string[] FingerPortNames = new[] {
             nameof(LeftThumb), nameof(LeftIndex), nameof(LeftMiddle), nameof(LeftRing), nameof(LeftPinky),
@@ -88,57 +88,60 @@ namespace FlameStream
 
         public string GetHeader() {
             if (Mode == FingertipOffsetMode.Unified) {
-                return $"{"FINGERTIP_OFFSETS".Localized()} (Unified: {UnifiedOffset.z * 1000f:F1}mm)";
+                float z = UnifiedOffset != null ? UnifiedOffset.Position.z : 0f;
+                return $"{"FINGERTIP_OFFSETS".Localized()} (Unified: {z * 1000f:F1}mm)";
             }
             return $"{"FINGERTIP_OFFSETS".Localized()} (Per-Finger)";
         }
 
         public Vector3 GetOffset(KeyboardFinger finger) {
             switch (finger) {
-                case KeyboardFinger.LeftThumb: return LeftThumb;
-                case KeyboardFinger.LeftIndex: return LeftIndex;
-                case KeyboardFinger.LeftMiddle: return LeftMiddle;
-                case KeyboardFinger.LeftRing: return LeftRing;
-                case KeyboardFinger.LeftPinky: return LeftPinky;
-                case KeyboardFinger.RightThumb: return RightThumb;
-                case KeyboardFinger.RightIndex: return RightIndex;
-                case KeyboardFinger.RightMiddle: return RightMiddle;
-                case KeyboardFinger.RightRing: return RightRing;
-                case KeyboardFinger.RightPinky: return RightPinky;
+                case KeyboardFinger.LeftThumb: return LeftThumb != null ? LeftThumb.Position : Vector3.zero;
+                case KeyboardFinger.LeftIndex: return LeftIndex != null ? LeftIndex.Position : Vector3.zero;
+                case KeyboardFinger.LeftMiddle: return LeftMiddle != null ? LeftMiddle.Position : Vector3.zero;
+                case KeyboardFinger.LeftRing: return LeftRing != null ? LeftRing.Position : Vector3.zero;
+                case KeyboardFinger.LeftPinky: return LeftPinky != null ? LeftPinky.Position : Vector3.zero;
+                case KeyboardFinger.RightThumb: return RightThumb != null ? RightThumb.Position : Vector3.zero;
+                case KeyboardFinger.RightIndex: return RightIndex != null ? RightIndex.Position : Vector3.zero;
+                case KeyboardFinger.RightMiddle: return RightMiddle != null ? RightMiddle.Position : Vector3.zero;
+                case KeyboardFinger.RightRing: return RightRing != null ? RightRing.Position : Vector3.zero;
+                case KeyboardFinger.RightPinky: return RightPinky != null ? RightPinky.Position : Vector3.zero;
                 default:
+                    var uPos = UnifiedOffset != null ? UnifiedOffset.Position : Vector3.zero;
                     return finger.IsLeftHand()
-                        ? UnifiedOffset
-                        : new Vector3(-UnifiedOffset.x, UnifiedOffset.y, UnifiedOffset.z);
+                        ? uPos
+                        : new Vector3(-uPos.x, uPos.y, uPos.z);
             }
         }
 
         public void SyncUnifiedToIndividual() {
-            Vector3 leftOffset = UnifiedOffset;
-            Vector3 rightOffset = new Vector3(-UnifiedOffset.x, UnifiedOffset.y, UnifiedOffset.z);
+            if (UnifiedOffset == null) return;
+            Vector3 leftPos = UnifiedOffset.Position;
+            Vector3 rightPos = new Vector3(-leftPos.x, leftPos.y, leftPos.z);
 
-            LeftThumb = leftOffset;
-            LeftIndex = leftOffset;
-            LeftMiddle = leftOffset;
-            LeftRing = leftOffset;
-            LeftPinky = leftOffset;
+            if (LeftThumb != null) LeftThumb.Position = leftPos;
+            if (LeftIndex != null) LeftIndex.Position = leftPos;
+            if (LeftMiddle != null) LeftMiddle.Position = leftPos;
+            if (LeftRing != null) LeftRing.Position = leftPos;
+            if (LeftPinky != null) LeftPinky.Position = leftPos;
 
-            RightThumb = rightOffset;
-            RightIndex = rightOffset;
-            RightMiddle = rightOffset;
-            RightRing = rightOffset;
-            RightPinky = rightOffset;
+            if (RightThumb != null) RightThumb.Position = rightPos;
+            if (RightIndex != null) RightIndex.Position = rightPos;
+            if (RightMiddle != null) RightMiddle.Position = rightPos;
+            if (RightRing != null) RightRing.Position = rightPos;
+            if (RightPinky != null) RightPinky.Position = rightPos;
 
-            SetDataInput(nameof(LeftThumb), leftOffset, true);
-            SetDataInput(nameof(LeftIndex), leftOffset, true);
-            SetDataInput(nameof(LeftMiddle), leftOffset, true);
-            SetDataInput(nameof(LeftRing), leftOffset, true);
-            SetDataInput(nameof(LeftPinky), leftOffset, true);
+            SetDataInput(nameof(LeftThumb), LeftThumb, true);
+            SetDataInput(nameof(LeftIndex), LeftIndex, true);
+            SetDataInput(nameof(LeftMiddle), LeftMiddle, true);
+            SetDataInput(nameof(LeftRing), LeftRing, true);
+            SetDataInput(nameof(LeftPinky), LeftPinky, true);
 
-            SetDataInput(nameof(RightThumb), rightOffset, true);
-            SetDataInput(nameof(RightIndex), rightOffset, true);
-            SetDataInput(nameof(RightMiddle), rightOffset, true);
-            SetDataInput(nameof(RightRing), rightOffset, true);
-            SetDataInput(nameof(RightPinky), rightOffset, true);
+            SetDataInput(nameof(RightThumb), RightThumb, true);
+            SetDataInput(nameof(RightIndex), RightIndex, true);
+            SetDataInput(nameof(RightMiddle), RightMiddle, true);
+            SetDataInput(nameof(RightRing), RightRing, true);
+            SetDataInput(nameof(RightPinky), RightPinky, true);
 
             foreach (var name in FingerPortNames) {
                 BroadcastDataInput(name);
@@ -165,13 +168,69 @@ namespace FlameStream
             } catch { }
         }
 
+        public FingertipOffsetVisualSetupTransform GetFingerTransform(KeyboardFinger finger) {
+            switch (finger) {
+                case KeyboardFinger.LeftThumb: return LeftThumb;
+                case KeyboardFinger.LeftIndex: return LeftIndex;
+                case KeyboardFinger.LeftMiddle: return LeftMiddle;
+                case KeyboardFinger.LeftRing: return LeftRing;
+                case KeyboardFinger.LeftPinky: return LeftPinky;
+                case KeyboardFinger.RightThumb: return RightThumb;
+                case KeyboardFinger.RightIndex: return RightIndex;
+                case KeyboardFinger.RightMiddle: return RightMiddle;
+                case KeyboardFinger.RightRing: return RightRing;
+                case KeyboardFinger.RightPinky: return RightPinky;
+                default: return null;
+            }
+        }
+
+        public void EnsureTransforms() {
+            if (UnifiedOffset == null) {
+                UnifiedOffset = StructuredData.Create<FingertipOffsetVisualSetupTransform>();
+                UnifiedOffset.TargetFinger = KeyboardFinger.LeftIndex;
+                UnifiedOffset.LocalizationKey = "FINGERTIP_OFFSET_UNIFIED";
+            }
+            UnifiedOffset.SetHideMirrorToOppositeHand(true);
+
+            EnsureFingerTransform(ref LeftThumb, KeyboardFinger.LeftThumb, "FINGERTIP_OFFSET_LEFT_THUMB");
+            EnsureFingerTransform(ref LeftIndex, KeyboardFinger.LeftIndex, "FINGERTIP_OFFSET_LEFT_INDEX");
+            EnsureFingerTransform(ref LeftMiddle, KeyboardFinger.LeftMiddle, "FINGERTIP_OFFSET_LEFT_MIDDLE");
+            EnsureFingerTransform(ref LeftRing, KeyboardFinger.LeftRing, "FINGERTIP_OFFSET_LEFT_RING");
+            EnsureFingerTransform(ref LeftPinky, KeyboardFinger.LeftPinky, "FINGERTIP_OFFSET_LEFT_PINKY");
+
+            EnsureFingerTransform(ref RightThumb, KeyboardFinger.RightThumb, "FINGERTIP_OFFSET_RIGHT_THUMB");
+            EnsureFingerTransform(ref RightIndex, KeyboardFinger.RightIndex, "FINGERTIP_OFFSET_RIGHT_INDEX");
+            EnsureFingerTransform(ref RightMiddle, KeyboardFinger.RightMiddle, "FINGERTIP_OFFSET_RIGHT_MIDDLE");
+            EnsureFingerTransform(ref RightRing, KeyboardFinger.RightRing, "FINGERTIP_OFFSET_RIGHT_RING");
+            EnsureFingerTransform(ref RightPinky, KeyboardFinger.RightPinky, "FINGERTIP_OFFSET_RIGHT_PINKY");
+
+            foreach (var name in FingerPortNames) {
+                if (System.Enum.TryParse<KeyboardFinger>(name, out var finger)) {
+                    var tr = GetFingerTransform(finger);
+                    if (tr != null) {
+                        tr.SetHideMirrorToOppositeHand(false);
+                    }
+                }
+            }
+        }
+
+        private void EnsureFingerTransform(ref FingertipOffsetVisualSetupTransform tr, KeyboardFinger finger, string locKey) {
+            if (tr == null) {
+                tr = StructuredData.Create<FingertipOffsetVisualSetupTransform>();
+            }
+            tr.TargetFinger = finger;
+            tr.LocalizationKey = locKey;
+        }
+
         protected override void OnCreate() {
             base.OnCreate();
             CollapsedSelf = true;
+            EnsureTransforms();
 
             Watch(nameof(Mode), delegate {
                 SyncUI();
                 RequestUiRefresh();
+                Parent?.SetupAllFingertipVisualSetupTransforms();
             });
 
             Watch(nameof(UnifiedOffset), delegate {

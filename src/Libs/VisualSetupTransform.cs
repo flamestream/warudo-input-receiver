@@ -213,7 +213,7 @@ namespace FlameStream {
             setupAnchor = null;
         }
 
-        public void EnterVisualSetup(bool isNavigationWanted) {
+        public virtual void EnterVisualSetup(bool isNavigationWanted) {
             if (InVisualSetupMode) return;
             InVisualSetupMode = true;
             OnEnterVisualSetup?.Invoke(this);

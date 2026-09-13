@@ -127,17 +127,23 @@ namespace FlameStream
             RefreshKeyBindingsParent();
         }
 
+        public KeyboardFinger? activeVisualSetupFinger = null;
+
         public void RefreshKeyBindingsParent() {
-            if (KeyBindings == null) return;
-            for (int i = 0; i < KeyBindings.Length; i++) {
-                if (KeyBindings[i] != null) {
-                    KeyBindings[i].Parent = this;
-                    KeyBindings[i].SetupTransformCallbacks();
+            if (KeyBindings != null) {
+                for (int i = 0; i < KeyBindings.Length; i++) {
+                    if (KeyBindings[i] != null) {
+                        KeyBindings[i].Parent = this;
+                        KeyBindings[i].SetupTransformCallbacks();
+                    }
                 }
             }
+            SetupAllFingertipVisualSetupTransforms();
         }
 
         void OnDestroyFingerMovement() {
+            activeVisualSetupFinger = null;
+
             leftHandPosTween?.Kill(false);
             leftHandRotTween?.Kill(false);
             rightHandPosTween?.Kill(false);
@@ -458,7 +464,10 @@ namespace FlameStream
             } else if (Character.OverlappingAnimations != null) {
                 for (int f = 0; f < 10; f++) {
                     KeyboardFinger finger = (KeyboardFinger)f;
-                    ApplyFingerLayerWeight(finger, f, targetFingerWeights[f]);
+                    float weight = (activeVisualSetupFinger.HasValue && activeVisualSetupFinger.Value == finger)
+                        ? 1.0f
+                        : targetFingerWeights[f];
+                    ApplyFingerLayerWeight(finger, f, weight);
                 }
             }
         }
@@ -620,41 +629,28 @@ namespace FlameStream
             }
         }
 
+        public KeyboardFinger GetOppositeHandFinger(KeyboardFinger finger) {
+            switch (finger) {
+                case KeyboardFinger.LeftThumb: return KeyboardFinger.RightThumb;
+                case KeyboardFinger.LeftIndex: return KeyboardFinger.RightIndex;
+                case KeyboardFinger.LeftMiddle: return KeyboardFinger.RightMiddle;
+                case KeyboardFinger.LeftRing: return KeyboardFinger.RightRing;
+                case KeyboardFinger.LeftPinky: return KeyboardFinger.RightPinky;
+                case KeyboardFinger.RightThumb: return KeyboardFinger.LeftThumb;
+                case KeyboardFinger.RightIndex: return KeyboardFinger.LeftIndex;
+                case KeyboardFinger.RightMiddle: return KeyboardFinger.LeftMiddle;
+                case KeyboardFinger.RightRing: return KeyboardFinger.LeftRing;
+                case KeyboardFinger.RightPinky: return KeyboardFinger.LeftPinky;
+                default: return finger;
+            }
+        }
+
         public Vector3 GetFingerTipWorldPosition(Animator anim, KeyboardFinger finger) {
             Vector3 offset = FingerMovementDefinitions?.FingertipOffsets?.GetOffset(finger) ?? new Vector3(0f, 0f, 0.012f);
             var distalBone = GetDistalBoneForFinger(finger);
             var distalTransform = anim != null ? anim.GetBoneTransform(distalBone) : null;
             if (distalTransform != null) {
-                Vector3 basePos = distalTransform.position;
-                var interBone = GetIntermediateBoneForFinger(finger);
-                var interTransform = anim.GetBoneTransform(interBone);
-
-                Vector3 F = Vector3.forward;
-                if (interTransform != null) {
-                    Vector3 delta = basePos - interTransform.position;
-                    if (delta.sqrMagnitude > 0.00001f) {
-                        F = delta.normalized;
-                    }
-                } else if (distalTransform.childCount > 0) {
-                    Vector3 delta = distalTransform.GetChild(0).position - basePos;
-                    if (delta.sqrMagnitude > 0.00001f) {
-                        F = delta.normalized;
-                    }
-                }
-
-                var handBone = finger.IsLeftHand() ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand;
-                var handTransform = anim.GetBoneTransform(handBone);
-                Vector3 palmDown = handTransform != null ? -handTransform.up : Vector3.down;
-                Vector3 D = Vector3.ProjectOnPlane(palmDown, F).normalized;
-                if (D.sqrMagnitude < 0.001f) {
-                    D = Vector3.ProjectOnPlane(Vector3.down, F).normalized;
-                }
-                if (D.sqrMagnitude < 0.001f) {
-                    D = Vector3.down;
-                }
-                Vector3 L = Vector3.Cross(F, D).normalized;
-
-                return basePos + (offset.x * L) + (offset.y * D) + (offset.z * F);
+                return distalTransform.TransformPoint(offset);
             }
 
             var fallbackHandBone = finger.IsLeftHand() ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand;
@@ -674,6 +670,96 @@ namespace FlameStream
             }
             Vector3 normal = rot * Vector3.up;
             return rootTr != null ? rootTr.rotation * normal : normal;
+        }
+
+        public void SetupAllFingertipVisualSetupTransforms() {
+            var offsets = FingerMovementDefinitions?.FingertipOffsets;
+            if (offsets == null) return;
+            offsets.EnsureTransforms();
+
+            SetupFingertipVisualSetupTransform(offsets.UnifiedOffset, KeyboardFinger.LeftIndex, true);
+            SetupFingertipVisualSetupTransform(offsets.LeftThumb, KeyboardFinger.LeftThumb, false);
+            SetupFingertipVisualSetupTransform(offsets.LeftIndex, KeyboardFinger.LeftIndex, false);
+            SetupFingertipVisualSetupTransform(offsets.LeftMiddle, KeyboardFinger.LeftMiddle, false);
+            SetupFingertipVisualSetupTransform(offsets.LeftRing, KeyboardFinger.LeftRing, false);
+            SetupFingertipVisualSetupTransform(offsets.LeftPinky, KeyboardFinger.LeftPinky, false);
+
+            SetupFingertipVisualSetupTransform(offsets.RightThumb, KeyboardFinger.RightThumb, false);
+            SetupFingertipVisualSetupTransform(offsets.RightIndex, KeyboardFinger.RightIndex, false);
+            SetupFingertipVisualSetupTransform(offsets.RightMiddle, KeyboardFinger.RightMiddle, false);
+            SetupFingertipVisualSetupTransform(offsets.RightRing, KeyboardFinger.RightRing, false);
+            SetupFingertipVisualSetupTransform(offsets.RightPinky, KeyboardFinger.RightPinky, false);
+        }
+
+        private void SetupFingertipVisualSetupTransform(FingertipOffsetVisualSetupTransform tr, KeyboardFinger finger, bool isUnified) {
+            if (tr == null) return;
+
+            tr.OnEnterVisualSetup = (transform) => {
+                activeVisualSetupFinger = finger;
+                int fIdx = (int)finger;
+                if (fIdx >= 0 && fIdx < fingerTweens.Length) {
+                    fingerTweens[fIdx]?.Kill(false);
+                }
+                if (Character?.OverlappingAnimations != null) {
+                    var layerId = GetFingerLayerId(finger);
+                    var layerData = Array.Find(Character.OverlappingAnimations, a => a.CustomLayerID == layerId);
+                    if (layerData != null) {
+                        int animancerLayerIdx = GetAnimancerLayerIndex(layerData);
+                        if (animancerLayerIdx >= 0) {
+                            SetAnimancerLayerWeight(animancerLayerIdx, 1.0f);
+                        }
+                    }
+                }
+            };
+
+            tr.OnMirrorToOppositeHand = (sourceTr) => {
+                if (FingerMovementDefinitions?.FingertipOffsets == null) return;
+                var offsets = FingerMovementDefinitions.FingertipOffsets;
+                var oppositeFinger = GetOppositeHandFinger(finger);
+                var oppositeTr = offsets.GetFingerTransform(oppositeFinger);
+                if (oppositeTr != null) {
+                    oppositeTr.Position = new Vector3(-sourceTr.Position.x, sourceTr.Position.y, sourceTr.Position.z);
+                    offsets.SetDataInput(oppositeFinger.ToString(), oppositeTr, true);
+                    offsets.BroadcastDataInput(oppositeFinger.ToString());
+                    offsets.RequestUiRefresh();
+                    Context.Service?.Toast(
+                        Warudo.Core.Server.ToastSeverity.Success,
+                        "APPLY_TO_OPPOSITE_HAND_FINGER".Localized(),
+                        $"Mirrored {finger} to {oppositeFinger}."
+                    );
+                }
+            };
+
+            tr.OnCreateAnchor = (transform, anchor) => {
+                var distalBone = GetDistalBoneForFinger(finger);
+
+                anchor.Attachable.Parent = Character;
+                anchor.Attachable.AttachType = Warudo.Plugins.Core.Assets.Mixins.AttachType.HumanBodyBone;
+                anchor.Attachable.AttachToBone = distalBone;
+
+                anchor.Transform.Position = transform.Position;
+                anchor.Transform.Rotation = Vector3.zero;
+                anchor.Broadcast();
+            };
+
+            tr.OnApplyAnchor = (transform, anchor) => {
+                transform.Position = anchor.Transform.Position;
+                if (isUnified) {
+                    FingerMovementDefinitions?.FingertipOffsets?.SyncUnifiedToIndividual();
+                }
+            };
+
+            tr.OnExitVisualSetup = (isApplied) => {
+                activeVisualSetupFinger = null;
+                int fIdx = (int)finger;
+                if (fIdx >= 0 && fIdx < fingerTweens.Length) {
+                    fingerTweens[fIdx]?.Kill(false);
+                }
+                ApplyFingerLayerWeight(finger, fIdx, 0.0f);
+
+                Context.Service.NavigateToAsset(Id);
+                Context.Service.BroadcastOpenedScene();
+            };
         }
 
         public Vector3 GetCurledFingerTipContactVector(Animator anim, KeyboardFinger finger) {
