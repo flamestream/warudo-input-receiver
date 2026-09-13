@@ -242,8 +242,9 @@ namespace FlameStream
                 leftKeyReleaseTime = -1f;
             } else if (activeLeftKey != null) {
                 if (activeLeftKey.EnableHandMovement) {
-                    targetLeftPos = restLeftPos + activeLeftKey.DeltaPosition;
-                    targetLeftRot = restLeftRot + activeLeftKey.DeltaRotation;
+                    GetKeyOriginRigOffset(activeLeftKey, out Vector3 originPosRig, out Vector3 originRotRig);
+                    targetLeftPos = restLeftPos + originPosRig + activeLeftKey.DeltaPosition;
+                    targetLeftRot = restLeftRot + originRotRig + activeLeftKey.DeltaRotation;
                 } else {
                     targetLeftPos = hasLeftKeyBeenPressed ? lastLeftKeyPos : restLeftPos;
                     targetLeftRot = hasLeftKeyBeenPressed ? lastLeftKeyRot : restLeftRot;
@@ -313,8 +314,9 @@ namespace FlameStream
                 rightKeyReleaseTime = -1f;
             } else if (activeRightKey != null) {
                 if (activeRightKey.EnableHandMovement) {
-                    targetRightPos = restRightPos + activeRightKey.DeltaPosition;
-                    targetRightRot = restRightRot + activeRightKey.DeltaRotation;
+                    GetKeyOriginRigOffset(activeRightKey, out Vector3 originPosRig, out Vector3 originRotRig);
+                    targetRightPos = restRightPos + originPosRig + activeRightKey.DeltaPosition;
+                    targetRightRot = restRightRot + originRotRig + activeRightKey.DeltaRotation;
                 } else {
                     targetRightPos = hasRightKeyBeenPressed ? lastRightKeyPos : restRightPos;
                     targetRightRot = hasRightKeyBeenPressed ? lastRightKeyRot : restRightRot;
@@ -1007,6 +1009,10 @@ namespace FlameStream
                     out Vector3 deltaPos,
                     out Vector3 deltaRot
                 );
+
+                GetKeyOriginRigOffset(k.AttachmentAnchor, out Vector3 originPosRig, out Vector3 originRotRig);
+                deltaPos -= originPosRig;
+                deltaRot = Helper.NormalizeRotationAngles(deltaRot - originRotRig);
 
                 var binding = StructuredData.Create<KeyboardKeyBinding>(b => {
                     b.Parent = this;

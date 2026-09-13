@@ -258,6 +258,7 @@ namespace FlameStream
             rootAnchor.Transform.Position = KeyboardRootPosition;
             rootAnchor.Transform.Rotation = KeyboardRootRotation;
             rootAnchor.Transform.Broadcast();
+            rootAnchor.Broadcast();
             return rootAnchor;
         }
 
@@ -507,10 +508,6 @@ namespace FlameStream
                         SetDataInput(nameof(IsHandEnabled), false, true);
                         BroadcastDataInput(nameof(IsHandEnabled));
                     }
-                    if (EnableFloatingKeys) {
-                        SetDataInput(nameof(EnableFloatingKeys), false, true);
-                        BroadcastDataInput(nameof(EnableFloatingKeys));
-                    }
                 }
                 UpdateHandTrackingState(); 
                 UpdateFloatingKeysState();
@@ -534,18 +531,8 @@ namespace FlameStream
                 if (keysPort?.Properties != null) {
                     if (Character == null) {
                         keysPort.Properties.description = "ENABLE_FLOATING_KEYS_DESC".Localized();
-                        if (EnableFloatingKeys) {
-                            EnableFloatingKeys = false;
-                            SetDataInput(nameof(EnableFloatingKeys), false, true);
-                            BroadcastDataInput(nameof(EnableFloatingKeys));
-                        }
                     } else if (AreKeyDefinitionsEmpty()) {
                         keysPort.Properties.description = "ENABLE_FLOATING_KEYS_NO_PRESET_DESC".Localized();
-                        if (EnableFloatingKeys) {
-                            EnableFloatingKeys = false;
-                            SetDataInput(nameof(EnableFloatingKeys), false, true);
-                            BroadcastDataInput(nameof(EnableFloatingKeys));
-                        }
                     } else if (!IsEnabled) {
                         keysPort.Properties.description = "ENABLE_FLOATING_KEYS_DISABLED_ASSET_DESC".Localized();
                     } else {
@@ -716,6 +703,7 @@ namespace FlameStream
             leftHandAnchor.Transform.Position = LeftHandRestPosition;
             leftHandAnchor.Transform.Rotation = leftIkRot;
             leftHandAnchor.Transform.Broadcast();
+            leftHandAnchor.Broadcast();
 
             // 3. Right Hand IK Anchor
             AnchorAsset rightHandAnchor = RightHandAnchor;
@@ -737,6 +725,9 @@ namespace FlameStream
             rightHandAnchor.Transform.Position = RightHandRestPosition;
             rightHandAnchor.Transform.Rotation = rightIkRot;
             rightHandAnchor.Transform.Broadcast();
+            rightHandAnchor.Broadcast();
+
+            rootAnchor.Broadcast();
         }
 
         Vector3 GetIndexTipWorldPosition(Animator animator, bool isLeft) {
