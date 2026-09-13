@@ -142,12 +142,11 @@ namespace FlameStream {
         public bool VisualGuidesAlwaysOnTop = true;
 
         public string GetHeader() {
-            var handSide = Finger.IsLeftHand() ? "L" : "R";
             var handMovementTag = EnableHandMovement ? "" : " (No Hand Move)";
             var pos = Transform != null ? Transform.Position : DeltaPosition;
             var listeningTag = IsListeningForKey ? " ⏳[LISTENING]" : "";
             var debugTag = IsDebugForced ? " ⚡[DEBUG]" : "";
-            return $"[{Key}] ➔ [{handSide}] {Finger} ΔPos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}){handMovementTag}{listeningTag}{debugTag}";
+            return $"[{Key}] ➔ {Finger} ΔPos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}){handMovementTag}{listeningTag}{debugTag}";
         }
 
         public void SyncUI() {
