@@ -367,47 +367,57 @@ namespace FlameStream
             };
         }
 
-        public void GetKeyOriginRigOffset(VirtualKeyAnchor anchor, out Vector3 posOffsetRig, out Vector3 rotOffsetRig) {
+        public KeyClusterTransform GetKeyClusterTransform(VirtualKeyAnchor anchor) {
+            KeyClusterTransform t = new KeyClusterTransform();
             if (anchor == VirtualKeyAnchor.LeftHand) {
-                var basePos = LeftHandRestPosition;
-                var baseRot = Quaternion.Euler(LeftHandRestRotation);
+                t.BasePivotRig = LeftHandRestPosition;
+                t.BaseRotRig = Quaternion.Euler(LeftHandRestRotation);
                 if (LeftKeysetTransform != null && LeftKeysetTransform.InVisualSetupMode && LeftKeysetTransform.setupAnchor != null) {
-                    posOffsetRig = LeftKeysetTransform.setupAnchor.Transform.Position - basePos;
-                    rotOffsetRig = Helper.NormalizeRotationAngles((Quaternion.Inverse(baseRot) * Quaternion.Euler(LeftKeysetTransform.setupAnchor.Transform.Rotation)).eulerAngles);
+                    t.OriginPos = Quaternion.Inverse(t.BaseRotRig) * (LeftKeysetTransform.setupAnchor.Transform.Position - t.BasePivotRig);
+                    t.OriginRot = Quaternion.Inverse(t.BaseRotRig) * Quaternion.Euler(LeftKeysetTransform.setupAnchor.Transform.Rotation);
+                    t.OriginScale = LeftKeysetTransform.setupAnchor.Transform.Scale;
                 } else {
-                    var pos = LeftKeysetTransform?.Position ?? Vector3.zero;
-                    var rot = LeftKeysetTransform?.Rotation ?? Vector3.zero;
-                    posOffsetRig = baseRot * pos;
-                    rotOffsetRig = rot;
+                    t.OriginPos = LeftKeysetTransform?.Position ?? Vector3.zero;
+                    t.OriginRot = Quaternion.Euler(LeftKeysetTransform?.Rotation ?? Vector3.zero);
+                    t.OriginScale = LeftKeysetTransform?.Scale ?? Vector3.one;
                 }
             } else if (anchor == VirtualKeyAnchor.RightHand) {
-                var basePos = RightHandRestPosition;
-                var baseRot = Quaternion.Euler(RightHandRestRotation);
+                t.BasePivotRig = RightHandRestPosition;
+                t.BaseRotRig = Quaternion.Euler(RightHandRestRotation);
                 if (RightKeysetTransform != null && RightKeysetTransform.InVisualSetupMode && RightKeysetTransform.setupAnchor != null) {
-                    posOffsetRig = RightKeysetTransform.setupAnchor.Transform.Position - basePos;
-                    rotOffsetRig = Helper.NormalizeRotationAngles((Quaternion.Inverse(baseRot) * Quaternion.Euler(RightKeysetTransform.setupAnchor.Transform.Rotation)).eulerAngles);
+                    t.OriginPos = Quaternion.Inverse(t.BaseRotRig) * (RightKeysetTransform.setupAnchor.Transform.Position - t.BasePivotRig);
+                    t.OriginRot = Quaternion.Inverse(t.BaseRotRig) * Quaternion.Euler(RightKeysetTransform.setupAnchor.Transform.Rotation);
+                    t.OriginScale = RightKeysetTransform.setupAnchor.Transform.Scale;
                 } else {
-                    var pos = RightKeysetTransform?.Position ?? Vector3.zero;
-                    var rot = RightKeysetTransform?.Rotation ?? Vector3.zero;
-                    posOffsetRig = baseRot * pos;
-                    rotOffsetRig = rot;
+                    t.OriginPos = RightKeysetTransform?.Position ?? Vector3.zero;
+                    t.OriginRot = Quaternion.Euler(RightKeysetTransform?.Rotation ?? Vector3.zero);
+                    t.OriginScale = RightKeysetTransform?.Scale ?? Vector3.one;
                 }
             } else {
+                t.BasePivotRig = Vector3.zero;
+                t.BaseRotRig = Quaternion.identity;
                 if (RootKeysetTransform != null && RootKeysetTransform.InVisualSetupMode && RootKeysetTransform.setupAnchor != null) {
-                    posOffsetRig = RootKeysetTransform.setupAnchor.Transform.Position;
-                    rotOffsetRig = RootKeysetTransform.setupAnchor.Transform.Rotation;
+                    t.OriginPos = RootKeysetTransform.setupAnchor.Transform.Position;
+                    t.OriginRot = Quaternion.Euler(RootKeysetTransform.setupAnchor.Transform.Rotation);
+                    t.OriginScale = RootKeysetTransform.setupAnchor.Transform.Scale;
                 } else {
-                    posOffsetRig = RootKeysetTransform?.Position ?? Vector3.zero;
-                    rotOffsetRig = RootKeysetTransform?.Rotation ?? Vector3.zero;
+                    t.OriginPos = RootKeysetTransform?.Position ?? Vector3.zero;
+                    t.OriginRot = Quaternion.Euler(RootKeysetTransform?.Rotation ?? Vector3.zero);
+                    t.OriginScale = RootKeysetTransform?.Scale ?? Vector3.one;
                 }
             }
+            return t;
         }
 
-        public void GetKeyOriginRigOffset(KeyboardKeyBinding binding, out Vector3 posOffsetRig, out Vector3 rotOffsetRig) {
+        public KeyClusterTransform GetKeyClusterTransform(KeyboardKeyBinding binding) {
             if (binding == null) {
-                posOffsetRig = Vector3.zero;
-                rotOffsetRig = Vector3.zero;
-                return;
+                return new KeyClusterTransform {
+                    BasePivotRig = Vector3.zero,
+                    BaseRotRig = Quaternion.identity,
+                    OriginPos = Vector3.zero,
+                    OriginRot = Quaternion.identity,
+                    OriginScale = Vector3.one
+                };
             }
             VirtualKeyAnchor anchor = binding.Finger.IsLeftHand() ? VirtualKeyAnchor.LeftHand : VirtualKeyAnchor.RightHand;
             if (VirtualKeysCollection?.Keys != null) {
@@ -417,7 +427,38 @@ namespace FlameStream
                     anchor = keyDef.AttachmentAnchor;
                 }
             }
-            GetKeyOriginRigOffset(anchor, out posOffsetRig, out rotOffsetRig);
+            return GetKeyClusterTransform(anchor);
+        }
+
+        public bool TryGetKeyCenterAndNormalIdentity(VirtualKeyDefinition k, out Vector3 keyCenterWorld, out Vector3 keyNormalWorld) {
+            keyCenterWorld = Vector3.zero;
+            keyNormalWorld = Vector3.up;
+            if (k == null) return false;
+
+            Transform rootTr = RootAnchor?.GameObject != null ? RootAnchor.GameObject.transform : null;
+
+            Vector3 basePos;
+            Quaternion baseRot;
+            if (k.AttachmentAnchor == VirtualKeyAnchor.LeftHand) {
+                basePos = LeftHandRestPosition;
+                baseRot = Quaternion.Euler(LeftHandRestRotation);
+            } else if (k.AttachmentAnchor == VirtualKeyAnchor.RightHand) {
+                basePos = RightHandRestPosition;
+                baseRot = Quaternion.Euler(RightHandRestRotation);
+            } else {
+                basePos = Vector3.zero;
+                baseRot = Quaternion.identity;
+            }
+
+            Vector3 keyLocalPos = k.Transform != null ? k.Transform.Position : Vector3.zero;
+            Quaternion keyLocalRot = Quaternion.Euler(k.Transform != null ? k.Transform.Rotation : Vector3.zero);
+
+            Vector3 keyPosRig = basePos + baseRot * keyLocalPos;
+            Quaternion keyRotRig = baseRot * keyLocalRot;
+
+            keyCenterWorld = rootTr != null ? rootTr.TransformPoint(keyPosRig) : keyPosRig;
+            keyNormalWorld = rootTr != null ? (rootTr.rotation * keyRotRig * Vector3.up) : (keyRotRig * Vector3.up);
+            return true;
         }
 
         public void RefreshVirtualKeysParent() {

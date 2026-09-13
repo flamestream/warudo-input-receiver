@@ -248,14 +248,9 @@ namespace FlameStream {
                     }
                 }
 
-                Vector3 restPos = isLeft ? Parent.LeftHandRestPosition : Parent.RightHandRestPosition;
-                Vector3 restRot = isLeft ? Parent.LeftHandRestRotation : Parent.RightHandRestRotation;
-
-                Parent.GetKeyOriginRigOffset(this, out Vector3 originPosRig, out Vector3 originRotRig);
-
-                Vector3 deltaHand = tr.Position;
-                Vector3 initialPos = restPos + originPosRig + deltaHand;
-                Vector3 initialRot = restRot + originRotRig + tr.Rotation;
+                var cluster = Parent.GetKeyClusterTransform(this);
+                Vector3 initialPos = cluster.TransformLocalToRig(tr.Position);
+                Vector3 initialRot = Helper.NormalizeRotationAngles(cluster.TransformRotationToRig(Quaternion.Euler(tr.Rotation)).eulerAngles);
 
                 setupAnchor.Transform.Position = initialPos;
                 setupAnchor.Transform.Rotation = initialRot;
@@ -281,7 +276,7 @@ Click **[Apply Transform]** when finished.
                 setupAnchor.Transform.Broadcast();
 
                 Transform parentTr = root != null && root.GameObject != null ? root.GameObject.transform : null;
-                CreateDebugVisuals(restPos + originPosRig, parentTr);
+                CreateDebugVisuals(cluster.ClusterOriginRig, parentTr);
 
                 var kbAnchor = setupAnchor as KeyBindingVisualSetupAnchorAsset;
                 if (kbAnchor != null) {
@@ -303,12 +298,9 @@ Click **[Apply Transform]** when finished.
 
             Transform.OnResetAnchor = (tr, setupAnchor) => {
                 if (Parent == null) return;
-                bool isLeft = Finger.IsLeftHand();
-                Vector3 restPos = isLeft ? Parent.LeftHandRestPosition : Parent.RightHandRestPosition;
-                Vector3 restRot = isLeft ? Parent.LeftHandRestRotation : Parent.RightHandRestRotation;
-                Parent.GetKeyOriginRigOffset(this, out Vector3 originPosRig, out Vector3 originRotRig);
-                setupAnchor.Transform.Position = restPos + originPosRig;
-                setupAnchor.Transform.Rotation = restRot + originRotRig;
+                var cluster = Parent.GetKeyClusterTransform(this);
+                setupAnchor.Transform.Position = cluster.ClusterOriginRig;
+                setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles(cluster.ClusterRotRig.eulerAngles);
                 setupAnchor.Transform.Scale = Vector3.one;
                 setupAnchor.Transform.Broadcast();
             };
@@ -316,16 +308,14 @@ Click **[Apply Transform]** when finished.
             Transform.OnApplyAnchor = (tr, setupAnchor) => {
                 if (Parent == null) return;
 
-                bool isLeft = Finger.IsLeftHand();
-                Vector3 restPos = isLeft ? Parent.LeftHandRestPosition : Parent.RightHandRestPosition;
-                Vector3 restRot = isLeft ? Parent.LeftHandRestRotation : Parent.RightHandRestRotation;
-                Parent.GetKeyOriginRigOffset(this, out Vector3 originPosRig, out Vector3 originRotRig);
-
-                Vector3 anchorPos = setupAnchor.Transform.Position;
-                Vector3 anchorRot = setupAnchor.Transform.Rotation;
-                Vector3 deltaHand = anchorPos - restPos - originPosRig;
-
-                Vector3 deltaRot = Helper.NormalizeRotationAngles(anchorRot - restRot - originRotRig);
+                var cluster = Parent.GetKeyClusterTransform(this);
+                cluster.InverseTransformFromRig(
+                    setupAnchor.Transform.Position,
+                    Quaternion.Euler(setupAnchor.Transform.Rotation),
+                    out Vector3 deltaHand,
+                    out Quaternion deltaRotQuat
+                );
+                Vector3 deltaRot = Helper.NormalizeRotationAngles(deltaRotQuat.eulerAngles);
 
                 tr.Position = deltaHand;
                 tr.Rotation = deltaRot;
