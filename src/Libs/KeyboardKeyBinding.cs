@@ -10,35 +10,44 @@ using Warudo.Core.Serializations;
 using Cysharp.Threading.Tasks;
 
 namespace FlameStream {
-    public class KeyboardKeyBinding : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData, IKeyListeningTarget {
+    public class KeyboardKeyBinding : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData {
 
         [DataInput(10)]
-        [Label("KEY")]
-        public VKCode Key;
+        [Label("KEY_INPUT")]
+        public KeyboardKeyInput KeyInput;
 
-        [Trigger(15)]
-        [Label("IDENTIFY_KEY")]
-        public void TriggerIdentifyKey() {
-            Parent?.ToggleKeyListening(this);
-        }
-
-        public bool IsListeningForKey { get; private set; }
-
-        public void SetListeningForKey(bool listening) {
-            IsListeningForKey = listening;
-            var port = GetTriggerPort(nameof(TriggerIdentifyKey));
-            if (port != null && port.Properties != null) {
-                port.Properties.label = listening ? "IDENTIFYING_KEY".Localized() : "IDENTIFY_KEY".Localized();
-                BroadcastTriggerProperties(nameof(TriggerIdentifyKey));
-                RequestUiRefresh();
+        public VKCode Key {
+            get => KeyInput != null ? KeyInput.Key : default(VKCode);
+            set {
+                EnsureKeyInput();
+                KeyInput.Key = value;
+                KeyInput.SetDataInput(nameof(KeyInput.Key), value, true);
+                KeyInput.BroadcastDataInput(nameof(KeyInput.Key));
+                SetDataInput(nameof(KeyInput), KeyInput, true);
             }
         }
 
-        public void OnKeyCaptured(VKCode newKey) {
-            Key = newKey;
-            SetDataInput(nameof(Key), newKey, true);
-            BroadcastDataInput(nameof(Key));
-            BroadcastDataInput(nameof(Transform));
+        public bool IsListeningForKey => KeyInput != null && KeyInput.IsListeningForKey;
+
+        public void EnsureKeyInput() {
+            if (KeyInput == null) {
+                KeyInput = StructuredData.Create<KeyboardKeyInput>();
+                KeyInput.Parent = Parent;
+            }
+            SetupKeyInputCallbacks();
+        }
+
+        public void SetupKeyInputCallbacks() {
+            if (KeyInput == null) return;
+            KeyInput.Parent = Parent;
+            KeyInput.OnKeyChanged = (k) => {
+                UpdateDebugButtonState();
+                BroadcastDataInput(nameof(Transform));
+                RequestUiRefresh();
+            };
+            KeyInput.OnListeningChanged = (listening) => {
+                RequestUiRefresh();
+            };
         }
 
         [DataInput(20)]
@@ -159,8 +168,18 @@ namespace FlameStream {
             } catch { }
         }
 
+        public override void Deserialize(SerializedStructuredData serialized) {
+            base.Deserialize(serialized);
+            if (serialized.dataInputs != null && serialized.dataInputs.TryGetValue("Key", out var legacyPort) && !string.IsNullOrEmpty(legacyPort?.value)) {
+                if (Enum.TryParse<VKCode>(legacyPort.value, out var legacyVk)) {
+                    Key = legacyVk;
+                }
+            }
+        }
+
         protected override void OnCreate() {
             base.OnCreate();
+            EnsureKeyInput();
             if (Transform == null) {
                 Transform = StructuredData.Create<KeyBindingVisualSetupTransform>();
                 Transform.Position = deltaPosition;
@@ -172,13 +191,14 @@ namespace FlameStream {
             SyncUI();
             UpdateDebugButtonState();
 
+            Watch(nameof(KeyInput), delegate {
+                SetupKeyInputCallbacks();
+                UpdateDebugButtonState();
+                BroadcastDataInput(nameof(Transform));
+            });
             Watch(nameof(Transform), delegate {
                 if (Transform != null) Transform.KeyBinding = this;
                 SetupTransformCallbacks();
-            });
-            Watch(nameof(Key), delegate {
-                UpdateDebugButtonState();
-                BroadcastDataInput(nameof(Transform));
             });
             Watch(nameof(Finger), delegate {
                 BroadcastDataInput(nameof(Transform));
@@ -191,7 +211,7 @@ namespace FlameStream {
 
         protected override void OnDestroy() {
             base.OnDestroy();
-            if (Parent != null && Parent.ActiveKeyListeningTarget == (IKeyListeningTarget)this) {
+            if (Parent != null && KeyInput != null && Parent.ActiveKeyListeningTarget == (IKeyListeningTarget)KeyInput) {
                 Parent.CancelKeyListening();
             }
             DestroyDebugVisuals();
@@ -199,6 +219,9 @@ namespace FlameStream {
         }
 
         public void SetupTransformCallbacks() {
+            if (KeyInput != null) {
+                KeyInput.Parent = Parent;
+            }
             if (Transform == null) return;
             Transform.KeyBinding = this;
             Transform.HideScale();

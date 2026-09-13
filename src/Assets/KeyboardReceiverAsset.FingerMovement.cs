@@ -971,7 +971,7 @@ namespace FlameStream
                     b.DeltaPosition = deltaPos;
                     b.DeltaRotation = deltaRot;
                     b.EnableHandMovement = true;
-                    b.SetDataInput(nameof(b.Key), b.Key, true);
+                    b.SetDataInput(nameof(b.KeyInput), b.KeyInput, true);
                     b.SetDataInput(nameof(b.Finger), b.Finger, true);
                     b.SetDataInput(nameof(b.EnableHandMovement), true, true);
                     if (b.Transform != null) {

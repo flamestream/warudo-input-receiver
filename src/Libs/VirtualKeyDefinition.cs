@@ -9,41 +9,52 @@ using Cysharp.Threading.Tasks;
 
 namespace FlameStream
 {
-    public class VirtualKeyDefinition : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData, IKeyListeningTarget
+    public class VirtualKeyDefinition : StructuredData<KeyboardReceiverAsset>, ICollapsibleStructuredData
     {
         [DataInput(5)]
         [Label("DISPLAY_LABEL")]
         public string DisplayLabel = "";
 
         [DataInput(10)]
-        [Label("KEY")]
-        public VKCode Key = VKCode.A;
+        [Label("KEY_INPUT")]
+        public KeyboardKeyInput KeyInput;
 
-        [Trigger(15)]
-        [Label("IDENTIFY_KEY")]
-        public void TriggerIdentifyKey() {
-            Parent?.ToggleKeyListening(this);
-        }
-
-        public bool IsListeningForKey { get; private set; }
-
-        public void SetListeningForKey(bool listening) {
-            IsListeningForKey = listening;
-            var port = GetTriggerPort(nameof(TriggerIdentifyKey));
-            if (port != null && port.Properties != null) {
-                port.Properties.label = listening ? "IDENTIFYING_KEY" : "IDENTIFY_KEY";
-                BroadcastTriggerProperties(nameof(TriggerIdentifyKey));
+        public VKCode Key {
+            get => KeyInput != null ? KeyInput.Key : VKCode.A;
+            set {
+                EnsureKeyInput();
+                KeyInput.Key = value;
+                KeyInput.SetDataInput(nameof(KeyInput.Key), value, true);
+                KeyInput.BroadcastDataInput(nameof(KeyInput.Key));
+                SetDataInput(nameof(KeyInput), KeyInput, true);
             }
         }
 
-        public void OnKeyCaptured(VKCode newKey) {
-            Key = newKey;
-            SetDataInput(nameof(Key), newKey, true);
-            BroadcastDataInput(nameof(Key));
-            BroadcastDataInput(nameof(Transform));
-            if (Parent != null) {
-                Parent.RebuildVirtualKeyMesh(this);
+        public bool IsListeningForKey => KeyInput != null && KeyInput.IsListeningForKey;
+
+        public void EnsureKeyInput() {
+            if (KeyInput == null) {
+                KeyInput = StructuredData.Create<KeyboardKeyInput>();
+                KeyInput.Key = VKCode.A;
+                KeyInput.Parent = Parent;
             }
+            SetupKeyInputCallbacks();
+        }
+
+        public void SetupKeyInputCallbacks() {
+            if (KeyInput == null) return;
+            KeyInput.Parent = Parent;
+            KeyInput.OnKeyChanged = (k) => {
+                UpdateDebugButtonState();
+                BroadcastDataInput(nameof(Transform));
+                if (Parent != null) {
+                    Parent.RebuildVirtualKeyMesh(this);
+                }
+                RequestUiRefresh();
+            };
+            KeyInput.OnListeningChanged = (listening) => {
+                RequestUiRefresh();
+            };
         }
 
         [DataInput(30)]
@@ -175,6 +186,7 @@ namespace FlameStream
 
         protected override void OnCreate() {
             base.OnCreate();
+            EnsureKeyInput();
             if (Transform == null) {
                 Transform = StructuredData.Create<VisualSetupTransform>();
                 Transform.Position = Vector3.zero;
@@ -197,6 +209,14 @@ namespace FlameStream
             SyncUI();
             UpdateDebugButtonState();
 
+            Watch(nameof(KeyInput), delegate {
+                SetupKeyInputCallbacks();
+                UpdateDebugButtonState();
+                BroadcastDataInput(nameof(Transform));
+                if (Parent != null) {
+                    Parent.RebuildVirtualKeyMesh(this);
+                }
+            });
             Watch(nameof(Transform), delegate {
                 SetupTransformCallbacks();
                 if (KeyGameObject != null && Transform != null) {
@@ -204,10 +224,6 @@ namespace FlameStream
                     KeyGameObject.transform.localRotation = Quaternion.Euler(Transform.Rotation);
                     KeyGameObject.transform.localScale = Transform.Scale;
                 }
-            });
-            Watch(nameof(Key), delegate { 
-                UpdateDebugButtonState();
-                BroadcastDataInput(nameof(Transform)); 
             });
             Watch(nameof(DisplayLabel), delegate { BroadcastDataInput(nameof(Transform)); });
             Watch(nameof(AttachmentAnchor), delegate {
@@ -246,9 +262,18 @@ namespace FlameStream
             } catch { }
         }
 
+        public override void Deserialize(SerializedStructuredData serialized) {
+            base.Deserialize(serialized);
+            if (serialized.dataInputs != null && serialized.dataInputs.TryGetValue("Key", out var legacyPort) && !string.IsNullOrEmpty(legacyPort?.value)) {
+                if (Enum.TryParse<VKCode>(legacyPort.value, out var legacyVk)) {
+                    Key = legacyVk;
+                }
+            }
+        }
+
         protected override void OnDestroy() {
             base.OnDestroy();
-            if (Parent != null && Parent.ActiveKeyListeningTarget == (IKeyListeningTarget)this) {
+            if (Parent != null && KeyInput != null && Parent.ActiveKeyListeningTarget == (IKeyListeningTarget)KeyInput) {
                 Parent.CancelKeyListening();
             }
             Transform?.DestroyAnchor();
@@ -256,6 +281,9 @@ namespace FlameStream
         }
 
         public void SetupTransformCallbacks() {
+            if (KeyInput != null) {
+                KeyInput.Parent = Parent;
+            }
             if (Transform == null) return;
             Transform.HideScale();
             Transform.LocalizationKey = "VIRTUAL_KEY";
