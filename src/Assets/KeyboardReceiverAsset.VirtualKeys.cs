@@ -206,10 +206,8 @@ namespace FlameStream
                 transforms.Left.Rotation = Vector3.zero;
                 transforms.Left.Scale = Vector3.one;
             }
-            transforms.Left.HideScale();
             transforms.Left.CollapsedSelf = true;
             LeftKeysetTransform.LocalizationKey = "LEFT_KEY_ORIGIN";
-            LeftKeysetTransform.HideScale();
             LeftKeysetTransform.OnEnterVisualSetup = (tr) => {
                 EnsureAnchors();
                 tr.OriginIndicatorOffset = LeftHandRestPosition;
@@ -226,9 +224,9 @@ namespace FlameStream
                 var baseRot = Quaternion.Euler(LeftHandRestRotation);
                 setupAnchor.Transform.Position = basePos + baseRot * tr.Position;
                 setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles((baseRot * Quaternion.Euler(tr.Rotation)).eulerAngles);
-                setupAnchor.Transform.Scale = Vector3.one;
+                setupAnchor.Transform.Scale = tr.Scale;
                 setupAnchor.Name = "⌛⚓-Left Key Origin";
-                setupAnchor.Instructions = "Position and rotate the entire **Left Key Origin**, relative to the **Left Hand Rest Pose**.\nThe red sphere indicates the origin location (Left Hand Rest Pose).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Instructions = "Position, rotate, and scale the entire **Left Key Origin**, relative to the **Left Hand Rest Pose**.\nThe red sphere indicates the origin location (Left Hand Rest Pose).\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             LeftKeysetTransform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -236,7 +234,7 @@ namespace FlameStream
                 var baseRot = Quaternion.Euler(LeftHandRestRotation);
                 tr.Position = Quaternion.Inverse(baseRot) * (setupAnchor.Transform.Position - basePos);
                 tr.Rotation = Helper.NormalizeRotationAngles((Quaternion.Inverse(baseRot) * Quaternion.Euler(setupAnchor.Transform.Rotation)).eulerAngles);
-                tr.Scale = Vector3.one;
+                tr.Scale = setupAnchor.Transform.Scale;
                 UpdateGroupTransforms();
             };
             LeftKeysetTransform.OnResetAnchor = (tr, setupAnchor) => {
@@ -268,10 +266,8 @@ namespace FlameStream
                 transforms.Right.Rotation = Vector3.zero;
                 transforms.Right.Scale = Vector3.one;
             }
-            transforms.Right.HideScale();
             transforms.Right.CollapsedSelf = true;
             RightKeysetTransform.LocalizationKey = "RIGHT_KEY_ORIGIN";
-            RightKeysetTransform.HideScale();
             RightKeysetTransform.OnEnterVisualSetup = (tr) => {
                 EnsureAnchors();
                 tr.OriginIndicatorOffset = RightHandRestPosition;
@@ -288,9 +284,9 @@ namespace FlameStream
                 var baseRot = Quaternion.Euler(RightHandRestRotation);
                 setupAnchor.Transform.Position = basePos + baseRot * tr.Position;
                 setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles((baseRot * Quaternion.Euler(tr.Rotation)).eulerAngles);
-                setupAnchor.Transform.Scale = Vector3.one;
+                setupAnchor.Transform.Scale = tr.Scale;
                 setupAnchor.Name = "⌛⚓-Right Key Origin";
-                setupAnchor.Instructions = "Position and rotate the entire **Right Key Origin**, relative to the **Right Hand Rest Pose**.\nThe red sphere indicates the origin location (Right Hand Rest Pose).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Instructions = "Position, rotate, and scale the entire **Right Key Origin**, relative to the **Right Hand Rest Pose**.\nThe red sphere indicates the origin location (Right Hand Rest Pose).\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             RightKeysetTransform.OnApplyAnchor = (tr, setupAnchor) => {
@@ -298,7 +294,7 @@ namespace FlameStream
                 var baseRot = Quaternion.Euler(RightHandRestRotation);
                 tr.Position = Quaternion.Inverse(baseRot) * (setupAnchor.Transform.Position - basePos);
                 tr.Rotation = Helper.NormalizeRotationAngles((Quaternion.Inverse(baseRot) * Quaternion.Euler(setupAnchor.Transform.Rotation)).eulerAngles);
-                tr.Scale = Vector3.one;
+                tr.Scale = setupAnchor.Transform.Scale;
                 UpdateGroupTransforms();
             };
             RightKeysetTransform.OnResetAnchor = (tr, setupAnchor) => {
@@ -330,10 +326,8 @@ namespace FlameStream
                 transforms.Root.Rotation = Vector3.zero;
                 transforms.Root.Scale = Vector3.one;
             }
-            transforms.Root.HideScale();
             transforms.Root.CollapsedSelf = true;
             RootKeysetTransform.LocalizationKey = "CENTER_KEY_ORIGIN";
-            RootKeysetTransform.HideScale();
             RootKeysetTransform.OnEnterVisualSetup = (tr) => { EnsureAnchors(); };
             RootKeysetTransform.OnCreateAnchor = (tr, setupAnchor) => {
                 var parent = RootAnchor;
@@ -345,15 +339,15 @@ namespace FlameStream
                 }
                 setupAnchor.Transform.Position = tr.Position;
                 setupAnchor.Transform.Rotation = tr.Rotation;
-                setupAnchor.Transform.Scale = Vector3.one;
+                setupAnchor.Transform.Scale = tr.Scale;
                 setupAnchor.Name = "⌛⚓-Center Key Origin";
-                setupAnchor.Instructions = "Position and rotate the entire **Center Key Origin**, relative to the **Keyboard Rig Origin**.\nThe red sphere indicates the origin location (Keyboard Rig Origin).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Instructions = "Position, rotate, and scale the entire **Center Key Origin**, relative to the **Keyboard Rig Origin**.\nThe red sphere indicates the origin location (Keyboard Rig Origin).\nClick **[Apply Transform]** when finished.";
                 setupAnchor.Transform.Broadcast();
             };
             RootKeysetTransform.OnApplyAnchor = (tr, setupAnchor) => {
                 tr.Position = setupAnchor.Transform.Position;
                 tr.Rotation = setupAnchor.Transform.Rotation;
-                tr.Scale = Vector3.one;
+                tr.Scale = setupAnchor.Transform.Scale;
                 UpdateGroupTransforms();
             };
             RootKeysetTransform.OnResetAnchor = (tr, setupAnchor) => {
@@ -381,9 +375,11 @@ namespace FlameStream
                 if (LeftKeysetTransform != null && LeftKeysetTransform.InVisualSetupMode && LeftKeysetTransform.setupAnchor != null) {
                     t.OriginPos = Quaternion.Inverse(t.BaseRotRig) * (LeftKeysetTransform.setupAnchor.Transform.Position - t.BasePivotRig);
                     t.OriginRot = Quaternion.Inverse(t.BaseRotRig) * Quaternion.Euler(LeftKeysetTransform.setupAnchor.Transform.Rotation);
+                    t.OriginScale = LeftKeysetTransform.setupAnchor.Transform.Scale;
                 } else {
                     t.OriginPos = LeftKeysetTransform?.Position ?? Vector3.zero;
                     t.OriginRot = Quaternion.Euler(LeftKeysetTransform?.Rotation ?? Vector3.zero);
+                    t.OriginScale = LeftKeysetTransform?.Scale ?? Vector3.one;
                 }
             } else if (anchor == VirtualKeyAnchor.RightHand) {
                 t.BasePivotRig = RightHandRestPosition;
@@ -391,9 +387,11 @@ namespace FlameStream
                 if (RightKeysetTransform != null && RightKeysetTransform.InVisualSetupMode && RightKeysetTransform.setupAnchor != null) {
                     t.OriginPos = Quaternion.Inverse(t.BaseRotRig) * (RightKeysetTransform.setupAnchor.Transform.Position - t.BasePivotRig);
                     t.OriginRot = Quaternion.Inverse(t.BaseRotRig) * Quaternion.Euler(RightKeysetTransform.setupAnchor.Transform.Rotation);
+                    t.OriginScale = RightKeysetTransform.setupAnchor.Transform.Scale;
                 } else {
                     t.OriginPos = RightKeysetTransform?.Position ?? Vector3.zero;
                     t.OriginRot = Quaternion.Euler(RightKeysetTransform?.Rotation ?? Vector3.zero);
+                    t.OriginScale = RightKeysetTransform?.Scale ?? Vector3.one;
                 }
             } else {
                 t.BasePivotRig = Vector3.zero;
@@ -401,9 +399,11 @@ namespace FlameStream
                 if (RootKeysetTransform != null && RootKeysetTransform.InVisualSetupMode && RootKeysetTransform.setupAnchor != null) {
                     t.OriginPos = RootKeysetTransform.setupAnchor.Transform.Position;
                     t.OriginRot = Quaternion.Euler(RootKeysetTransform.setupAnchor.Transform.Rotation);
+                    t.OriginScale = RootKeysetTransform.setupAnchor.Transform.Scale;
                 } else {
                     t.OriginPos = RootKeysetTransform?.Position ?? Vector3.zero;
                     t.OriginRot = Quaternion.Euler(RootKeysetTransform?.Rotation ?? Vector3.zero);
+                    t.OriginScale = RootKeysetTransform?.Scale ?? Vector3.one;
                 }
             }
             return t;
@@ -415,7 +415,8 @@ namespace FlameStream
                     BasePivotRig = Vector3.zero,
                     BaseRotRig = Quaternion.identity,
                     OriginPos = Vector3.zero,
-                    OriginRot = Quaternion.identity
+                    OriginRot = Quaternion.identity,
+                    OriginScale = Vector3.one
                 };
             }
             VirtualKeyAnchor anchor = binding.Finger.IsLeftHand() ? VirtualKeyAnchor.LeftHand : VirtualKeyAnchor.RightHand;

@@ -34,7 +34,6 @@ namespace FlameStream
                 Root.Rotation = Vector3.zero;
                 Root.Scale = Vector3.one;
             }
-            Root.HideScale();
             Root.CollapsedSelf = true;
 
             if (Left == null) {
@@ -43,7 +42,6 @@ namespace FlameStream
                 Left.Rotation = Vector3.zero;
                 Left.Scale = Vector3.one;
             }
-            Left.HideScale();
             Left.CollapsedSelf = true;
 
             if (Right == null) {
@@ -52,7 +50,6 @@ namespace FlameStream
                 Right.Rotation = Vector3.zero;
                 Right.Scale = Vector3.one;
             }
-            Right.HideScale();
             Right.CollapsedSelf = true;
 
             Watch(nameof(Root), delegate {
@@ -73,22 +70,33 @@ namespace FlameStream
         public Quaternion BaseRotRig;
         public Vector3 OriginPos;
         public Quaternion OriginRot;
+        public Vector3 OriginScale;
 
         public Vector3 ClusterOriginRig => BasePivotRig + BaseRotRig * OriginPos;
         public Quaternion ClusterRotRig => BaseRotRig * OriginRot;
 
+        public Vector3 TransformLocalToRig(Vector3 deltaLocal, Vector3 keyLocalPos) {
+            Vector3 adjustedLocal = deltaLocal + Vector3.Scale(OriginScale - Vector3.one, keyLocalPos);
+            return ClusterOriginRig + ClusterRotRig * adjustedLocal;
+        }
+
         public Vector3 TransformLocalToRig(Vector3 deltaLocal) {
-            return ClusterOriginRig + ClusterRotRig * deltaLocal;
+            return TransformLocalToRig(deltaLocal, deltaLocal);
         }
 
         public Quaternion TransformRotationToRig(Quaternion rotLocal) {
             return ClusterRotRig * rotLocal;
         }
 
-        public void InverseTransformFromRig(Vector3 rigPos, Quaternion rigRot, out Vector3 deltaLocal, out Quaternion rotLocal) {
+        public void InverseTransformFromRig(Vector3 rigPos, Quaternion rigRot, Vector3 keyLocalPos, out Vector3 deltaLocal, out Quaternion rotLocal) {
             Quaternion invRot = Quaternion.Inverse(ClusterRotRig);
-            deltaLocal = invRot * (rigPos - ClusterOriginRig);
+            Vector3 adjustedLocal = invRot * (rigPos - ClusterOriginRig);
+            deltaLocal = adjustedLocal - Vector3.Scale(OriginScale - Vector3.one, keyLocalPos);
             rotLocal = invRot * rigRot;
+        }
+
+        public void InverseTransformFromRig(Vector3 rigPos, Quaternion rigRot, out Vector3 deltaLocal, out Quaternion rotLocal) {
+            InverseTransformFromRig(rigPos, rigRot, Vector3.zero, out deltaLocal, out rotLocal);
         }
     }
 }

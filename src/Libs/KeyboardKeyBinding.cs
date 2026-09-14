@@ -218,6 +218,17 @@ namespace FlameStream {
             Transform?.DestroyAnchor();
         }
 
+        public Vector3 GetKeyLocalPosition() {
+            if (Parent != null && Parent.VirtualKeysCollection?.Keys != null) {
+                var keyDef = Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == Key && k.AssignedFinger == Finger)
+                          ?? Parent.VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == Key);
+                if (keyDef != null && keyDef.Transform != null) {
+                    return keyDef.Transform.Position;
+                }
+            }
+            return DeltaPosition;
+        }
+
         public void SetupTransformCallbacks() {
             if (KeyInput != null) {
                 KeyInput.Parent = Parent;
@@ -249,7 +260,7 @@ namespace FlameStream {
                 }
 
                 var cluster = Parent.GetKeyClusterTransform(this);
-                Vector3 initialPos = cluster.TransformLocalToRig(tr.Position);
+                Vector3 initialPos = cluster.TransformLocalToRig(tr.Position, GetKeyLocalPosition());
                 Vector3 initialRot = Helper.NormalizeRotationAngles(cluster.TransformRotationToRig(Quaternion.Euler(tr.Rotation)).eulerAngles);
 
                 setupAnchor.Transform.Position = initialPos;
@@ -299,7 +310,7 @@ Click **[Apply Transform]** when finished.
             Transform.OnResetAnchor = (tr, setupAnchor) => {
                 if (Parent == null) return;
                 var cluster = Parent.GetKeyClusterTransform(this);
-                setupAnchor.Transform.Position = cluster.ClusterOriginRig;
+                setupAnchor.Transform.Position = cluster.TransformLocalToRig(Vector3.zero, GetKeyLocalPosition());
                 setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles(cluster.ClusterRotRig.eulerAngles);
                 setupAnchor.Transform.Scale = Vector3.one;
                 setupAnchor.Transform.Broadcast();
@@ -312,6 +323,7 @@ Click **[Apply Transform]** when finished.
                 cluster.InverseTransformFromRig(
                     setupAnchor.Transform.Position,
                     Quaternion.Euler(setupAnchor.Transform.Rotation),
+                    GetKeyLocalPosition(),
                     out Vector3 deltaHand,
                     out Quaternion deltaRotQuat
                 );

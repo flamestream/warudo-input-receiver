@@ -243,7 +243,7 @@ namespace FlameStream
             } else if (activeLeftKey != null) {
                 if (activeLeftKey.EnableHandMovement) {
                     var cluster = GetKeyClusterTransform(activeLeftKey);
-                    targetLeftPos = cluster.TransformLocalToRig(activeLeftKey.DeltaPosition);
+                    targetLeftPos = cluster.TransformLocalToRig(activeLeftKey.DeltaPosition, activeLeftKey.GetKeyLocalPosition());
                     targetLeftRot = Helper.NormalizeRotationAngles(cluster.TransformRotationToRig(Quaternion.Euler(activeLeftKey.DeltaRotation)).eulerAngles);
                 } else {
                     targetLeftPos = hasLeftKeyBeenPressed ? lastLeftKeyPos : restLeftPos;
@@ -315,7 +315,7 @@ namespace FlameStream
             } else if (activeRightKey != null) {
                 if (activeRightKey.EnableHandMovement) {
                     var cluster = GetKeyClusterTransform(activeRightKey);
-                    targetRightPos = cluster.TransformLocalToRig(activeRightKey.DeltaPosition);
+                    targetRightPos = cluster.TransformLocalToRig(activeRightKey.DeltaPosition, activeRightKey.GetKeyLocalPosition());
                     targetRightRot = Helper.NormalizeRotationAngles(cluster.TransformRotationToRig(Quaternion.Euler(activeRightKey.DeltaRotation)).eulerAngles);
                 } else {
                     targetRightPos = hasRightKeyBeenPressed ? lastRightKeyPos : restRightPos;
