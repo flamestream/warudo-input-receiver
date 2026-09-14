@@ -430,37 +430,6 @@ namespace FlameStream
             return GetKeyClusterTransform(anchor);
         }
 
-        public bool TryGetKeyCenterAndNormalIdentity(VirtualKeyDefinition k, out Vector3 keyCenterWorld, out Vector3 keyNormalWorld) {
-            keyCenterWorld = Vector3.zero;
-            keyNormalWorld = Vector3.up;
-            if (k == null) return false;
-
-            Transform rootTr = RootAnchor?.GameObject != null ? RootAnchor.GameObject.transform : null;
-
-            Vector3 basePos;
-            Quaternion baseRot;
-            if (k.AttachmentAnchor == VirtualKeyAnchor.LeftHand) {
-                basePos = LeftHandRestPosition;
-                baseRot = Quaternion.Euler(LeftHandRestRotation);
-            } else if (k.AttachmentAnchor == VirtualKeyAnchor.RightHand) {
-                basePos = RightHandRestPosition;
-                baseRot = Quaternion.Euler(RightHandRestRotation);
-            } else {
-                basePos = Vector3.zero;
-                baseRot = Quaternion.identity;
-            }
-
-            Vector3 keyLocalPos = k.Transform != null ? k.Transform.Position : Vector3.zero;
-            Quaternion keyLocalRot = Quaternion.Euler(k.Transform != null ? k.Transform.Rotation : Vector3.zero);
-
-            Vector3 keyPosRig = basePos + baseRot * keyLocalPos;
-            Quaternion keyRotRig = baseRot * keyLocalRot;
-
-            keyCenterWorld = rootTr != null ? rootTr.TransformPoint(keyPosRig) : keyPosRig;
-            keyNormalWorld = rootTr != null ? (rootTr.rotation * keyRotRig * Vector3.up) : (keyRotRig * Vector3.up);
-            return true;
-        }
-
         public void RefreshVirtualKeysParent() {
             if (VirtualKeysCollection != null) {
                 VirtualKeysCollection.Parent = this;

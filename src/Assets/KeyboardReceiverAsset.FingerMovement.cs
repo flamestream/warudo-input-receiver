@@ -715,22 +715,6 @@ namespace FlameStream
             return GetKeyboardBedNormalWorld(fallbackAnchor);
         }
 
-        public Vector3 GetHandAlignmentReferenceBedNormalWorldIdentity(bool isLeftHand, VirtualKeyAnchor fallbackAnchor = VirtualKeyAnchor.KeyboardRoot) {
-            var refKey = GetHandAlignmentReferenceKey(isLeftHand);
-            if (refKey != null && TryGetKeyCenterAndNormalIdentity(refKey, out _, out Vector3 refNormal)) {
-                return refNormal;
-            }
-            Transform rootTr = RootAnchor?.GameObject != null ? RootAnchor.GameObject.transform : null;
-            Quaternion rot = Quaternion.identity;
-            if (fallbackAnchor == VirtualKeyAnchor.LeftHand) {
-                rot = Quaternion.Euler(LeftHandRestRotation);
-            } else if (fallbackAnchor == VirtualKeyAnchor.RightHand) {
-                rot = Quaternion.Euler(RightHandRestRotation);
-            }
-            Vector3 normal = rot * Vector3.up;
-            return rootTr != null ? rootTr.rotation * normal : normal;
-        }
-
         public void SetupAllFingertipVisualSetupTransforms() {
             var offsets = FingerMovementDefinitions?.FingertipOffsets;
             if (offsets == null) return;
@@ -978,14 +962,14 @@ namespace FlameStream
 
             bool tiltMode = (BindingGenerator?.GenerationMode ?? KeyGenerationMode.TiltToKeySurface) == KeyGenerationMode.TiltToKeySurface;
 
-            Vector3 leftBedNormal = GetHandAlignmentReferenceBedNormalWorldIdentity(true, VirtualKeyAnchor.LeftHand);
-            Vector3 rightBedNormal = GetHandAlignmentReferenceBedNormalWorldIdentity(false, VirtualKeyAnchor.RightHand);
+            Vector3 leftBedNormal = GetHandAlignmentReferenceBedNormalWorld(true, VirtualKeyAnchor.LeftHand);
+            Vector3 rightBedNormal = GetHandAlignmentReferenceBedNormalWorld(false, VirtualKeyAnchor.RightHand);
 
             foreach (var k in VirtualKeysCollection.Keys) {
                 if (k == null) continue;
 
-                // 1. Get Key position and orientation in World Space (Identity cluster frame)
-                if (!TryGetKeyCenterAndNormalIdentity(k, out Vector3 keyCenterWorld, out Vector3 keyNormalWorld)) continue;
+                // 1. Get Key position and orientation in World Space (against current translated/rotated/scaled cluster)
+                if (!TryGetKeyCenterAndNormal(k, out Vector3 keyCenterWorld, out Vector3 keyNormalWorld)) continue;
 
                 KeyboardFinger finger = k.AssignedFinger;
                 int fingerIdx = (int)finger;
@@ -1016,10 +1000,16 @@ namespace FlameStream
                     bedNormalWorld
                 );
 
-                // 3. Convert solved wrist pose into identity cluster frame
+                // 3. Convert solved wrist pose into cluster frame using InverseTransformFromRig
                 var clusterTransform = GetKeyClusterTransform(k.AttachmentAnchor);
-                Vector3 deltaPos = Quaternion.Inverse(clusterTransform.BaseRotRig) * (solvedPosRig - clusterTransform.BasePivotRig);
-                Quaternion deltaRotQuat = Quaternion.Inverse(clusterTransform.BaseRotRig) * solvedRotRig;
+                Vector3 keyLocalPos = k.Transform != null ? k.Transform.Position : Vector3.zero;
+                clusterTransform.InverseTransformFromRig(
+                    solvedPosRig,
+                    solvedRotRig,
+                    keyLocalPos,
+                    out Vector3 deltaPos,
+                    out Quaternion deltaRotQuat
+                );
                 Vector3 deltaRot = Helper.NormalizeRotationAngles(deltaRotQuat.eulerAngles);
 
                 var binding = StructuredData.Create<KeyboardKeyBinding>(b => {
