@@ -849,8 +849,8 @@ namespace FlameStream
         }
 
         public async void AutoGenerateKeyBindingsFromFloatingKeys() {
-            if (Character == null || !Character.Active || Character.GameObject == null) {
-                Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Warning, "AUTO_GENERATE_KEY_BINDINGS".Localized(), "AUTO_GENERATE_NO_CHARACTER".Localized());
+            if (Character == null || !Character.Active || Character.GameObject == null || IsBasicSetupNotDone()) {
+                Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Warning, "AUTO_GENERATE_KEY_BINDINGS".Localized(), IsBasicSetupNotDone() ? "BASIC_SETUP_REQUIRED_DESC".Localized() : "AUTO_GENERATE_NO_CHARACTER".Localized());
                 return;
             }
 

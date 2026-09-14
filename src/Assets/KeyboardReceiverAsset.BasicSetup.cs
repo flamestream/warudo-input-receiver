@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using DG.Tweening;
 using UnityEngine;
 using Warudo.Core;
 using Warudo.Core.Attributes;
@@ -21,8 +22,14 @@ namespace FlameStream
         [DataInput(10)]
         [Label("ENABLE")]
         [Description("KEYBOARD_ENABLE_DESC")]
-        [DisabledIf(nameof(IsCharacterMissing))]
+        [DisabledIf(nameof(IsHandTrackingDisabled))]
         public bool IsHandEnabled;
+
+        public bool IsHandTrackingDisabled() => IsCharacterMissing() || IsBasicSetupNotDone();
+
+        [DataInput(12)]
+        [Label("ACTIVE_TRANSITION")]
+        public ActiveTransition ActiveTransition;
 
         public bool IsCharacterMissing() => Character == null;
 
@@ -32,22 +39,80 @@ namespace FlameStream
 
         [DataInput(25)]
         [Label("AUTO_SETUP")]
+        [HiddenIf(nameof(IsBasicSetupDone))]
         public KeyboardAutoSetup AutoSetup;
 
+        [Trigger(26)]
+        [Label("RESET_BASIC_SETUP")]
+        [Description("RESET_BASIC_SETUP_DESC")]
+        [HiddenIf(nameof(IsBasicSetupNotDone))]
+        public void TriggerResetBasicSetup() {
+            ResetBasicSetup();
+        }
+
         [DataInput(30)]
-        [Label("KEYBOARD_RIG_ORIGIN")]
-        [Description("KEYBOARD_RIG_ORIGIN_DESC")]
-        public CollapsibleVisualSetupTransform RootTransform;
+        [Label("SAVED_DATA")]
+        public KeyboardBasicSetupSavedData SavedData;
 
-        [DataInput(40)]
-        [Label("LEFT_HAND_REST")]
-        [Description("LEFT_HAND_REST_DESC")]
-        public CollapsibleVisualSetupTransform LeftHandRestTransform;
+        public KeyboardBasicSetupSavedData Advanced => SavedData;
 
-        [DataInput(50)]
-        [Label("RIGHT_HAND_REST")]
-        [Description("RIGHT_HAND_REST_DESC")]
-        public CollapsibleVisualSetupTransform RightHandRestTransform;
+        public string BaseHandAnimation {
+            get => SavedData?.BaseHandAnimation;
+            set {
+                if (SavedData != null) {
+                    SavedData.BaseHandAnimation = value;
+                    SavedData.SetDataInput(nameof(SavedData.BaseHandAnimation), value, true);
+                    SavedData.BroadcastDataInput(nameof(SavedData.BaseHandAnimation));
+                }
+            }
+        }
+
+        public bool IsBasicSetupComplete {
+            get => SavedData?.IsBasicSetupDone ?? false;
+            set {
+                if (SavedData != null) {
+                    SavedData.IsBasicSetupDone = value;
+                    SavedData.SetDataInput(nameof(SavedData.IsBasicSetupDone), value, true);
+                    SavedData.BroadcastDataInput(nameof(SavedData.IsBasicSetupDone));
+                }
+            }
+        }
+
+        public bool IsBasicSetupDone() => IsBasicSetupComplete && Character != null && Character.Active;
+        public bool IsBasicSetupNotDone() => !IsBasicSetupDone();
+
+        public CollapsibleVisualSetupTransform RootTransform {
+            get => SavedData?.RootTransform;
+            set {
+                if (SavedData != null) {
+                    SavedData.RootTransform = value;
+                    SavedData.SetDataInput(nameof(SavedData.RootTransform), value, true);
+                    SavedData.BroadcastDataInput(nameof(SavedData.RootTransform));
+                }
+            }
+        }
+
+        public CollapsibleVisualSetupTransform LeftHandRestTransform {
+            get => SavedData?.LeftHandRestTransform;
+            set {
+                if (SavedData != null) {
+                    SavedData.LeftHandRestTransform = value;
+                    SavedData.SetDataInput(nameof(SavedData.LeftHandRestTransform), value, true);
+                    SavedData.BroadcastDataInput(nameof(SavedData.LeftHandRestTransform));
+                }
+            }
+        }
+
+        public CollapsibleVisualSetupTransform RightHandRestTransform {
+            get => SavedData?.RightHandRestTransform;
+            set {
+                if (SavedData != null) {
+                    SavedData.RightHandRestTransform = value;
+                    SavedData.SetDataInput(nameof(SavedData.RightHandRestTransform), value, true);
+                    SavedData.BroadcastDataInput(nameof(SavedData.RightHandRestTransform));
+                }
+            }
+        }
 
         public Vector3 GetLeftHandMovementScale() => Vector3.one;
 
@@ -350,7 +415,7 @@ namespace FlameStream
             SetupRightHandRestTransform();
         }
 
-        void SetupRootTransform() {
+        public void SetupRootTransform() {
             if (RootTransform == null) {
                 RootTransform = StructuredData.Create<CollapsibleVisualSetupTransform>();
                 RootTransform.Position = new Vector3(0f, 0.6218f, 0.1484f);
@@ -498,7 +563,26 @@ namespace FlameStream
             AutoSetup.Parent = this;
             AutoSetup.CollapsedSelf = true;
 
+            if (SavedData == null) {
+                SavedData = StructuredData.Create<KeyboardBasicSetupSavedData>();
+            }
+            SavedData.Parent = this;
+            SavedData.CollapsedSelf = true;
+
             SetupVisualTransforms();
+
+            if (ActiveTransition == null) {
+                ActiveTransition = StructuredData.Create<ActiveTransition>();
+            }
+            Watch(nameof(ActiveTransition), delegate { });
+            Watch(nameof(SavedData), delegate {
+                if (SavedData != null) {
+                    SavedData.Parent = this;
+                }
+                SetupVisualTransforms();
+                SynchronizeAllFingerAnimations();
+                RefreshSetupPorts();
+            });
 
             Watch(nameof(AutoSetup), delegate {
                 if (AutoSetup != null) {
@@ -506,9 +590,6 @@ namespace FlameStream
                 }
                 AutoSetup?.UpdateButtonState();
             });
-            Watch(nameof(RootTransform), delegate { SetupRootTransform(); });
-            Watch(nameof(LeftHandRestTransform), delegate { SetupLeftHandRestTransform(); });
-            Watch(nameof(RightHandRestTransform), delegate { SetupRightHandRestTransform(); });
 
             Watch(nameof(IsEnabled), delegate { 
                 UpdateHandTrackingState(); 
@@ -530,17 +611,47 @@ namespace FlameStream
                 UpdateFloatingKeysState();
                 AutoSetup?.UpdateButtonState();
                 UpdateInputEnableDescriptions();
+                RefreshSetupPorts();
             });
 
             UpdateInputEnableDescriptions();
             UpdateAdvancedSectionDebugState();
+            RefreshSetupPorts();
+        }
+
+        public void RefreshSetupPorts() {
+            try {
+                var handPort = GetDataInputPort(nameof(IsHandEnabled));
+                if (handPort?.Properties != null) {
+                    handPort.Properties.disabled = IsHandTrackingDisabled();
+                    handPort.Properties.description = IsBasicSetupNotDone()
+                        ? "BASIC_SETUP_REQUIRED_DESC".Localized()
+                        : "KEYBOARD_ENABLE_DESC".Localized();
+                    BroadcastDataInputProperties(nameof(IsHandEnabled));
+                }
+                var autoSetupPort = GetDataInputPort(nameof(AutoSetup));
+                if (autoSetupPort?.Properties != null) {
+                    autoSetupPort.Properties.hidden = IsBasicSetupDone();
+                    BroadcastDataInputProperties(nameof(AutoSetup));
+                }
+                var resetTrigger = GetTriggerPort(nameof(TriggerResetBasicSetup));
+                if (resetTrigger?.Properties != null) {
+                    resetTrigger.Properties.hidden = IsBasicSetupNotDone();
+                    BroadcastTriggerProperties(nameof(TriggerResetBasicSetup));
+                }
+                AutoSetup?.UpdateButtonState();
+                BindingGenerator?.UpdateStatus();
+                RequestUiRefresh();
+            } catch { }
         }
 
         public void UpdateInputEnableDescriptions() {
             try {
                 var handPort = GetDataInputPort(nameof(IsHandEnabled));
                 if (handPort?.Properties != null) {
-                    handPort.Properties.description = "KEYBOARD_ENABLE_DESC".Localized();
+                    handPort.Properties.description = IsBasicSetupNotDone()
+                        ? "BASIC_SETUP_REQUIRED_DESC".Localized()
+                        : "KEYBOARD_ENABLE_DESC".Localized();
                     BroadcastDataInputProperties(nameof(IsHandEnabled));
                 }
 
@@ -566,6 +677,8 @@ namespace FlameStream
         void OnDestroyBasicSetup() {
             ActiveKeyBindingInVisualSetup = null;
             DeactivateAllDebugKeys();
+            handIkTween?.Kill();
+            handIkTween = null;
 
             try {
                 if (Character != null && Character.Active && Character.OverlappingAnimations != null) {
@@ -628,22 +741,109 @@ namespace FlameStream
             }
         }
 
+        DG.Tweening.Tween handIkTween;
+        float currentHandIkWeight = 0f;
+
+        void TransitionIkLimbs(bool isEnabledWanted, DG.Tweening.TweenCallback onComplete = null) {
+            if (Character == null) return;
+
+            var transition = ActiveTransition ?? new ActiveTransition();
+            var targetWeight = isEnabledWanted ? 1f : 0f;
+
+            var leftIk = Character.LeftHandIK;
+            var rightIk = Character.RightHandIK;
+            var leftAnchor = LeftHandAnchor;
+            var rightAnchor = RightHandAnchor;
+
+            if (isEnabledWanted) {
+                if (leftIk != null && leftAnchor != null) {
+                    leftIk.Enabled = true;
+                    leftIk.IkTarget = leftAnchor;
+                }
+                if (rightIk != null && rightAnchor != null) {
+                    rightIk.Enabled = true;
+                    rightIk.IkTarget = rightAnchor;
+                }
+            }
+
+            handIkTween?.Kill();
+
+            if (transition.Time <= 0f) {
+                currentHandIkWeight = targetWeight;
+                ApplyHandIkWeight(targetWeight);
+                if (!isEnabledWanted) {
+                    if (leftIk != null) { leftIk.Enabled = false; leftIk.IkTarget = null; leftIk.Broadcast(); }
+                    if (rightIk != null) { rightIk.Enabled = false; rightIk.IkTarget = null; rightIk.Broadcast(); }
+                    ClearAnchors();
+                    ResetFingerWeights();
+                    ClearFingerAnimations();
+                }
+                onComplete?.Invoke();
+                return;
+            }
+
+            handIkTween = DG.Tweening.DOTween.To(
+                () => currentHandIkWeight,
+                v => {
+                    currentHandIkWeight = v;
+                    ApplyHandIkWeight(v);
+                },
+                targetWeight,
+                transition.Time
+            )
+            .SetEase(transition.Ease)
+            .OnComplete(() => {
+                if (!isEnabledWanted) {
+                    if (leftIk != null) { leftIk.Enabled = false; leftIk.IkTarget = null; leftIk.Broadcast(); }
+                    if (rightIk != null) { rightIk.Enabled = false; rightIk.IkTarget = null; rightIk.Broadcast(); }
+                    ClearAnchors();
+                    ResetFingerWeights();
+                    ClearFingerAnimations();
+                }
+                onComplete?.Invoke();
+            });
+        }
+
+        void ApplyHandIkWeight(float weight) {
+            if (Character == null) return;
+
+            var leftIk = Character.LeftHandIK;
+            if (leftIk != null && leftIk.Enabled) {
+                leftIk.PositionWeight = weight;
+                leftIk.RotationWeight = weight;
+                leftIk.BendGoalWeight = weight;
+                leftIk.Broadcast();
+            }
+
+            var rightIk = Character.RightHandIK;
+            if (rightIk != null && rightIk.Enabled) {
+                rightIk.PositionWeight = weight;
+                rightIk.RotationWeight = weight;
+                rightIk.BendGoalWeight = weight;
+                rightIk.Broadcast();
+            }
+
+            // Drive base hand pose animation layer weight in sync with IK weight
+            if (Character.OverlappingAnimations != null) {
+                var baseLayerId = $"{CHARACTER_ANIM_LAYER_ID_PREFIX} Base Hand Pose";
+                var baseLayerData = Array.Find(Character.OverlappingAnimations, a => a.CustomLayerID == baseLayerId);
+                if (baseLayerData != null) {
+                    baseLayerData.Weight = weight;
+                    int animancerIdx = GetAnimancerLayerIndex(baseLayerData);
+                    if (animancerIdx >= 0) {
+                        SetAnimancerLayerWeight(animancerIdx, weight);
+                    }
+                }
+            }
+        }
+
         void UpdateHandTrackingState() {
-            if (Character != null && IsEnabled && IsHandEnabled) {
+            if (Character != null && IsEnabled && IsHandEnabled && IsBasicSetupDone()) {
                 EnsureAnchors();
                 SynchronizeAllFingerAnimations();
-                var leftAnchor = LeftHandAnchor;
-                var rightAnchor = RightHandAnchor;
-                if (leftAnchor != null) {
-                    EnableLimb(true, Character.LeftHandIK, leftAnchor);
-                }
-                if (rightAnchor != null) {
-                    EnableLimb(true, Character.RightHandIK, rightAnchor);
-                }
+                TransitionIkLimbs(true);
             } else {
-                ClearAnchors();
-                ResetFingerWeights();
-                ClearFingerAnimations();
+                TransitionIkLimbs(false);
             }
         }
 
@@ -859,31 +1059,51 @@ namespace FlameStream
                 RightHandRestTransform.BroadcastDataInput(nameof(RightHandRestTransform.Rotation));
             }
 
+            string capturedAnim = !string.IsNullOrEmpty(Character.DefaultIdleAnimation) 
+                ? Character.DefaultIdleAnimation 
+                : Character.OverlappingAnimations?.FirstOrDefault(a => !string.IsNullOrEmpty(a.Animation) && !(a.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false))?.Animation;
+
+            if (!string.IsNullOrEmpty(capturedAnim)) {
+                BaseHandAnimation = capturedAnim;
+                if (SavedData != null) {
+                    SavedData.SetDataInput(nameof(SavedData.BaseHandAnimation), capturedAnim, true);
+                    SavedData.BroadcastDataInput(nameof(SavedData.BaseHandAnimation));
+                }
+            }
+
+            IsBasicSetupComplete = true;
+
             EnsureAnchors();
             UpdateRootTransform();
             UpdateHandRestTransforms();
             UpdateGroupTransforms();
+            SynchronizeAllFingerAnimations();
 
+            if (AutoSetup != null) {
+                AutoSetup.CollapsedSelf = true;
+            }
             AutoSetup?.UpdateButtonState();
+            RefreshSetupPorts();
 
-            Context.Service?.BroadcastOpenedScene();
             Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Success, "AUTO_SETUP".Localized(), "AUTO_SETUP_SUCCESS".Localized());
         }
 
-        public void ApplyBasicSetup() {
-            if (Character == null) {
-                Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Warning, Name, "Please select a Character before applying Basic Setup.");
-                return;
+        public void ResetBasicSetup() {
+            IsBasicSetupComplete = false;
+
+            if (IsHandEnabled) {
+                IsHandEnabled = false;
+                SetDataInput(nameof(IsHandEnabled), false, true);
+                BroadcastDataInput(nameof(IsHandEnabled));
             }
 
-            IsEnabled = true;
-            IsHandEnabled = true;
-            BroadcastDataInput(nameof(IsEnabled));
-            BroadcastDataInput(nameof(IsHandEnabled));
-
+            if (AutoSetup != null) {
+                AutoSetup.CollapsedSelf = true;
+            }
             UpdateHandTrackingState();
+            RefreshSetupPorts();
 
-            Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Success, Name, "Basic setup applied successfully. Root and hand anchors configured.");
+            Context.Service?.Toast(Warudo.Core.Server.ToastSeverity.Info, "RESET_BASIC_SETUP".Localized(), "RESET_BASIC_SETUP_DESC".Localized());
         }
 
         public void ClearAnchors() {
@@ -941,8 +1161,40 @@ namespace FlameStream
             var userLayers = Character.OverlappingAnimations?.Where(d => !(d.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false)).ToList() ?? new List<OverlappingAnimationData>();
             var pluginLayers = Character.OverlappingAnimations?.Where(d => d.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false).ToList() ?? new List<OverlappingAnimationData>();
 
-            // Always maintain strict canonical order of all fingers (LeftPinky -> RightPinky)
             var newPluginLayers = new List<OverlappingAnimationData>();
+
+            // 1. Base Hand Pose Layer (Non-additive, masked to Left & Right fingers)
+            var baseAnimClip = !string.IsNullOrEmpty(BaseHandAnimation) ? BaseHandAnimation : Character.DefaultIdleAnimation;
+            if (!string.IsNullOrEmpty(baseAnimClip)) {
+                var baseLayerId = $"{CHARACTER_ANIM_LAYER_ID_PREFIX} Base Hand Pose";
+                var baseLayer = pluginLayers.FirstOrDefault(d => d.CustomLayerID == baseLayerId);
+                var baseMask = new[] { AnimationMaskedBodyPart.LeftFingers, AnimationMaskedBodyPart.RightFingers };
+                float targetBaseWeight = (IsEnabled && IsHandEnabled) ? (handIkTween != null && handIkTween.IsActive() ? currentHandIkWeight : 1f) : 0f;
+
+                if (baseLayer == null) {
+                    baseLayer = StructuredData.Create<OverlappingAnimationData>();
+                    baseLayer.CustomLayerID = baseLayerId;
+                    baseLayer.Enabled = true;
+                    baseLayer.Animation = baseAnimClip;
+                    baseLayer.Weight = targetBaseWeight;
+                    baseLayer.Speed = 1f;
+                    baseLayer.Additive = false; // Non-additive: sets stable baseline
+                    baseLayer.Looping = false;
+                    baseLayer.Masked = true;
+                    baseLayer.MaskedBodyParts = baseMask;
+                } else {
+                    baseLayer.Enabled = true;
+                    baseLayer.Animation = baseAnimClip;
+                    baseLayer.Additive = false;
+                    baseLayer.Looping = false;
+                    baseLayer.Speed = 1f;
+                    baseLayer.Masked = true;
+                    baseLayer.MaskedBodyParts = baseMask;
+                }
+                newPluginLayers.Add(baseLayer);
+            }
+
+            // 2. 10 Finger Press Overlay Animations (Additive = true)
             foreach (KeyboardFinger f in Enum.GetValues(typeof(KeyboardFinger))) {
                 var layerId = GetFingerLayerId(f);
                 var animClip = GetFingerAnimation(f);

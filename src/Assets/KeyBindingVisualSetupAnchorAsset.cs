@@ -26,25 +26,26 @@ namespace FlameStream {
         }
 
         [Trigger(20)]
-        [Label("ALIGN_HAND_WITH_BUTTON_SURFACE")]
-        [Description("ALIGN_HAND_WITH_BUTTON_SURFACE_DESC")]
-        public void TriggerAlignHandWithSurface() {
-            OnAlignHandWithSurface?.Invoke();
-        }
-
-        [Trigger(21)]
         [Label("MOVE_FINGER_TO_BUTTON")]
         [Description("MOVE_FINGER_TO_BUTTON_DESC")]
         public void TriggerMoveFingerToButton() {
             OnMoveFingerToButton?.Invoke();
         }
 
-        [Trigger(22)]
+        [Trigger(21)]
         [Label("ROTATE_HAND_TO_NATURAL_ROTATION")]
         [Description("ROTATE_HAND_TO_NATURAL_ROTATION_DESC")]
         public void TriggerRotateHandToNaturalRotation() {
             OnRotateHandToNaturalRotation?.Invoke();
         }
+
+        [Trigger(22)]
+        [Label("ALIGN_HAND_WITH_BUTTON_SURFACE")]
+        [Description("ALIGN_HAND_WITH_BUTTON_SURFACE_DESC")]
+        public void TriggerAlignHandWithSurface() {
+            OnAlignHandWithSurface?.Invoke();
+        }
+
 
         [Section("VISUAL_GUIDES")]
 

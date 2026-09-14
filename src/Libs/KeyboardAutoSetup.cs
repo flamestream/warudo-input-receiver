@@ -15,7 +15,7 @@ namespace FlameStream
             Parent?.AutoSetupFromCharacterPose();
         }
 
-        public string GetHeader() => "AUTO_SETUP_HEADER".Localized();
+        public string GetHeader() => "CLICK_TO_SETUP_CHARACTER".Localized();
 
         protected override void OnCreate() {
             base.OnCreate();
