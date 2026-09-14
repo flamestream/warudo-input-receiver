@@ -28,9 +28,42 @@ namespace FlameStream
         protected override void OnCreate() {
             base.OnCreate();
             CollapsedSelf = true;
-            if (Left != null) Left.CollapsedSelf = true;
-            if (Right != null) Right.CollapsedSelf = true;
-            if (Root != null) Root.CollapsedSelf = true;
+            if (Root == null) {
+                Root = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                Root.Position = Vector3.zero;
+                Root.Rotation = Vector3.zero;
+                Root.Scale = Vector3.one;
+            }
+            Root.HideScale();
+            Root.CollapsedSelf = true;
+
+            if (Left == null) {
+                Left = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                Left.Position = Vector3.zero;
+                Left.Rotation = Vector3.zero;
+                Left.Scale = Vector3.one;
+            }
+            Left.HideScale();
+            Left.CollapsedSelf = true;
+
+            if (Right == null) {
+                Right = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                Right.Position = Vector3.zero;
+                Right.Rotation = Vector3.zero;
+                Right.Scale = Vector3.one;
+            }
+            Right.HideScale();
+            Right.CollapsedSelf = true;
+
+            Watch(nameof(Root), delegate {
+                Parent?.SetupRootKeysetTransform();
+            });
+            Watch(nameof(Left), delegate {
+                Parent?.SetupLeftKeysetTransform();
+            });
+            Watch(nameof(Right), delegate {
+                Parent?.SetupRightKeysetTransform();
+            });
         }
     }
 
@@ -40,14 +73,12 @@ namespace FlameStream
         public Quaternion BaseRotRig;
         public Vector3 OriginPos;
         public Quaternion OriginRot;
-        public Vector3 OriginScale;
 
         public Vector3 ClusterOriginRig => BasePivotRig + BaseRotRig * OriginPos;
         public Quaternion ClusterRotRig => BaseRotRig * OriginRot;
 
         public Vector3 TransformLocalToRig(Vector3 deltaLocal) {
-            Vector3 scaled = Vector3.Scale(deltaLocal, OriginScale);
-            return ClusterOriginRig + ClusterRotRig * scaled;
+            return ClusterOriginRig + ClusterRotRig * deltaLocal;
         }
 
         public Quaternion TransformRotationToRig(Quaternion rotLocal) {
@@ -56,12 +87,7 @@ namespace FlameStream
 
         public void InverseTransformFromRig(Vector3 rigPos, Quaternion rigRot, out Vector3 deltaLocal, out Quaternion rotLocal) {
             Quaternion invRot = Quaternion.Inverse(ClusterRotRig);
-            Vector3 unrotated = invRot * (rigPos - ClusterOriginRig);
-            deltaLocal = new Vector3(
-                Mathf.Abs(OriginScale.x) > 0.00001f ? unrotated.x / OriginScale.x : unrotated.x,
-                Mathf.Abs(OriginScale.y) > 0.00001f ? unrotated.y / OriginScale.y : unrotated.y,
-                Mathf.Abs(OriginScale.z) > 0.00001f ? unrotated.z / OriginScale.z : unrotated.z
-            );
+            deltaLocal = invRot * (rigPos - ClusterOriginRig);
             rotLocal = invRot * rigRot;
         }
     }
