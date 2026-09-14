@@ -53,6 +53,23 @@ namespace FlameStream
 
         public Vector3 GetRightHandMovementScale() => Vector3.one;
 
+        public bool IsInAnyVisualSetup {
+            get {
+                if (RootTransform != null && RootTransform.InVisualSetupMode) return true;
+                if (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode) return true;
+                if (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode) return true;
+                if (RootKeysetTransform != null && RootKeysetTransform.InVisualSetupMode) return true;
+                if (LeftKeysetTransform != null && LeftKeysetTransform.InVisualSetupMode) return true;
+                if (RightKeysetTransform != null && RightKeysetTransform.InVisualSetupMode) return true;
+                if (ActiveVirtualKeyInVisualSetup != null) return true;
+                if (ActiveKeyBindingInVisualSetup != null) return true;
+                if (activeVisualSetupFinger.HasValue) return true;
+                if (FingerMovementDefinitions?.FingertipOffsets != null && FingerMovementDefinitions.FingertipOffsets.IsInAnyVisualSetup()) return true;
+                return false;
+            }
+        }
+
+
         public bool ReturnToRest {
             get => FingerTransitions?.ReturnToRest ?? true;
             set {

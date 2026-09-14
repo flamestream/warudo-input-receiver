@@ -140,6 +140,24 @@ namespace FlameStream
         }
 
         public KeyboardFinger? activeVisualSetupFinger = null;
+        private bool wasInAnyVisualSetup = false;
+
+        public void OnEnterVisualSetupMode() {
+            ResetFingerWeights();
+            if (activeVisualSetupFinger.HasValue) {
+                int fIdx = (int)activeVisualSetupFinger.Value;
+                ApplyFingerLayerWeight(activeVisualSetupFinger.Value, fIdx, 1.0f);
+            }
+            if (ActiveKeyBindingInVisualSetup != null) {
+                int fIdx = (int)ActiveKeyBindingInVisualSetup.Finger;
+                ApplyFingerLayerWeight(ActiveKeyBindingInVisualSetup.Finger, fIdx, 1.0f);
+            }
+        }
+
+        public void OnExitVisualSetupMode() {
+            ResetFingerWeights();
+        }
+
 
         public void RefreshKeyBindingsParent() {
             if (KeyBindings != null) {
@@ -195,6 +213,16 @@ namespace FlameStream
         void OnUpdateFingerMovement() {
             if (!IsEnabled || !IsHandEnabled || Character == null) return;
 
+            bool inSetup = IsInAnyVisualSetup;
+            if (inSetup != wasInAnyVisualSetup) {
+                wasInAnyVisualSetup = inSetup;
+                if (inSetup) {
+                    OnEnterVisualSetupMode();
+                } else {
+                    OnExitVisualSetupMode();
+                }
+            }
+
             if (KeyBindings != null && KeyBindings.Length > 0 && KeyBindings[0] != null && KeyBindings[0].Parent == null) {
                 RefreshKeyBindingsParent();
             }
@@ -211,7 +239,7 @@ namespace FlameStream
                 activeKeySetup.UpdateDebugVisuals();
             }
 
-            var activeLeftKey = isLeftInVisualSetup ? null : GetActiveKeyForHand(true, KeyBindings);
+            var activeLeftKey = (isLeftInVisualSetup || inSetup) ? null : GetActiveKeyForHand(true, KeyBindings);
             Vector3 restLeftPos = (LeftHandRestTransform != null && LeftHandRestTransform.InVisualSetupMode && LeftHandRestTransform.setupAnchor != null)
                 ? LeftHandRestTransform.setupAnchor.Transform.Position
                 : LeftHandRestPosition;
@@ -231,7 +259,7 @@ namespace FlameStream
                 lastLeftKeyRot = targetLeftRot;
                 hasLeftKeyBeenPressed = false;
                 leftKeyReleaseTime = -1f;
-            } else if (isLeftInVisualSetup) {
+            } else if (isLeftInVisualSetup || inSetup) {
                 targetLeftPos = restLeftPos;
                 targetLeftRot = restLeftRot;
                 currentLeftHandPos = restLeftPos;
@@ -283,7 +311,7 @@ namespace FlameStream
                 activeKeySetup.UpdateDebugVisuals();
             }
 
-            var activeRightKey = isRightInVisualSetup ? null : GetActiveKeyForHand(false, KeyBindings);
+            var activeRightKey = (isRightInVisualSetup || inSetup) ? null : GetActiveKeyForHand(false, KeyBindings);
             Vector3 restRightPos = (RightHandRestTransform != null && RightHandRestTransform.InVisualSetupMode && RightHandRestTransform.setupAnchor != null)
                 ? RightHandRestTransform.setupAnchor.Transform.Position
                 : RightHandRestPosition;
@@ -303,7 +331,7 @@ namespace FlameStream
                 lastRightKeyRot = targetRightRot;
                 hasRightKeyBeenPressed = false;
                 rightKeyReleaseTime = -1f;
-            } else if (isRightInVisualSetup) {
+            } else if (isRightInVisualSetup || inSetup) {
                 targetRightPos = restRightPos;
                 targetRightRot = restRightRot;
                 currentRightHandPos = restRightPos;
@@ -350,7 +378,7 @@ namespace FlameStream
             }
 
             // 3. Populate targetFingerWeights for ALL currently pressed keys across all bindings
-            if (KeyBindings != null) {
+            if (!inSetup && KeyBindings != null) {
                 for (int i = 0; i < KeyBindings.Length; i++) {
                     var binding = KeyBindings[i];
                     if (binding == null) continue;
@@ -375,11 +403,14 @@ namespace FlameStream
             if (isRightKeySetup) {
                 targetFingerWeights[(int)activeKeySetup.Finger] = 1.0f;
             }
+            if (activeVisualSetupFinger.HasValue) {
+                targetFingerWeights[(int)activeVisualSetupFinger.Value] = 1.0f;
+            }
 
             // 4. Drive Left Hand Anchor
             var leftAnchor = LeftHandAnchor;
             if (leftAnchor != null) {
-                if (isLeftInVisualSetup) {
+                if (isLeftInVisualSetup || inSetup) {
                     leftHandPosTween?.Kill(false);
                     leftHandRotTween?.Kill(false);
                     currentLeftHandPos = targetLeftPos;
@@ -419,7 +450,7 @@ namespace FlameStream
             // 5. Drive Right Hand Anchor
             var rightAnchor = RightHandAnchor;
             if (rightAnchor != null) {
-                if (isRightInVisualSetup) {
+                if (isRightInVisualSetup || inSetup) {
                     rightHandPosTween?.Kill(false);
                     rightHandRotTween?.Kill(false);
                     currentRightHandPos = targetRightPos;
@@ -455,6 +486,7 @@ namespace FlameStream
                 rightAnchor.Transform.Rotation = ApplyHandIKIntermediateRotation(false, currentRightHandRot);
                 rightAnchor.Transform.Broadcast();
             }
+
 
             // 6. Drive 10 Finger Overlay Animations
             if (isBatchAutoGenerating) {
@@ -739,10 +771,7 @@ namespace FlameStream
 
             tr.OnEnterVisualSetup = (transform) => {
                 activeVisualSetupFinger = finger;
-                int fIdx = (int)finger;
-                if (fIdx >= 0 && fIdx < fingerTweens.Length) {
-                    fingerTweens[fIdx]?.Kill(false);
-                }
+                ResetFingerWeights();
                 if (Character?.OverlappingAnimations != null) {
                     var layerId = GetFingerLayerId(finger);
                     var layerData = Array.Find(Character.OverlappingAnimations, a => a.CustomLayerID == layerId);
@@ -754,6 +783,7 @@ namespace FlameStream
                     }
                 }
             };
+
 
             tr.OnMirrorToOppositeHand = (sourceTr) => {
                 if (FingerMovementDefinitions?.FingertipOffsets == null) return;
@@ -794,15 +824,12 @@ namespace FlameStream
 
             tr.OnExitVisualSetup = (isApplied) => {
                 activeVisualSetupFinger = null;
-                int fIdx = (int)finger;
-                if (fIdx >= 0 && fIdx < fingerTweens.Length) {
-                    fingerTweens[fIdx]?.Kill(false);
-                }
-                ApplyFingerLayerWeight(finger, fIdx, 0.0f);
+                ResetFingerWeights();
 
                 Context.Service.NavigateToAsset(Id);
                 Context.Service.BroadcastOpenedScene();
             };
+
         }
 
         public Vector3 GetCurledFingerTipContactVector(Animator anim, KeyboardFinger finger) {

@@ -184,6 +184,22 @@ namespace FlameStream
             }
         }
 
+        public bool IsInAnyVisualSetup() {
+            if (UnifiedOffset != null && UnifiedOffset.InVisualSetupMode) return true;
+            if (LeftThumb != null && LeftThumb.InVisualSetupMode) return true;
+            if (LeftIndex != null && LeftIndex.InVisualSetupMode) return true;
+            if (LeftMiddle != null && LeftMiddle.InVisualSetupMode) return true;
+            if (LeftRing != null && LeftRing.InVisualSetupMode) return true;
+            if (LeftPinky != null && LeftPinky.InVisualSetupMode) return true;
+            if (RightThumb != null && RightThumb.InVisualSetupMode) return true;
+            if (RightIndex != null && RightIndex.InVisualSetupMode) return true;
+            if (RightMiddle != null && RightMiddle.InVisualSetupMode) return true;
+            if (RightRing != null && RightRing.InVisualSetupMode) return true;
+            if (RightPinky != null && RightPinky.InVisualSetupMode) return true;
+            return false;
+        }
+
+
         public void EnsureTransforms() {
             if (UnifiedOffset == null) {
                 UnifiedOffset = StructuredData.Create<FingertipOffsetVisualSetupTransform>();

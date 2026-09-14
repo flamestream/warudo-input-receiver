@@ -736,10 +736,11 @@ namespace FlameStream
                     keyDef.KeyGameObject.transform.localScale = keyDef.Transform.setupAnchor.Transform.Scale;
                 }
 
-                // Input evaluation & glow
-                bool isDown = Down((int)keyDef.Key);
+                // Input evaluation & glow (suppressed during any visual setup mode)
+                bool isDown = IsInAnyVisualSetup ? false : Down((int)keyDef.Key);
 
                 ApplyKeyGlowState(keyDef, isDown, dt);
+
             }
 
             UpdateIdentifyPulseAnimation();
