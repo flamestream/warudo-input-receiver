@@ -96,13 +96,18 @@ Only the **first** member of a section gets `[Section("NAME")]`. For dynamic sec
 ### 3.13 Asset Auto-Migration
 Use the two-phase pipeline in `ReceiverAsset.Deserialize()`: `OnPreMigrateAsset` (rename/remove raw port keys before deserialization) → `base.Deserialize()` → `OnPostMigrateAsset` (heal typed C# objects via `SetDataInput`). → [Gotcha #29](.ai/warudo_runtime_gotchas.md)
 
+### 3.14 Key Origins Scaling & Natural Hand Reach Alignment
+- Avatar bones do not scale with props/keyboards. Never scale wrist reach deltas from floor/rig origin `(0, 0, 0)`.
+- Use key-relative reach compensation: shift the wrist target by the key's scale expansion `(scale - 1) * keyLocalPos` so the reaching offset between key cap and wrist is 100% scale-invariant. → [Gotcha #42](.ai/warudo_runtime_gotchas.md)
+- Always solve hand reach orientations against live world/rig transformed keys (considering the live resting elbow line) and store relative to cluster via `InverseTransformFromRig`. → [Gotcha #43](.ai/warudo_runtime_gotchas.md)
+
 ---
 
 ## 4. Knowledge Base Index
 
 | File | Covers |
 |------|--------|
-| [warudo_runtime_gotchas.md](.ai/warudo_runtime_gotchas.md) | All runtime quirks, crash bugs, and serialization traps (41 entries) |
+| [warudo_runtime_gotchas.md](.ai/warudo_runtime_gotchas.md) | All runtime quirks, crash bugs, and serialization traps (43 entries) |
 | [plugin_development_cheatsheet.md](.ai/plugin_development_cheatsheet.md) | Plugin/Node/Asset patterns, port attributes, UniTask, toasts |
 | [animancer_integration_guide.md](.ai/animancer_integration_guide.md) | Animancer Pro/Lite conflict, assembly identity, layer blending patterns |
 | [warudo_modding_architecture.md](.ai/warudo_modding_architecture.md) | UMod build pipeline, `.warudo` package structure, SDK vs runtime env |

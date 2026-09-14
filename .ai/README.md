@@ -55,3 +55,5 @@ This directory contains key architecture notes, integration patterns, build pipe
    - Rest-relative hand slab & surface normal orientation (Gotcha #39).
    - `SetCharacterOverlappingAnimations` crash in Playground mode (Roslyn `RecursivelySetData` failure) and `IsPlaygroundMode` branch fix (Gotcha #40).
    - UMod security scanner blocks `System.Reflection`; `SetPortDefaultValue` removed entirely (Gotcha #41).
+   - Key Origins scaling & dynamic hand IK reach compensation via scale cancellation (Gotcha #42).
+   - Natural hand rotation alignment solved against live transformed keys in rig space (Gotcha #43).

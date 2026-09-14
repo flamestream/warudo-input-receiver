@@ -1483,3 +1483,63 @@ When [`personal-tools/sync.ps1`](file:///d:/Code/FS%20Input%20Receiver/personal-
 - If Playground-only reflection is ever needed in the future, always wrap it in `// [PLAYGROUND_ONLY_START]` and `// [PLAYGROUND_ONLY_END]`.
 - Always use `sync.bat src unity` before running `build-mod.ps1` or packaging in Unity.
 
+---
+
+## 42. Key Origins Scaling & Dynamic Hand IK Reach Compensation
+
+### The Phenomenon
+When scaling `Key Origins` (`Center Key Origin`, `Left Key Origin`, `Right Key Origin`), applying naive scale transformations to hand IK reach targets causes severe distortion:
+1. **Vertical/Spatial Blow-up**: If wrist positions are scaled relative to the rig root `(0, 0, 0)` on the floor, the elevation of the keyboard (e.g., table height `Y = 0.85m`) is multiplied by the scale factor, launching the hands high into the air or sinking them into the floor.
+2. **Arm Geometry Distortion**: In Warudo, `Attachable` does not propagate scale to children or IK targets. More importantly, the avatar's arms, forearms, and fingers have fixed skeletal lengths and **do not scale** when the keyboard scales. If the reach offset is scaled proportionally from the origin, the hand target can easily exceed the physical reach limit of the avatar's arm.
+3. **Key Drift Mismatch**: When the keyboard mesh or cluster scales, individual keys move outward from the cluster origin by `(Scale - 1) * localKeyPos`. If the wrist does not track this outward expansion, the fingers will miss the key caps entirely.
+
+### Root Cause
+A key cluster scaling operation changes the position of key caps relative to the cluster origin:
+$$\mathbf{P}_{\text{key, rig}} = \mathbf{P}_{\text{cluster}} + \mathbf{R}_{\text{cluster}} \cdot (\mathbf{S}_{\text{origin}} \odot \mathbf{p}_{\text{key, local}})$$
+where $\mathbf{S}_{\text{origin}}$ is the cluster scale vector, and $\mathbf{p}_{\text{key, local}}$ is the key position relative to the unscaled cluster origin.
+
+The key's displacement due strictly to scaling is:
+$$\Delta \mathbf{P}_{\text{key, rig}} = \mathbf{R}_{\text{cluster}} \cdot \left[ (\mathbf{S}_{\text{origin}} - \mathbf{1}) \odot \mathbf{p}_{\text{key, local}} \right]$$
+
+### The Scale-Invariant Reach Solution
+To keep the finger-to-key reaching vector identical regardless of scale, the wrist IK target must shift by the exact same scaling displacement as the target key:
+$$\mathbf{W}_{\text{rig}} = \mathbf{P}_{\text{cluster}} + \mathbf{R}_{\text{cluster}} \cdot \left[ \mathbf{\delta}_{\text{local}} + (\mathbf{S}_{\text{origin}} - \mathbf{1}) \odot \mathbf{p}_{\text{key, local}} \right]$$
+
+When computing the vector from the key cap to the wrist in rig space:
+$$\mathbf{W}_{\text{rig}} - \mathbf{P}_{\text{key, rig}} = \mathbf{R}_{\text{cluster}} \cdot (\mathbf{\delta}_{\text{local}} - \mathbf{p}_{\text{key, local}})$$
+
+**Notice that $\mathbf{S}_{\text{origin}}$ completely cancels out!**
+The relative reaching offset between the key cap and the wrist target is 100% scale-invariant. The keyboard cluster scales naturally, keys spread out or compress, and the hands track their keys without arm distortion or launching into the air.
+
+### Rule
+- Never scale wrist reach deltas from the floor/rig origin $(0, 0, 0)$.
+- In `KeyClusterTransform`, incorporate `(originScale - Vector3.one) * keyLocalPos` into the rig reach position so the key-to-wrist vector remains constant regardless of cluster scale.
+
+---
+
+## 43. Natural Hand Rotation Alignment Must Solve Against Live Transformed Keys
+
+### The Phenomenon
+When auto-generating finger key bindings (`AutoGenerateKeyBindingsFromFloatingKeys`), solving forearm yaw and hand pitch/roll against unrotated/unscaled identity keys (`TryGetKeyCenterAndNormalIdentity`) produced unnatural or misaligned hand orientations on angled or rotated keyboards in user scenes. The hands looked oriented against an unrotated, flat desk rather than resting naturally on the slanted keyboard.
+
+### Root Cause
+Hand reach orientation depends on two geometric constraints:
+1. **The key surface normal**: Determines the palm bed tilt and roll.
+2. **The vector from the avatar's resting elbow to the key**: Determines the natural forearm yaw and approach angle.
+
+Because 3D rotation composition is non-commutative and rotation cannot compensate for linear translation or scaling offsets relative to the avatar's body without considering the live elbow line, solving at identity and post-multiplying by `clusterRot` ignores the actual spatial geometry between the avatar's body and the key in the user's scene.
+
+### Solution: Solve in Live Rig Space & Store Relative to Cluster
+1. **Solve against live world/rig keys**: Auto-generation queries `TryGetKeyCenterAndNormal` and `GetHandAlignmentReferenceBedNormalWorld`, determining the true natural wrist orientation $\mathbf{R}_{\text{solved}}$ in the live scene.
+2. **Store relative to the cluster**: Use `clusterTransform.InverseTransformFromRig(R_solved)` to record:
+   $$\mathbf{R}_{\text{stored}} = \mathbf{R}_{\text{cluster}}^{-1} \cdot \mathbf{R}_{\text{solved}}$$
+3. **Reconstruct at runtime**: When evaluating finger movement at runtime, `clusterTransform.TransformToRig(R_stored)` applies:
+   $$\mathbf{R}_{\text{cluster}} \cdot \mathbf{R}_{\text{stored}} = \mathbf{R}_{\text{cluster}} \cdot \left( \mathbf{R}_{\text{cluster}}^{-1} \cdot \mathbf{R}_{\text{solved}} \right) = \mathbf{R}_{\text{solved}}$$
+
+This captures the natural tilt and yaw of the hand on the keys in the user's actual scene, while remaining fully responsive to dynamic changes in the `Key Origins` anchor.
+
+### Rule
+- Always calculate hand reach alignment against live transformed keys in rig/world space.
+- Store orientations relative to the cluster via `clusterTransform.InverseTransformFromRig(rotation)` so dynamic changes to `Key Origins` propagate smoothly.
+
+
