@@ -55,7 +55,7 @@ namespace FlameStream
         }
 
         void OnUpdateBody() {
-            if (!IsBodyEnabled) return;
+            if (!IsEnabled || !IsHandEnabled || !IsBodyEnabled) return;
             if (Character == null) return;
             if (cursorAnchorAsset == null) return;
 

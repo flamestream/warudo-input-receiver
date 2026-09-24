@@ -18,6 +18,8 @@ namespace FlameStream
     public partial class KeyboardReceiverAsset : ReceiverAsset {
 
         [Section("BASIC_SETUP")]
+        [Markdown(5)]
+        public string DelegationStatus = "";
 
         [DataInput(10)]
         [Label("ENABLE")]
@@ -689,6 +691,7 @@ namespace FlameStream
         }
 
         void OnUpdateBasicSetup() {
+            UpdateUiStatus();
             if (AutoSetup == null) {
                 SetupAutoSetup();
             }
@@ -744,8 +747,19 @@ namespace FlameStream
         DG.Tweening.Tween handIkTween;
         float currentHandIkWeight = 0f;
 
+        public void OnHandDelegationChanged() {
+            if (activeCoordinator != null) {
+                handIkTween?.Kill();
+            } else {
+                UpdateHandTrackingState();
+            }
+        }
+
         void TransitionIkLimbs(bool isEnabledWanted, DG.Tweening.TweenCallback onComplete = null) {
             if (Character == null) return;
+            if (activeCoordinator != null) {
+                return;
+            }
 
             var transition = ActiveTransition ?? new ActiveTransition();
             var targetWeight = isEnabledWanted ? 1f : 0f;
@@ -772,8 +786,8 @@ namespace FlameStream
                 currentHandIkWeight = targetWeight;
                 ApplyHandIkWeight(targetWeight);
                 if (!isEnabledWanted) {
-                    if (leftIk != null) { leftIk.Enabled = false; leftIk.IkTarget = null; leftIk.Broadcast(); }
-                    if (rightIk != null) { rightIk.Enabled = false; rightIk.IkTarget = null; rightIk.Broadcast(); }
+                    if (leftIk != null && leftAnchor != null && leftIk.IkTarget == leftAnchor) { leftIk.Enabled = false; leftIk.IkTarget = null; leftIk.Broadcast(); }
+                    if (rightIk != null && rightAnchor != null && rightIk.IkTarget == rightAnchor) { rightIk.Enabled = false; rightIk.IkTarget = null; rightIk.Broadcast(); }
                     ClearAnchors();
                     ResetFingerWeights();
                     ClearFingerAnimations();
@@ -794,8 +808,8 @@ namespace FlameStream
             .SetEase(transition.Ease)
             .OnComplete(() => {
                 if (!isEnabledWanted) {
-                    if (leftIk != null) { leftIk.Enabled = false; leftIk.IkTarget = null; leftIk.Broadcast(); }
-                    if (rightIk != null) { rightIk.Enabled = false; rightIk.IkTarget = null; rightIk.Broadcast(); }
+                    if (leftIk != null && leftAnchor != null && leftIk.IkTarget == leftAnchor) { leftIk.Enabled = false; leftIk.IkTarget = null; leftIk.Broadcast(); }
+                    if (rightIk != null && rightAnchor != null && rightIk.IkTarget == rightAnchor) { rightIk.Enabled = false; rightIk.IkTarget = null; rightIk.Broadcast(); }
                     ClearAnchors();
                     ResetFingerWeights();
                     ClearFingerAnimations();
@@ -805,10 +819,14 @@ namespace FlameStream
         }
 
         void ApplyHandIkWeight(float weight) {
+            if (activeCoordinator != null) return;
             if (Character == null) return;
 
+            var leftAnchor = LeftHandAnchor;
+            var rightAnchor = RightHandAnchor;
+
             var leftIk = Character.LeftHandIK;
-            if (leftIk != null && leftIk.Enabled) {
+            if (leftIk != null && leftIk.Enabled && leftAnchor != null && leftIk.IkTarget == leftAnchor) {
                 leftIk.PositionWeight = weight;
                 leftIk.RotationWeight = weight;
                 leftIk.BendGoalWeight = weight;
@@ -816,7 +834,7 @@ namespace FlameStream
             }
 
             var rightIk = Character.RightHandIK;
-            if (rightIk != null && rightIk.Enabled) {
+            if (rightIk != null && rightIk.Enabled && rightAnchor != null && rightIk.IkTarget == rightAnchor) {
                 rightIk.PositionWeight = weight;
                 rightIk.RotationWeight = weight;
                 rightIk.BendGoalWeight = weight;
@@ -1112,8 +1130,8 @@ namespace FlameStream
             var right = RightHandAnchor;
 
             if (Character != null) {
-                EnableLimb(false, Character.LeftHandIK, null);
-                EnableLimb(false, Character.RightHandIK, null);
+                EnableLimb(false, Character.LeftHandIK, left);
+                EnableLimb(false, Character.RightHandIK, right);
             }
 
             if (left != null) {
@@ -1136,19 +1154,23 @@ namespace FlameStream
         }
 
         void EnableLimb(bool isEnabled, LimbIKData limb, AnchorAsset anchor) {
+            if (activeCoordinator != null) return;
             if (limb == null) return;
             if (isEnabled && anchor != null) {
                 limb.Enabled = true;
                 limb.IkTarget = anchor;
                 limb.PositionWeight = 1.0f;
                 limb.RotationWeight = 1.0f;
-            } else {
-                limb.Enabled = false;
-                limb.IkTarget = null;
-                limb.PositionWeight = 0f;
-                limb.RotationWeight = 0f;
+                limb.Broadcast();
+            } else if (!isEnabled) {
+                if (anchor != null && limb.IkTarget == anchor) {
+                    limb.Enabled = false;
+                    limb.IkTarget = null;
+                    limb.PositionWeight = 0f;
+                    limb.RotationWeight = 0f;
+                    limb.Broadcast();
+                }
             }
-            limb.Broadcast();
         }
 
         public void SynchronizeFingerAnimation(KeyboardFinger finger) {

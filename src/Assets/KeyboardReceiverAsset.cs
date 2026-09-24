@@ -1,5 +1,7 @@
+using System.Linq;
 using UnityEngine;
 using Warudo.Core.Attributes;
+using Warudo.Core.Localization;
 using Warudo.Core.Scenes;
 using Warudo.Core.Serializations;
 
@@ -43,6 +45,80 @@ namespace FlameStream
             UnityEngine.Debug.Log($"[FlameStream.Asset.KeyboardReceiver] {msg}");
         }
 
+
+        private MultiInputCoordinatorAsset activeCoordinator;
+        public MultiInputCoordinatorAsset ActiveCoordinator => activeCoordinator;
+
+        public void RegisterCoordinator(MultiInputCoordinatorAsset coordinator) {
+            if (activeCoordinator == coordinator) return;
+            activeCoordinator = coordinator;
+            OnHandDelegationChanged();
+            RequestUiRefresh();
+        }
+
+        public void UnregisterCoordinator(MultiInputCoordinatorAsset coordinator) {
+            if (activeCoordinator != coordinator) return;
+            activeCoordinator = null;
+            OnHandDelegationChanged();
+            RequestUiRefresh();
+        }
+
+        public string GetDelegationStatusMessage() {
+            if (activeCoordinator != null) {
+                if (activeCoordinator.IsEnabled) {
+                    return string.Format("IK_DELEGATED_TO".Localized(), "HAND".Localized(), activeCoordinator.Name);
+                } else {
+                    return string.Format("IK_PAUSED_COORDINATOR_DISABLED".Localized(), "HAND".Localized(), activeCoordinator.Name);
+                }
+            }
+            if (Character != null && IsEnabled && IsHandEnabled) {
+                var leftAnchor = LeftHandAnchor;
+                var rightAnchor = RightHandAnchor;
+                var leftIk = Character.LeftHandIK;
+                var rightIk = Character.RightHandIK;
+
+                if (leftIk != null && leftIk.Enabled && leftIk.IkTarget != null && (leftAnchor == null || leftIk.IkTarget != leftAnchor)) {
+                    return string.Format("IK_NOT_CONTROLLING_HAND".Localized(), "LEFT_HAND".Localized(), leftIk.IkTarget.Name);
+                }
+                if (rightIk != null && rightIk.Enabled && rightIk.IkTarget != null && (rightAnchor == null || rightIk.IkTarget != rightAnchor)) {
+                    return string.Format("IK_NOT_CONTROLLING_HAND".Localized(), "RIGHT_HAND".Localized(), rightIk.IkTarget.Name);
+                }
+                if ((leftIk != null && !leftIk.Enabled && leftAnchor != null) || (rightIk != null && !rightIk.Enabled && rightAnchor != null)) {
+                    return string.Format("IK_NOT_ACTIVE".Localized(), "HAND".Localized());
+                }
+
+                var allReceivers = Scene?.GetAssets<PointerReceiverAsset>();
+                if (allReceivers != null) {
+                    bool conflict = allReceivers.Any(p => p.Character == Character && p.IsEnabled && p.IsHandEnabled && p.ActiveCoordinator == null);
+                    if (conflict) {
+                        return string.Format("IK_CONFLICT_DETECTED".Localized(), Character.Name);
+                    }
+                }
+                var allKeyboards = Scene?.GetAssets<KeyboardReceiverAsset>();
+                if (allKeyboards != null) {
+                    bool conflict = allKeyboards.Any(k => k != this && k.Character == Character && k.IsEnabled && k.IsHandEnabled && k.ActiveCoordinator == null);
+                    if (conflict) {
+                        return string.Format("IK_CONFLICT_DETECTED".Localized(), Character.Name);
+                    }
+                }
+                var allGamepads = Scene?.GetAssets<GamepadReceiverAsset>();
+                if (allGamepads != null) {
+                    bool conflict = allGamepads.Any(g => g.Character == Character && g.IsEnabled && g.IsHandEnabled);
+                    if (conflict) {
+                        return string.Format("IK_CONFLICT_DETECTED".Localized(), Character.Name);
+                    }
+                }
+            }
+            return "";
+        }
+
+        public void UpdateUiStatus() {
+            var newDelegation = GetDelegationStatusMessage();
+            if (DelegationStatus != newDelegation) {
+                DelegationStatus = newDelegation;
+                BroadcastDataInput(nameof(DelegationStatus));
+            }
+        }
 
         protected override void OnCreate() {
             base.OnCreate();

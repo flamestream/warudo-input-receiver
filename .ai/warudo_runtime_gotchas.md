@@ -1542,4 +1542,104 @@ This captures the natural tilt and yaw of the hand on the keys in the user's act
 - Always calculate hand reach alignment against live transformed keys in rig/world space.
 - Store orientations relative to the cluster via `clusterTransform.InverseTransformFromRig(rotation)` so dynamic changes to `Key Origins` propagate smoothly.
 
+---
+
+## 44. Warudo `Attachable` Architecture, `"Attachable Wrapper"`, and Scale-Free Reparenting
+
+### The Phenomenon
+When reparenting an `AnchorAsset` or `PropAsset` between different spaces (`World`, `Character`, `Screen`) at runtime:
+1. Reparenting to `Screen` (from `Character` or `World`) caused the anchor to shoot tens or hundreds of meters into space.
+2. Reparenting `Character` -> `World` appeared to work, but `World` -> `Character` calculated incorrect offsets and displaced the anchor.
+3. Legacy scripts using `Helper._SetParent` or `Helper.SetParent` divided local positions by `parent.Transform.Scale` and multiplied `child.Transform.Scale` by `1 / parent.Transform.Scale`, corrupting the anchor's transform scale permanently.
+4. Calling `anchor.GameObject.transform.SetParent(newParent)` in user code broke Warudo's internal transform tracking, preventing the anchor from following its parent.
+
+### Root Cause: How Warudo's `Attachable` Mixin Actually Works
+Decompilation of `Warudo.Plugins.Core.Assets.Mixins.Attachable` and `GameObjectAsset` reveals the actual internal transform hierarchy:
+
+1. **The Hidden `"Attachable Wrapper"` GameObject**:
+   When an `AnchorAsset` or `PropAsset` is initialized via `Attachable.Initialize(anchor.GameObject)`:
+   ```csharp
+   var wrapper = new GameObject("Attachable Wrapper");
+   this.Transform = wrapper.transform;
+   anchor.GameObject.transform.SetParent(wrapper.transform, false);
+   ```
+   `anchor.GameObject` is **always** a child of this internal `wrapper.transform`!
+   - `wrapper.transform` itself is **never** parented to the target parent in Unity (`wrapper.transform.parent == null`). It remains a root-level transform.
+   - `wrapper.transform.localScale` is **always** `Vector3.one` (Warudo never touches the wrapper's scale).
+
+2. **Per-Frame Positioning in `Attachable.OnPostLateUpdate`**:
+   Warudo evaluates `Attachable.Parent`:
+   - If `Parent == null` (`World`): Sets `wrapper.transform.position = Vector3.zero` and `wrapper.transform.rotation = Quaternion.identity`.
+   - If `Parent is CharacterAsset`: Sets `wrapper.transform.position = Character.MainTransform.position` and `wrapper.transform.rotation = Character.MainTransform.rotation` (using `CharacterAsset.MainTransform`, **not** `Character.GameObject.transform`!).
+   - If `Parent is GameObjectAsset` (e.g. `ScreenAsset`): Sets `wrapper.transform.position = Parent.GameObject.transform.position` and `wrapper.transform.rotation = Parent.GameObject.transform.rotation`.
+
+3. **Per-Frame Local Transform Application in `GameObjectAsset.OnLateUpdate`**:
+   `TransformData.ApplyAsLocalTransform(this.GameObject.transform)` sets:
+   - `anchor.GameObject.transform.localPosition = anchor.Transform.Position`
+   - `anchor.GameObject.transform.localRotation = Quaternion.Euler(anchor.Transform.Rotation)`
+   - `anchor.GameObject.transform.localScale = anchor.Transform.Scale`
+
+4. **Why `Helper._SetParent` and Native `InverseTransformPoint` Exploded**:
+   - Because `wrapper.transform` is unscaled (`localScale = (1, 1, 1)`), the child's local coordinates `anchor.Transform.Position` are in an **unscaled** rotated reference frame centered at `parent.position`.
+   - `Helper._SetParent` naively created a temporary parent GameObject with `pa.transform.localScale = parent.Transform.Scale`. For screens where `Transform.Scale` is small (e.g. 0.05), parenting divided `localPosition` by 0.05 (multiplying the numbers by 20) and multiplied `child.Transform.Scale` by 20. But because `wrapper.transform` does not have that scale, the anchor was placed 20 times too far away!
+   - Similarly, Unity's `Transform.InverseTransformPoint(worldPos)` divides by `lossyScale`. Calling `InverseTransformPoint` on a scaled prop or screen divides coordinates by the prop's mesh scale, causing spatial explosion when rendered under Warudo's unscaled wrapper.
+
+5. **Arbitrary Threshold Traps (`Position.y < 0.2f`)**:
+   - Sanity checks assuming `Position.y < 0.2f` indicates an uninitialized character floor height clobber valid coordinates in other coordinate frames (e.g. `Screen`, where `(0, 0, 0)` is the center of the display and resting hands have `y <= 0`).
+
+### The Solution: Clean Attachable Parenting & Scale-Free Vector Transforms
+
+1. **Never Touch Unity `Transform.SetParent` Manually**:
+   Let Warudo manage `Attachable.Parent`. Only ensure `anchor.GameObject.transform` stays parented to `anchor.Attachable.Transform`:
+   ```csharp
+   public void AttachAnchorToParent(AnchorAsset anchor, RestHandParentType parentType) {
+       if (anchor == null) return;
+       switch (parentType) {
+           case RestHandParentType.Character:
+               anchor.Attachable.Parent = Character;
+               anchor.Attachable.AttachType = Warudo.Plugins.Core.Assets.Mixins.AttachType.TransformPath;
+               anchor.Attachable.AttachToTransform = null;
+               break;
+           case RestHandParentType.Screen:
+               var screen = screenAsset ?? GetSurfaceScreen();
+               anchor.Attachable.Parent = screen;
+               anchor.Attachable.AttachType = Warudo.Plugins.Core.Assets.Mixins.AttachType.TransformPath;
+               anchor.Attachable.AttachToTransform = null;
+               break;
+           case RestHandParentType.World:
+               anchor.Attachable.Parent = null;
+               break;
+       }
+       if (anchor.GameObject != null && anchor.Attachable?.Transform != null) {
+           anchor.GameObject.transform.SetParent(anchor.Attachable.Transform, false);
+       }
+   }
+   ```
+
+2. **Query the True Parent Transform**:
+   - For `CharacterAsset`: Use `Character.MainTransform ?? Character.GameObject?.transform`.
+   - For `GameObjectAsset` (`ScreenAsset`, props): Use `asset.GameObject?.transform`.
+   - For `World`: `null` (origin at `Vector3.zero`, rotation `Quaternion.identity`).
+
+3. **Convert Between Frames Without Scale**:
+   ```csharp
+   // Local to World
+   worldPos = p != null ? p.position + p.rotation * localPos : localPos;
+   worldRot = p != null ? p.rotation * Quaternion.Euler(localRot) : Quaternion.Euler(localRot);
+
+   // World to Local
+   localPos = p != null ? Quaternion.Inverse(p.rotation) * (worldPos - p.position) : worldPos;
+   localRot = p != null ? Helper.NormalizeRotationAngles((Quaternion.Inverse(p.rotation) * worldRot).eulerAngles) : Helper.NormalizeRotationAngles(worldRot.eulerAngles);
+   ```
+
+4. **Bi-Directional Migration of Stored StructuredData**:
+   When `ParentType` changes, convert both live anchors (`targetAnchor`, `poleAnchor`), visual setup gizmos (`setupAnchor`), and stored configuration data (`Target.Position`, `Target.Rotation`, `Pole.Position`, `Pole.Rotation`) simultaneously so scene serialization and visual calibration stay in sync.
+
+### Rule
+- Never call `anchor.GameObject.transform.SetParent(target)` directly — this decouples the anchor from Warudo's `"Attachable Wrapper"`.
+- When parent is `CharacterAsset`, always reference `Character.MainTransform`, never `Character.GameObject.transform`.
+- Never use `Transform.InverseTransformPoint` or scale temporary GameObjects when reparenting Warudo `Attachable` assets. Convert coordinate frames using pure position offsets and rotation quaternions: $\mathbf{p}_{\text{local}} = \mathbf{R}_{\text{parent}}^{-1} \cdot (\mathbf{P}_{\text{world}} - \mathbf{P}_{\text{parent}})$.
+- Never use absolute vertical threshold sanity checks (e.g. `Position.y < 0.2f`) on properties that can be parented to props or screens.
+
+
 

@@ -57,3 +57,5 @@ This directory contains key architecture notes, integration patterns, build pipe
    - UMod security scanner blocks `System.Reflection`; `SetPortDefaultValue` removed entirely (Gotcha #41).
    - Key Origins scaling & dynamic hand IK reach compensation via scale cancellation (Gotcha #42).
    - Natural hand rotation alignment solved against live transformed keys in rig space (Gotcha #43).
+   - Warudo `Attachable` architecture (`Attachable Wrapper`), unscaled transform hierarchy, and scale-free reparenting (Gotcha #44).
+

@@ -347,22 +347,29 @@ namespace FlameStream
             }
 
             TransitionIkLimbs(false, AdvancedOptions.LimbIkLeaveTransition, () => {
-                var leftIk = Character.LeftHandIK;
-                leftIk.Enabled = false;
-                leftIk.IkTarget = null;
+                var leftAnchor = LeftHandAnchor;
+                var rightAnchor = RightHandAnchor;
 
-                if (AdvancedOptions.BendGoalControlOptionsInstance.IsEnabled) {
-                    leftIk.BendGoalTarget = null;
+                var leftIk = Character.LeftHandIK;
+                if (leftIk != null && leftAnchor != null && leftIk.IkTarget == leftAnchor) {
+                    leftIk.Enabled = false;
+                    leftIk.IkTarget = null;
+
+                    if (AdvancedOptions.BendGoalControlOptionsInstance.IsEnabled) {
+                        leftIk.BendGoalTarget = null;
+                    }
+                    leftIk.Broadcast();
                 }
-                leftIk.Broadcast();
 
                 var rightIk = Character.RightHandIK;
-                rightIk.Enabled = false;
-                rightIk.IkTarget = null;
-                if (AdvancedOptions.BendGoalControlOptionsInstance.IsEnabled) {
-                    rightIk.BendGoalTarget = null;
+                if (rightIk != null && rightAnchor != null && rightIk.IkTarget == rightAnchor) {
+                    rightIk.Enabled = false;
+                    rightIk.IkTarget = null;
+                    if (AdvancedOptions.BendGoalControlOptionsInstance.IsEnabled) {
+                        rightIk.BendGoalTarget = null;
+                    }
+                    rightIk.Broadcast();
                 }
-                rightIk.Broadcast();
 
                 ClearAllSceneAssets();
 

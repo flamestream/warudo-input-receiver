@@ -27,9 +27,19 @@ namespace FlameStream
         Vector3 handPositionOffset;
         Vector3 handRotationOffset;
         AnchorAsset handAnchor;
+        public AnchorAsset HandAnchor => handAnchor != null ? handAnchor : (handAnchor = GetHandIK());
         AnchorAsset handSetupRootAnchor;
         Tween tweenLeftIK;
         Tween tweenRightIK;
+
+        public void OnHandDelegationChanged() {
+            if (activeCoordinator != null) {
+                tweenLeftIK?.Kill();
+                tweenRightIK?.Kill();
+            } else {
+                OnInputAffectingHandSetupChange();
+            }
+        }
 
 
         void OnCreateMoveHand() {
@@ -42,14 +52,25 @@ namespace FlameStream
 
             Watch(nameof(HandMouseMode), delegate { OnHandStateSettingChange(); });
             Watch(nameof(HandPenMode), delegate { OnHandStateSettingChange(); });
+            Watch(nameof(HandDynamicRotation), delegate {
+                if (HandDynamicRotation != null) {
+                    HandDynamicRotation.AutoRotationEvaluator = CalculateAutoHandRotation;
+                }
+            });
+            if (HandDynamicRotation != null) {
+                HandDynamicRotation.AutoRotationEvaluator = CalculateAutoHandRotation;
+            }
         }
 
         void OnReadyHand() {
+            if (HandDynamicRotation != null) {
+                HandDynamicRotation.AutoRotationEvaluator = CalculateAutoHandRotation;
+            }
 
             NeutralHandPosition.LocalizationKey = "NEUTRAL_POSITION";
             NeutralHandPosition.OnEnterVisualSetup = (tr) => { HandleNeutralEnterVisualSetup(); };
             NeutralHandPosition.OnExitVisualSetup = (a) => { HandleNeutralExitVisualSetup(a); };
-            NeutralHandPosition.OnCreateAnchor = (tr, a) => { a.Attachable.Parent = screenAsset; };
+            NeutralHandPosition.OnCreateAnchor = (tr, a) => { a.Attachable.Parent = screenAsset ?? GetSurfaceScreen(); };
 
             HandMouseMode.OnAnimationChange = (p) => { HandleHandAnimationChange((PoseState)p); };
             HandMouseMode.OnAnimationWeightChange = (p, w, r) => { HandleHandAnimationWeightChange((PoseState)p, w, r); };
@@ -63,14 +84,34 @@ namespace FlameStream
             HandPenMode.OnEnterVisualSetup = (p) => { HandleHandEnterVisualSetup((PoseState)p); };
             HandPenMode.OnExitVisualSetup = (p, ia) => { HandleHandExitVisualSetup((PoseState)p, ia); };
 
-            OnInputAffectingHandSetupChange();
+            OnInputAffectingHandSetupChange(instant: true);
         }
 
         void OnUpdateHand() {
-            if (!IsHandEnabled) return;
+            if (!IsEnabled || !IsHandEnabled) return;
+            if (handAnchor == null) handAnchor = GetHandIK();
             if (handAnchor == null) return;
 
-            if (inSetupMode) {
+            // Self-healing: if Dominant Limb IK was cleared or deactivated while we are active, restore it unless another asset is controlling it
+            if (activeCoordinator == null && Character != null && !isHandDisabledByOutOfBound) {
+                var dominantLimb = IsRightHanded ? Character.RightHandIK : Character.LeftHandIK;
+                var activeTween = IsRightHanded ? tweenRightIK : tweenLeftIK;
+                bool isTweening = activeTween != null && activeTween.IsActive();
+                if (!isTweening && dominantLimb != null && (dominantLimb.IkTarget == null || dominantLimb.IkTarget == handAnchor)) {
+                    if (!dominantLimb.Enabled || dominantLimb.IkTarget == null) {
+                        dominantLimb.Enabled = true;
+                        dominantLimb.IkTarget = handAnchor;
+                        dominantLimb.PositionWeight = 1.0f;
+                        dominantLimb.RotationWeight = 1.0f;
+                        dominantLimb.BendGoalWeight = 1.0f;
+                        dominantLimb.Broadcast();
+                    }
+                }
+            }
+
+            if (IsInRestHandVisualSetup) {
+                handState = null;
+            } else if (inSetupMode) {
                 handState = setupModeHandState;
                 CalculateSetupHandOffsets();
             } else {
@@ -112,7 +153,7 @@ namespace FlameStream
                 r += st.Transform.Rotation;
             }
 
-            var time = inSetupMode ? 0 : st?.EnterTransition.Time ?? HandMouseMode.EnterTransition.Time;
+            var time = (inSetupMode || !isReady) ? 0 : st?.EnterTransition.Time ?? HandMouseMode.EnterTransition.Time;
             var ease = st?.EnterTransition.Ease ?? HandMouseMode.EnterTransition.Ease;
             SetHandOffsetTransforms(tr.position, r, time, ease);
 
@@ -159,23 +200,48 @@ namespace FlameStream
             OnHandStateChange();
         }
 
-        void OnInputAffectingHandSetupChange() {
-            if (!IsEnabled) return;
+        void OnInputAffectingHandSetupChange(bool instant = false) {
             if (!isReady) return;
-            if (Character == null) return;
 
-            var isHandEnabled = IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound;
-            if (!isHandEnabled) {
+            var isHandActive = IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound && Character != null;
+            if (!isHandActive) {
                 handState = null;
                 OnHandStateChange();
             }
 
-            handAnchor = GetHandIK();
-            handAnchor.Attachable.Parent = GetCursorAnchor();
-            handAnchor.Broadcast();
+            if (isHandActive) {
+                cursorAnchorAsset = GetCursorAnchor();
+                if (cursorAnchorAsset != null && screenAsset != null) {
+                    cursorAnchorAsset.Attachable.Parent = screenAsset;
+                }
 
-            EnableLimb(isHandEnabled && !IsRightHanded, Character.LeftHandIK, handAnchor, tweenLeftIK);
-            EnableLimb(isHandEnabled && IsRightHanded, Character.RightHandIK, handAnchor, tweenRightIK);
+                handAnchor = GetHandIK();
+                if (handAnchor != null && cursorAnchorAsset != null) {
+                    handAnchor.Attachable.Parent = cursorAnchorAsset;
+                    handAnchor.Broadcast();
+                }
+            }
+
+            var dominantLimb = Character != null ? (IsRightHanded ? Character.RightHandIK : Character.LeftHandIK) : null;
+            if (Character != null) {
+                if (IsRightHanded) {
+                    EnableLimb(isHandActive, dominantLimb, handAnchor, ref tweenRightIK, instant);
+                } else {
+                    EnableLimb(isHandActive, dominantLimb, handAnchor, ref tweenLeftIK, instant);
+                }
+
+                var nonDominantLimb = IsRightHanded ? Character.LeftHandIK : Character.RightHandIK;
+                if (nonDominantLimb != null && nonDominantLimb.IkTarget == handAnchor) {
+                    nonDominantLimb.IkTarget = null;
+                    nonDominantLimb.PositionWeight = 0f;
+                    nonDominantLimb.RotationWeight = 0f;
+                    nonDominantLimb.BendGoalWeight = 0f;
+                    nonDominantLimb.Broadcast();
+                }
+            } else if (!isHandActive) {
+                DestroyHandIK();
+                DestroyCursorAnchor();
+            }
         }
 
         void OnHandSideChange() {
@@ -200,6 +266,9 @@ namespace FlameStream
             }
 
             Character.SetDataInput($"{nameof(Character.OverlappingAnimations)}", layers, true);
+            SetupRestHandTransform();
+            SetupRestHandPoleTransform();
+            UpdateRestHandAnchorTransforms();
         }
 
         PoseState GetHandState(int source, bool button1) {
@@ -223,16 +292,54 @@ namespace FlameStream
             return GetAsset<AnchorAsset>(ref HandAnchorAssetId, skipAutoCreate, newAssetName: $"🔒⚓-{LAYER_NAME_PREFIX} Hand IK");
         }
 
-        void EnableLimb(bool isEnabled, LimbIKData limb, AnchorAsset anchor, Tween tween) {
-            limb.Enabled = true;
-            limb.IkTarget = anchor;
+        public void DestroyHandIK() {
+            tweenHandPosition?.Kill();
+            tweenHandRotation?.Kill();
+            tweenHandProgress?.Kill();
+            var anchor = handAnchor ?? (HandAnchorAssetId != Guid.Empty ? Scene?.GetAssets<AnchorAsset>().FirstOrDefault(a => a.Id == HandAnchorAssetId) : null);
+            if (anchor != null) {
+                CleanDestroy(anchor);
+            }
+            HandAnchorAssetId = Guid.Empty;
+            handAnchor = null;
+        }
+
+        void EnableLimb(bool isEnabled, LimbIKData limb, AnchorAsset anchor, ref Tween tween, bool instant = false) {
+            if (activeCoordinator != null) {
+                return;
+            }
+            if (limb == null) {
+                if (!isEnabled) {
+                    DestroyHandIK();
+                    DestroyCursorAnchor();
+                }
+                return;
+            }
 
             var targetValue = isEnabled ? 1.0f : 0.0f;
             tween?.Kill();
-            if (ActiveTransition.Time == 0) {
+            var duration = instant ? 0f : (ActiveTransition != null ? ActiveTransition.Time : 0f);
+            var ease = ActiveTransition != null ? ActiveTransition.Ease : Ease.Linear;
+
+            if (isEnabled) {
+                limb.Enabled = true;
+                limb.IkTarget = anchor;
+                limb.Broadcast();
+            }
+
+            if (duration <= 0f) {
                 limb.PositionWeight = targetValue;
                 limb.RotationWeight = targetValue;
                 limb.BendGoalWeight = targetValue;
+                if (!isEnabled) {
+                    if (limb.IkTarget == handAnchor || limb.IkTarget == anchor || limb.IkTarget == null) {
+                        limb.IkTarget = null;
+                        limb.Enabled = false;
+                    }
+                    DestroyHandIK();
+                    DestroyCursorAnchor();
+                }
+                limb.Broadcast();
             } else {
                 tween = DOTween.To(
                     () => limb.PositionWeight,
@@ -243,10 +350,19 @@ namespace FlameStream
                         limb.Broadcast();
                     },
                     targetValue,
-                    ActiveTransition.Time
-                ).SetEase(ActiveTransition.Ease);
+                    duration
+                ).SetEase(ease).OnComplete(() => {
+                    if (!isEnabled) {
+                        if (limb.IkTarget == handAnchor || limb.IkTarget == anchor || limb.IkTarget == null) {
+                            limb.IkTarget = null;
+                            limb.Enabled = false;
+                            limb.Broadcast();
+                        }
+                        DestroyHandIK();
+                        DestroyCursorAnchor();
+                    }
+                });
             }
-            limb.Broadcast();
         }
 
         void SetHandOffsetTransforms(Vector3 pos, Vector3 rot, float time = 0, Ease ease = Ease.Linear) {
@@ -289,6 +405,7 @@ namespace FlameStream
                 ).SetEase(ease);
             }
         }
+
 
         void HandleNeutralEnterVisualSetup() {
             if (inSetupMode) return;

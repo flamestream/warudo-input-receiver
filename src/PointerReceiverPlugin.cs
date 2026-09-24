@@ -14,6 +14,7 @@ namespace FlameStream {
             typeof(GameInputReceiverAsset),
             typeof(GamepadReceiverAsset),
             typeof(KeyboardReceiverAsset),
+            typeof(MultiInputCoordinatorAsset),
             typeof(PointerReceiverAsset),
             typeof(VisualSetupAnchorAsset),
             typeof(KeyBindingVisualSetupAnchorAsset),

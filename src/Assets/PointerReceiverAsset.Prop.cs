@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
@@ -30,9 +31,12 @@ namespace FlameStream
         Vector3 propRotationOffset;
         Vector3 propScale;
         PropAsset prop;
+        public PropAsset Prop => prop;
         AnchorAsset propSetupRootAnchor;
 
         void OnCreateProp() {
+            Watch(nameof(IsEnabled), delegate { OnInputAffectingPropChange(); });
+            Watch(nameof(IsHandEnabled), delegate { OnInputAffectingPropChange(); });
             Watch(nameof(IsPropEnabled), delegate { OnPropEnabledChanged(); });
 
             Watch(nameof(IsPropEnabled), delegate { OnInputAffectingPropChange(); });
@@ -59,7 +63,7 @@ namespace FlameStream
         }
 
         void OnUpdateProp() {
-            if (!IsPropEnabled) return;
+            if (!IsEnabled || !IsHandEnabled || !IsPropEnabled) return;
             if (prop == null) return;
 
             if (inSetupMode) {
@@ -85,8 +89,6 @@ namespace FlameStream
             GetDataInputPort(nameof(PropMouseMode)).Properties.hidden = !(IsPropEnabled && isBasicSetupComplete);
             GetDataInputPort(nameof(PropPenMode)).Properties.hidden = !(IsPropEnabled && isBasicSetupComplete);
 
-            prop?.SetDataInput(nameof(prop.Enabled), IsPropEnabled && IsHandEnabled, true);
-
             BroadcastDataInputProperties(nameof(PropSource));
             BroadcastDataInputProperties(nameof(PropMouseMode));
             BroadcastDataInputProperties(nameof(PropPenMode));
@@ -96,16 +98,26 @@ namespace FlameStream
             OnPropStateChange();
         }
 
+        public void DestroyProp() {
+            tweenPropPosition?.Kill();
+            tweenPropRotation?.Kill();
+            tweenPropScale?.Kill();
+            tweenPropProgress?.Kill();
+            var p = prop ?? (PenPropAssetId != Guid.Empty ? Scene?.GetAssets<PropAsset>().FirstOrDefault(a => a.Id == PenPropAssetId) : null);
+            if (p != null) {
+                CleanDestroy(p);
+            }
+            PenPropAssetId = Guid.Empty;
+            prop = null;
+        }
+
         void OnInputAffectingPropChange() {
             if (!isReady) return;
-            if (!IsPropEnabled) return;
-            if (PropSource == null) {
-                var p = GetProp(true);
-                CleanDestroy(p);
-                PenPropAssetId = Guid.Empty;
+            bool shouldPropBeActive = IsEnabled && IsHandEnabled && IsPropEnabled && !string.IsNullOrEmpty(PropSource) && Character != null;
+            if (!shouldPropBeActive) {
+                DestroyProp();
                 return;
-            };
-            if (Character == null) return;
+            }
 
             prop = GetProp();
             prop.SetDataInput(nameof(Source), PropSource, true);
@@ -114,6 +126,7 @@ namespace FlameStream
             prop.Attachable.AttachToBone = IsRightHanded
                 ? HumanBodyBones.RightHand
                 : HumanBodyBones.LeftHand;
+            prop.SetDataInput(nameof(prop.Enabled), true, true);
             prop.Broadcast();
         }
 

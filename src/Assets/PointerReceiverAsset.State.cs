@@ -11,6 +11,10 @@ namespace FlameStream {
         public bool LastButton2;
 
         void OnUpdateState() {
+            if (DataSourceReceiver != null && DataSourceReceiver != this && DataSourceReceiver.IsEnabled && !isDataSourceFallbackActive) {
+                lastState = DataSourceReceiver.LastRawState;
+            }
+
             if (lastState == null) return;
 
             var parts = lastState.Split(';');

@@ -10,9 +10,29 @@ using Warudo.Plugins.Core.Assets.Utility;
 namespace FlameStream {
     public class DynamicVector3 : StructuredData {
 
-        [DataInput]
+        [DataInput(10)]
         [Label("ENABLE")]
         public bool Enabled;
+
+        [DataInput(15)]
+        [Label("DYNAMIC_ROTATION_AUTO")]
+        [Description("DYNAMIC_ROTATION_AUTO_DESC")]
+        public bool Auto = true;
+
+        [DataInput(16)]
+        [Label("AUTO_ROTATION_MAX_SPEED")]
+        [Description("AUTO_ROTATION_MAX_SPEED_DESC")]
+        [FloatSlider(30f, 720f, 10f)]
+        public float AutoMaxSpeed = 240f;
+
+        [DataInput(17)]
+        [Label("AUTO_ROTATION_SETTLE_FRAMES")]
+        [Description("AUTO_ROTATION_SETTLE_FRAMES_DESC")]
+        [IntegerSlider(0, 30)]
+        public int AutoSettleFrames = 8;
+
+        public virtual bool HasAutoMode => false;
+        public Func<Vector3, Vector3> AutoRotationEvaluator;
 
         [Trigger]
         [Label("ENTER_VISUAL_SETUP")]
@@ -27,13 +47,13 @@ namespace FlameStream {
             ExitVisualSetup(false);
         }
 
-        [DataInput]
+        [DataInput(20)]
         [Hidden]
         public DistanceInputMathExpression X;
-        [DataInput]
+        [DataInput(30)]
         [Hidden]
         public DistanceInputMathExpression Y;
-        [DataInput]
+        [DataInput(40)]
         [Hidden]
         public DistanceInputMathExpression Z;
 
@@ -56,13 +76,18 @@ namespace FlameStream {
         Material debugOrbitCircleMat;
 
         public Vector3 Evaluate(Vector3 v) {
-            var result = Enabled
-                ? new Vector3(
-                    X != null ? X.Evaluate(v) : 0f,
-                    Y != null ? Y.Evaluate(v) : 0f,
-                    Z != null ? Z.Evaluate(v) : 0f
-                )
-                : Vector3.zero;
+            Vector3 result = Vector3.zero;
+            if (Enabled) {
+                if (HasAutoMode && Auto && AutoRotationEvaluator != null) {
+                    result = AutoRotationEvaluator(v);
+                } else {
+                    result = new Vector3(
+                        X != null ? X.Evaluate(v) : 0f,
+                        Y != null ? Y.Evaluate(v) : 0f,
+                        Z != null ? Z.Evaluate(v) : 0f
+                    );
+                }
+            }
             if (debugMode) {
                 DebugMessage = $@"
 dx: {v.x:F3}
@@ -99,6 +124,7 @@ result: {result}
             if (Y == null) Y = StructuredData.Create<DistanceInputMathExpression>();
             if (Z == null) Z = StructuredData.Create<DistanceInputMathExpression>();
             Watch(nameof(Enabled), delegate { OnEnabledChanged(); });
+            Watch(nameof(Auto), delegate { OnEnabledChanged(); });
             OnEnabledChanged();
         }
 
@@ -323,22 +349,37 @@ result: {result}
             }
         }
 
-        void OnEnabledChanged() {
-            GetDataInputPort(nameof(X)).Properties.hidden = !Enabled;
-            GetDataInputPort(nameof(Y)).Properties.hidden = !Enabled;
-            GetDataInputPort(nameof(Z)).Properties.hidden = !Enabled;
-            GetDataInputPort(nameof(DebugMessage)).Properties.hidden = !Enabled;
-            GetTriggerPort(nameof(ToggleDebugModeTrigger)).Properties.hidden = !Enabled;
+        protected virtual void OnEnabledChanged() {
+            bool showAuto = Enabled && HasAutoMode;
+            GetDataInputPort(nameof(Auto)).Properties.hidden = !showAuto;
 
+            bool showAutoSettings = showAuto && Auto;
+            GetDataInputPort(nameof(AutoMaxSpeed)).Properties.hidden = !showAutoSettings;
+            GetDataInputPort(nameof(AutoSettleFrames)).Properties.hidden = !showAutoSettings;
+
+            bool showManual = Enabled && (!HasAutoMode || !Auto);
+            GetDataInputPort(nameof(X)).Properties.hidden = !showManual;
+            GetDataInputPort(nameof(Y)).Properties.hidden = !showManual;
+            GetDataInputPort(nameof(Z)).Properties.hidden = !showManual;
+            GetDataInputPort(nameof(DebugMessage)).Properties.hidden = !showManual;
+            GetTriggerPort(nameof(ToggleDebugModeTrigger)).Properties.hidden = !showManual;
+            GetTriggerPort(nameof(EnterVisualSetupTrigger)).Properties.hidden = !showManual;
+
+            BroadcastDataInputProperties(nameof(Auto));
+            BroadcastDataInputProperties(nameof(AutoMaxSpeed));
+            BroadcastDataInputProperties(nameof(AutoSettleFrames));
             BroadcastDataInputProperties(nameof(X));
             BroadcastDataInputProperties(nameof(Y));
             BroadcastDataInputProperties(nameof(Z));
             BroadcastDataInputProperties(nameof(DebugMessage));
             BroadcastTriggerProperties(nameof(ToggleDebugModeTrigger));
+            BroadcastTriggerProperties(nameof(EnterVisualSetupTrigger));
         }
     }
 
     public class HandRotationDynamicVector3 : DynamicVector3 {
+        public override bool HasAutoMode => true;
+
         public HandRotationDynamicVector3() {
             X = StructuredData.Create<DistanceInputMathExpression>((me) => {
                 me.Expression = "min(2 * abs(dx), 1) * (atan2(abs(dy), abs(dx)) * (180 / pi) - 90) * sign(dx)";

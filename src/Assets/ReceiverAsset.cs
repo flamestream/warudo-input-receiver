@@ -41,6 +41,8 @@ namespace FlameStream {
         Task listenTask;
 
         protected string lastState;
+        public string LastRawState => lastState;
+        public bool IsSocketListening => udpClient != null;
 
         [Markdown(0)]
         public string VersionUpdate = "FS_INPUT_RECEIVER_VERSION_UPDATE".Localized();

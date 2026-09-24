@@ -101,13 +101,19 @@ Use the two-phase pipeline in `ReceiverAsset.Deserialize()`: `OnPreMigrateAsset`
 - Use key-relative reach compensation: shift the wrist target by the key's scale expansion `(scale - 1) * keyLocalPos` so the reaching offset between key cap and wrist is 100% scale-invariant. → [Gotcha #42](.ai/warudo_runtime_gotchas.md)
 - Always solve hand reach orientations against live world/rig transformed keys (considering the live resting elbow line) and store relative to cluster via `InverseTransformFromRig`. → [Gotcha #43](.ai/warudo_runtime_gotchas.md)
 
+### 3.15 Warudo Attachable Architecture & Scale-Free Reparenting
+- `AnchorAsset` GameObjects are parented under an internal unscaled `"Attachable Wrapper"` (`scale = (1, 1, 1)`). Never call `GameObject.transform.SetParent(newParent)` directly — this decouples the anchor from Warudo's wrapper.
+- For `CharacterAsset`, `Attachable` targets `Character.MainTransform`, never `Character.GameObject.transform`.
+- When reparenting between coordinate spaces (Character, Screen, World), never use `Transform.InverseTransformPoint` or scaled temporary GameObjects (which divide/multiply coordinates by prop mesh scale). Convert reference frames using pure unscaled vector/quaternion transforms: $\mathbf{p}_{\text{local}} = \mathbf{R}_{\text{parent}}^{-1} \cdot (\mathbf{P}_{\text{world}} - \mathbf{P}_{\text{parent}})$.
+- Never use absolute vertical threshold sanity checks (e.g. `Position.y < 0.2f`) on properties that can be parented to props or screens. → [Gotcha #44](.ai/warudo_runtime_gotchas.md)
+
 ---
 
 ## 4. Knowledge Base Index
 
 | File | Covers |
 |------|--------|
-| [warudo_runtime_gotchas.md](.ai/warudo_runtime_gotchas.md) | All runtime quirks, crash bugs, and serialization traps (43 entries) |
+| [warudo_runtime_gotchas.md](.ai/warudo_runtime_gotchas.md) | All runtime quirks, crash bugs, and serialization traps (44 entries) |
 | [plugin_development_cheatsheet.md](.ai/plugin_development_cheatsheet.md) | Plugin/Node/Asset patterns, port attributes, UniTask, toasts |
 | [animancer_integration_guide.md](.ai/animancer_integration_guide.md) | Animancer Pro/Lite conflict, assembly identity, layer blending patterns |
 | [warudo_modding_architecture.md](.ai/warudo_modding_architecture.md) | UMod build pipeline, `.warudo` package structure, SDK vs runtime env |
