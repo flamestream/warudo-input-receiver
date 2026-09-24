@@ -775,7 +775,9 @@ namespace FlameStream
             cachedAutoHandRotX = float.NaN;
             autoHandSettleCountdown = 0;
             ResetCharacterPosition();
-            DisplayDebugSpheres();
+            if (isDebugModeForced) {
+                DisplayDebugSpheres();
+            }
         }
 
         public void TriggerOtherEnterSetupModes(int source, bool button1) {

@@ -85,6 +85,9 @@ namespace FlameStream {
             }
             OriginSphere.OnChange = () => OnOriginSphereChange?.Invoke();
 
+            SetDataInput(nameof(ShowOrigin), ShowOrigin, true);
+            SetDataInput(nameof(AlwaysOnTop), AlwaysOnTop, true);
+
             Watch(nameof(Animation), delegate {
                 OnAnimationChange?.Invoke(Animation);
             });

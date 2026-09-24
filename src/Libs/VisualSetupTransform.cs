@@ -59,6 +59,7 @@ namespace FlameStream {
 
         public bool ShowOriginIndicator = true;
         public bool OriginAlwaysOnTop = false;
+        public Color? DefaultOriginSphereColor = null;
         public float OriginIndicatorSize = 0.035f;
         public Vector3 OriginIndicatorOffset = Vector3.zero;
         public GameObject originIndicatorGo;
@@ -69,8 +70,9 @@ namespace FlameStream {
             ShowOriginIndicator = visible;
             if (originIndicatorGo != null) {
                 originIndicatorGo.SetActive(visible);
-            } else if (visible && setupAnchor != null && setupAnchor.GameObject != null && setupAnchor.GameObject.transform.parent != null) {
-                CreateOriginIndicator(setupAnchor.GameObject.transform.parent, OriginIndicatorOffset);
+            } else if (visible && setupAnchor != null && setupAnchor.GameObject != null) {
+                var parent = setupAnchor.GameObject.transform.parent ?? setupAnchor.GameObject.transform;
+                CreateOriginIndicator(parent, OriginIndicatorOffset);
             }
         }
 
@@ -86,7 +88,7 @@ namespace FlameStream {
                 originIndicatorMat = null;
             }
 
-            Color sphereColor = setupAnchor?.OriginSphere?.Color ?? new Color(1f, 0.1f, 0.1f, 0.95f);
+            Color sphereColor = setupAnchor?.OriginSphere?.Color ?? DefaultOriginSphereColor ?? new Color(1f, 0.1f, 0.1f, 0.95f);
             bool glow = setupAnchor?.OriginSphere?.Glow ?? true;
 
             if (OriginAlwaysOnTop) {
@@ -170,7 +172,13 @@ namespace FlameStream {
             bool isScaleHidden = GetDataInputPort(nameof(Scale))?.Properties?.hidden ?? false;
             setupAnchor.SetHideScale(isScaleHidden);
             setupAnchor.ShowOrigin = ShowOriginIndicator;
+            setupAnchor.SetDataInput(nameof(VisualSetupAnchorAsset.ShowOrigin), ShowOriginIndicator, true);
             setupAnchor.AlwaysOnTop = OriginAlwaysOnTop;
+            setupAnchor.SetDataInput(nameof(VisualSetupAnchorAsset.AlwaysOnTop), OriginAlwaysOnTop, true);
+
+            if (DefaultOriginSphereColor.HasValue && setupAnchor.OriginSphere != null) {
+                setupAnchor.OriginSphere.SetDefaults(DefaultOriginSphereColor.Value, 1.0f, true);
+            }
             setupAnchor.OnShowOriginChange = (show) => {
                 SetOriginIndicatorVisible(show);
             };
@@ -189,8 +197,9 @@ namespace FlameStream {
             setupAnchor.Broadcast();
             Scene.UpdateNewAssetName(setupAnchor);
 
-            if (ShowOriginIndicator && setupAnchor != null && setupAnchor.GameObject != null && setupAnchor.GameObject.transform.parent != null) {
-                CreateOriginIndicator(setupAnchor.GameObject.transform.parent);
+            if (ShowOriginIndicator && setupAnchor != null && setupAnchor.GameObject != null) {
+                var parent = setupAnchor.GameObject.transform.parent ?? setupAnchor.GameObject.transform;
+                CreateOriginIndicator(parent);
             }
 
             setupAnchor.OnAnimationChange = (a) => {
@@ -315,6 +324,7 @@ namespace FlameStream {
 
         protected override void OnCreate() {
             base.OnCreate();
+            DefaultOriginSphereColor = new Color(0f, 0.85f, 1f, 0.95f);
             Watch(nameof(Position), delegate {
                 Position.z = 0;
                 BroadcastDataInput(nameof(Position));

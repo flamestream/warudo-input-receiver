@@ -68,9 +68,15 @@ namespace FlameStream
             }
 
             NeutralHandPosition.LocalizationKey = "NEUTRAL_POSITION";
+            NeutralHandPosition.DefaultOriginSphereColor = new Color(0f, 0.85f, 1f, 0.95f);
             NeutralHandPosition.OnEnterVisualSetup = (tr) => { HandleNeutralEnterVisualSetup(); };
             NeutralHandPosition.OnExitVisualSetup = (a) => { HandleNeutralExitVisualSetup(a); };
-            NeutralHandPosition.OnCreateAnchor = (tr, a) => { a.Attachable.Parent = screenAsset ?? GetSurfaceScreen(); };
+            NeutralHandPosition.OnCreateAnchor = (tr, a) => {
+                a.Attachable.Parent = screenAsset ?? GetSurfaceScreen();
+                if (a.OriginSphere != null) {
+                    a.OriginSphere.SetDefaults(new Color(0f, 0.85f, 1f, 0.95f), 1.0f, true);
+                }
+            };
 
             HandMouseMode.OnAnimationChange = (p) => { HandleHandAnimationChange((PoseState)p); };
             HandMouseMode.OnAnimationWeightChange = (p, w, r) => { HandleHandAnimationWeightChange((PoseState)p, w, r); };
