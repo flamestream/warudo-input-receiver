@@ -23,13 +23,13 @@ namespace FlameStream {
         [Label("AUTO_ROTATION_MAX_SPEED")]
         [Description("AUTO_ROTATION_MAX_SPEED_DESC")]
         [FloatSlider(30f, 720f, 10f)]
-        public float AutoMaxSpeed = 240f;
+        public float AutoMaxSpeed = 360f;
 
         [DataInput(17)]
         [Label("AUTO_ROTATION_SETTLE_FRAMES")]
         [Description("AUTO_ROTATION_SETTLE_FRAMES_DESC")]
         [IntegerSlider(0, 30)]
-        public int AutoSettleFrames = 8;
+        public int AutoSettleFrames = 16;
 
         public virtual bool HasAutoMode => false;
         public Func<Vector3, Vector3> AutoRotationEvaluator;
