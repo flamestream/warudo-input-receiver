@@ -37,9 +37,21 @@ namespace FlameStream
 
             Watch(nameof(BodyMouseMode), delegate { OnBodyStateSettingChange(); });
             Watch(nameof(BodyPenMode), delegate { OnBodyStateSettingChange(); });
+            Watch(nameof(BodyDynamicRotation), delegate { SetupBodyDynamicRotation(); });
+            SetupBodyDynamicRotation();
+        }
+
+        void SetupBodyDynamicRotation() {
+            if (BodyDynamicRotation == null) return;
+            BodyDynamicRotation.LocalizationKey = "DYNAMIC_ROTATION_PIVOT";
+            BodyDynamicRotation.GetParentAnchor = () => screenAsset ?? GetSurfaceScreen();
+            BodyDynamicRotation.GetRestPosition = () => NeutralHandPosition != null ? NeutralHandPosition.Position : Vector3.zero;
+            BodyDynamicRotation.OnEnterVisualSetup = (dr) => { HandleBodyDynamicRotationEnterVisualSetup(); };
+            BodyDynamicRotation.OnExitVisualSetup = (isApplied) => { HandleBodyDynamicRotationExitVisualSetup(isApplied); };
         }
 
         void OnReadyBody() {
+            SetupBodyDynamicRotation();
 
             BodyMouseMode.OnAnimationChange = (p) => { HandleBodyAnimationChange((PoseState)p); };
             BodyMouseMode.OnAnimationWeightChange = (p, w, r) => { HandleBodyAnimationWeightChange((PoseState)p, w, r); };
@@ -326,6 +338,17 @@ namespace FlameStream
             }
             lastBodyState = null;
         }
+
+        void HandleBodyDynamicRotationEnterVisualSetup() {
+            if (inSetupMode) return;
+            EnterSetupModeMinimal();
+        }
+
+        void HandleBodyDynamicRotationExitVisualSetup(bool isApply) {
+            if (!inSetupMode) return;
+            ExitSetupModeMinimal();
+        }
+
         void HandleBodyCreateAnchor(PoseState p, VisualSetupTransform tr, VisualSetupAnchorAsset a) {
             bodySetupRootAnchor = Scene.AddAsset<AnchorAsset>();
             var title = "SETUP_ANCHOR_NAME_BODY_ROOT".Localized();

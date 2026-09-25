@@ -53,19 +53,23 @@ namespace FlameStream
             Watch(nameof(HandMouseMode), delegate { OnHandStateSettingChange(); });
             Watch(nameof(HandPenMode), delegate { OnHandStateSettingChange(); });
             Watch(nameof(HandDynamicRotation), delegate {
-                if (HandDynamicRotation != null) {
-                    HandDynamicRotation.AutoRotationEvaluator = CalculateAutoHandRotation;
-                }
+                SetupHandDynamicRotation();
             });
-            if (HandDynamicRotation != null) {
-                HandDynamicRotation.AutoRotationEvaluator = CalculateAutoHandRotation;
-            }
+            SetupHandDynamicRotation();
+        }
+
+        void SetupHandDynamicRotation() {
+            if (HandDynamicRotation == null) return;
+            HandDynamicRotation.LocalizationKey = "DYNAMIC_ROTATION_PIVOT";
+            HandDynamicRotation.AutoRotationEvaluator = CalculateAutoHandRotation;
+            HandDynamicRotation.GetParentAnchor = () => screenAsset ?? GetSurfaceScreen();
+            HandDynamicRotation.GetRestPosition = () => NeutralHandPosition != null ? NeutralHandPosition.Position : Vector3.zero;
+            HandDynamicRotation.OnEnterVisualSetup = (dr) => { HandleDynamicRotationEnterVisualSetup(); };
+            HandDynamicRotation.OnExitVisualSetup = (isApplied) => { HandleDynamicRotationExitVisualSetup(isApplied); };
         }
 
         void OnReadyHand() {
-            if (HandDynamicRotation != null) {
-                HandDynamicRotation.AutoRotationEvaluator = CalculateAutoHandRotation;
-            }
+            SetupHandDynamicRotation();
 
             NeutralHandPosition.LocalizationKey = "NEUTRAL_POSITION";
             NeutralHandPosition.DefaultOriginSphereColor = new Color(0f, 0.85f, 1f, 0.95f);
@@ -425,6 +429,16 @@ namespace FlameStream
             setupModeHandState?.Transform.ExitVisualSetup(isApply);
             setupModeBodyState?.Transform.ExitVisualSetup(isApply);
             setupModePropState?.Transform.ExitVisualSetup(isApply);
+        }
+
+        void HandleDynamicRotationEnterVisualSetup() {
+            if (inSetupMode) return;
+            EnterSetupModeMinimal();
+        }
+
+        void HandleDynamicRotationExitVisualSetup(bool isApply) {
+            if (!inSetupMode) return;
+            ExitSetupModeMinimal();
         }
 
         void HandleHandEnterVisualSetup(PoseState p) {

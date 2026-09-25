@@ -5,6 +5,7 @@ using Warudo.Core;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
 using Warudo.Core.Localization;
+using Warudo.Plugins.Core.Assets;
 using Warudo.Plugins.Core.Assets.Utility;
 
 namespace FlameStream {
@@ -20,32 +21,19 @@ namespace FlameStream {
         public bool Auto = true;
 
         [DataInput(16)]
-        [Label("AUTO_ROTATION_MAX_SPEED")]
-        [Description("AUTO_ROTATION_MAX_SPEED_DESC")]
-        [FloatSlider(30f, 720f, 10f)]
-        public float AutoMaxSpeed = 360f;
-
-        [DataInput(17)]
         [Label("AUTO_ROTATION_SETTLE_FRAMES")]
         [Description("AUTO_ROTATION_SETTLE_FRAMES_DESC")]
         [IntegerSlider(0, 30)]
         public int AutoSettleFrames = 16;
 
+        [DataInput(17)]
+        [Label("AUTO_ROTATION_MAX_SPEED")]
+        [Description("AUTO_ROTATION_MAX_SPEED_DESC")]
+        [FloatSlider(30f, 720f, 10f)]
+        public float AutoMaxSpeed = 360f;
+
         public virtual bool HasAutoMode => false;
         public Func<Vector3, Vector3> AutoRotationEvaluator;
-
-        [Trigger]
-        [Label("ENTER_VISUAL_SETUP")]
-        public void EnterVisualSetupTrigger() {
-            EnterVisualSetup(true);
-        }
-
-        [Trigger]
-        [Label("CANCEL_VISUAL_SETUP")]
-        [Hidden]
-        public void CancelVisualSetupTrigger() {
-            ExitVisualSetup(false);
-        }
 
         [DataInput(20)]
         [Hidden]
@@ -57,6 +45,19 @@ namespace FlameStream {
         [Hidden]
         public DistanceInputMathExpression Z;
 
+        [Trigger(50)]
+        [Label("ENTER_VISUAL_SETUP")]
+        public void EnterVisualSetupTrigger() {
+            EnterVisualSetup(true);
+        }
+
+        [Trigger(60)]
+        [Label("CANCEL_VISUAL_SETUP")]
+        [Hidden]
+        public void CancelVisualSetupTrigger() {
+            ExitVisualSetup(false);
+        }
+
         [DataInput]
         [Hidden]
         public Vector3 SphereCenterOffset = Vector3.zero;
@@ -65,7 +66,7 @@ namespace FlameStream {
         public VisualSetupAnchorAsset setupAnchor;
         public string LocalizationKey;
         public Func<Vector3> GetRestPosition;
-        public Func<AnchorAsset> GetParentAnchor;
+        public Func<GameObjectAsset> GetParentAnchor;
         public Action<DynamicVector3> OnEnterVisualSetup;
         public Action<bool> OnExitVisualSetup;
 
@@ -158,18 +159,22 @@ result: {result}
 ";
             if (parentAnchor != null) {
                 setupAnchor.Attachable.Parent = parentAnchor;
-                if (parentAnchor.GameObject != null) {
-                    setupAnchor.GameObject.transform.SetParent(parentAnchor.GameObject.transform, false);
-                }
             }
 
             setupAnchor.Transform.Position = initialAnchorPos;
             setupAnchor.Transform.Rotation = Vector3.zero;
+            setupAnchor.Transform.Scale = Vector3.one;
+            setupAnchor.SetHideScale(true);
+            setupAnchor.HideAnimation();
+            setupAnchor.HidePortIfExists(nameof(setupAnchor.ShowOrigin));
+            setupAnchor.HidePortIfExists(nameof(setupAnchor.AlwaysOnTop));
+            setupAnchor.HidePortIfExists(nameof(setupAnchor.OriginSphere));
             setupAnchor.Transform.Broadcast();
             Scene.UpdateNewAssetName(setupAnchor);
 
             setupAnchor.ApplyTriggerAction = () => Apply(setupAnchor);
             setupAnchor.CancelTriggerAction = () => ExitVisualSetup(false);
+            setupAnchor.ResetTriggerAction = () => ResetAnchorToOrigin();
 
             Transform parentTr = parentAnchor != null && parentAnchor.GameObject != null ? parentAnchor.GameObject.transform : null;
             CreateDebugVisuals(restPos, initialAnchorPos, parentTr);
@@ -198,6 +203,15 @@ result: {result}
             BroadcastTriggerProperties(nameof(CancelVisualSetupTrigger));
 
             OnExitVisualSetup?.Invoke(isApplied);
+        }
+
+        public void ResetAnchorToOrigin() {
+            if (!InVisualSetupMode || setupAnchor == null) return;
+            setupAnchor.Transform.Position = Vector3.zero;
+            setupAnchor.Transform.Rotation = Vector3.zero;
+            setupAnchor.Transform.Scale = Vector3.one;
+            setupAnchor.Transform.Broadcast();
+            UpdateDebugVisuals();
         }
 
         public void DestroyAnchor() {
@@ -349,13 +363,20 @@ result: {result}
             }
         }
 
+        protected override void OnUpdate() {
+            base.OnUpdate();
+            if (InVisualSetupMode) {
+                UpdateDebugVisuals();
+            }
+        }
+
         protected virtual void OnEnabledChanged() {
             bool showAuto = Enabled && HasAutoMode;
             GetDataInputPort(nameof(Auto)).Properties.hidden = !showAuto;
 
             bool showAutoSettings = showAuto && Auto;
-            GetDataInputPort(nameof(AutoMaxSpeed)).Properties.hidden = !showAutoSettings;
             GetDataInputPort(nameof(AutoSettleFrames)).Properties.hidden = !showAutoSettings;
+            GetDataInputPort(nameof(AutoMaxSpeed)).Properties.hidden = !showAutoSettings;
 
             bool showManual = Enabled && (!HasAutoMode || !Auto);
             GetDataInputPort(nameof(X)).Properties.hidden = !showManual;

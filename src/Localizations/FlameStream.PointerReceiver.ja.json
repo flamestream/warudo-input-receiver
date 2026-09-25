@@ -288,6 +288,8 @@
         "SETUP_ANCHOR_INSTRUCTIONS_PEN_HAND": "移動する🔴アンカーに対して手を配置します。\n\n- 画面上の手首待機位置を調整するには、アセット**［⌛⚓-🔥👆 ニュートラル］**を選択してください。\n- 自動動的回転が有効な場合、手を無理な位置に動かすと手が無限回転する場合があります。手がループしている場合は、**［↺ 原点にリセット］**をクリックして停止できます。",
         "SETUP_ANCHOR_INSTRUCTIONS_PEN_PROP_ACTIVE": "手に取り付けられたプロップを配置します。",
         "SETUP_ANCHOR_INSTRUCTIONS_PEN_PROP": "手に取り付けられたプロップを配置します。",
+        "SETUP_ANCHOR_INSTRUCTIONS_DYNAMIC_ROTATION_PIVOT": "手の回転の中心となる位置にこのアンカーを配置してください（デフォルトは画面の中央です）。\n\nカーソルが画面上を移動するとき、アバターの手はこのピボット点に向かって自然に傾きや角度を変えます。\n\n- **［↺ 原点にリセット］**: ピボットを画面の中央にリセットします。\n- **［変形を適用］**: 新しいピボット位置を保存し、手の傾き角度を更新します。",
+        "SETUP_ANCHOR_NAME_DYNAMIC_ROTATION_PIVOT": "🔥👆 動的回転ピボット",
         "SETUP_ANCHOR_NAME_BODY_ROOT": "🔥👆🫚 ボディ",
         "SETUP_ANCHOR_NAME_HAND_ROOT": "🔥👆🫚 手",
         "SETUP_ANCHOR_NAME_MOUSE_BODY_ACTIVE": "🔥👆🖱️ ボディ（アクティブ）",
