@@ -67,6 +67,7 @@ namespace FlameStream {
         public string LocalizationKey;
         public Func<Vector3> GetRestPosition;
         public Func<GameObjectAsset> GetParentAnchor;
+        public Func<Vector3> GetDefaultPivotPosition;
         public Func<bool> GetIsRightHanded;
         public Action<DynamicVector3> OnEnterVisualSetup;
         public Action<bool> OnExitVisualSetup;
@@ -144,9 +145,14 @@ result: {result}
             var parentAnchor = GetParentAnchor?.Invoke();
             Vector3 restPos = GetRestPosition != null ? GetRestPosition() : Vector3.zero;
 
-            Vector3 initialAnchorPos = (SphereCenterOffset != Vector3.zero)
-                ? (restPos + SphereCenterOffset)
-                : restPos;
+            Vector3 initialAnchorPos;
+            if (SphereCenterOffset != Vector3.zero) {
+                initialAnchorPos = restPos + SphereCenterOffset;
+            } else if (GetDefaultPivotPosition != null) {
+                initialAnchorPos = GetDefaultPivotPosition();
+            } else {
+                initialAnchorPos = restPos;
+            }
 
             DestroyAnchor();
             setupAnchor = Scene.AddAssetToGroup<VisualSetupAnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
@@ -208,7 +214,8 @@ result: {result}
 
         public void ResetAnchorToOrigin() {
             if (!InVisualSetupMode || setupAnchor == null) return;
-            setupAnchor.Transform.Position = Vector3.zero;
+            Vector3 defaultPos = GetDefaultPivotPosition != null ? GetDefaultPivotPosition() : Vector3.zero;
+            setupAnchor.Transform.Position = defaultPos;
             setupAnchor.Transform.Rotation = Vector3.zero;
             setupAnchor.Transform.Scale = Vector3.one;
             setupAnchor.Transform.Broadcast();
@@ -230,14 +237,14 @@ result: {result}
             SphereCenterOffset = anchorPos - restPos;
             BroadcastDataInput(nameof(SphereCenterOffset));
 
-            // R is vector from pivot anchor to resting hand on screen plane
-            Vector3 R = restPos - anchorPos;
-            if (R.sqrMagnitude < 0.0001f) {
-                R = new Vector3(0f, 0.3f, 0f);
+            // P is vector from resting hand to pivot anchor on screen plane
+            Vector3 P = anchorPos - restPos;
+            if (P.sqrMagnitude < 0.0001f) {
+                P = new Vector3(0f, -0.3f, 0f);
             }
 
-            string rx = R.x.ToString("0.######", CultureInfo.InvariantCulture);
-            string ry = R.y.ToString("0.######", CultureInfo.InvariantCulture);
+            string px = P.x.ToString("0.######", CultureInfo.InvariantCulture);
+            string negPy = (-P.y).ToString("0.######", CultureInfo.InvariantCulture);
 
             if (X == null) X = StructuredData.Create<DistanceInputMathExpression>();
             if (Y == null) Y = StructuredData.Create<DistanceInputMathExpression>();
@@ -246,8 +253,12 @@ result: {result}
             bool isRight = GetIsRightHanded != null ? GetIsRightHanded() : true;
             string sign = isRight ? "-" : "";
 
-            // Planar Sweep (X): in-plane rotation around pivot on tablet surface
-            X.Expression = $"{sign}(atan2({rx} - dx, {ry} - dy) - atan2({rx}, {ry})) * (180 / pi)";
+            // Planar Sweep (X): 360 degree rotation around pivot
+            // Vector from cursor to pivot is (Px + dx, Py + dy). Angle relative to (0, -1) is atan2(vx, -vy)
+            string pxTerm = P.x >= 0 ? $"{px} + dx" : $"dx - {Math.Abs(P.x).ToString("0.######", CultureInfo.InvariantCulture)}";
+            string pyTerm = (-P.y) >= 0 ? $"{negPy} - dy" : $"-{Math.Abs(-P.y).ToString("0.######", CultureInfo.InvariantCulture)} - dy";
+
+            X.Expression = $"{sign}(atan2({pxTerm}, {pyTerm}) * (180 / pi))";
             X.OnExpressionChange();
             X.BroadcastDataInput(nameof(X.Expression));
 
@@ -259,6 +270,8 @@ result: {result}
             Z.OnExpressionChange();
             Z.BroadcastDataInput(nameof(Z.Expression));
 
+            Auto = false;
+            BroadcastDataInput(nameof(Auto));
             Enabled = true;
             BroadcastDataInput(nameof(Enabled));
             BroadcastDataInput(nameof(X));

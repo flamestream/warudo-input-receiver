@@ -65,6 +65,19 @@ namespace FlameStream
             HandDynamicRotation.GetParentAnchor = () => screenAsset ?? GetSurfaceScreen();
             HandDynamicRotation.GetRestPosition = () => NeutralHandPosition != null ? NeutralHandPosition.Position : Vector3.zero;
             HandDynamicRotation.GetIsRightHanded = () => IsRightHanded;
+            HandDynamicRotation.GetDefaultPivotPosition = () => {
+                bool isRight = IsRightHanded;
+                var anim = Character != null ? (Character.Animator ?? Character.CloneAnimator) : null;
+                var elbowBone = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightLowerArm : HumanBodyBones.LeftLowerArm) : null;
+                Vector3 elbowWorld = elbowBone != null ? elbowBone.position : GetNaturalRestingElbowWorldPosition();
+                var s = screenAsset ?? GetSurfaceScreen();
+                if (s != null) {
+                    Quaternion screenRot = s.GameObject != null ? s.GameObject.transform.rotation : Quaternion.Euler(s.Transform.Rotation);
+                    Vector3 screenPos = s.GameObject != null ? s.GameObject.transform.position : s.Transform.Position;
+                    return Quaternion.Inverse(screenRot) * (elbowWorld - screenPos);
+                }
+                return (NeutralHandPosition != null ? NeutralHandPosition.Position : Vector3.zero) + new Vector3(isRight ? -0.1f : 0.1f, -0.3f, 0f);
+            };
             HandDynamicRotation.OnEnterVisualSetup = (dr) => { HandleDynamicRotationEnterVisualSetup(); };
             HandDynamicRotation.OnExitVisualSetup = (isApplied) => { HandleDynamicRotationExitVisualSetup(isApplied); };
         }
