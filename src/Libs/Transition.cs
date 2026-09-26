@@ -15,14 +15,27 @@ namespace FlameStream
         [Label("TRANSITION_EASING")]
         public Ease Ease = Ease.Linear;
 
+        [DataInput]
+        [Label("TRANSITION_DELAY")]
+        [FloatSlider(0f, 1f, 0.1f)]
+        public float Delay = 0f;
+
+        protected override void OnCreate() {
+            base.OnCreate();
+            var delayPort = GetDataInputPort(nameof(Delay));
+            if (delayPort?.Properties != null) {
+                delayPort.Properties.hidden = true;
+            }
+        }
+
         public string ShortLabel {
             get {
-                return $"{Time}s";
+                return Delay > 0 ? $"{Time}(+{Delay})s" : $"{Time}s";
             }
         }
 
         public virtual string GetHeader() {
-            return $"{Time:0.##}s ({Ease})";
+            return Delay > 0 ? $"{Time:0.##}s (+{Delay:0.#}s) ({Ease})" : $"{Time:0.##}s ({Ease})";
         }
     }
 
@@ -30,6 +43,7 @@ namespace FlameStream
         public ActiveTransition() {
             Time = 0.5f;
             Ease = Ease.Linear;
+            Delay = 0.1f;
         }
     }
 

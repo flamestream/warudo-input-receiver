@@ -31,7 +31,7 @@ namespace FlameStream {
         [DataInput(20)]
         [Label("PARENT")]
         [Description("ELBOW_POLE_PARENT_DESC")]
-        public RestHandParentType ParentType = RestHandParentType.Character;
+        public AnchorParentType ParentType = AnchorParentType.World;
 
         [DataInput(30)]
         [Label("INITIAL_POLE_TRANSFORM")]

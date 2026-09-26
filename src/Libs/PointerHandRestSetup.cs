@@ -6,6 +6,20 @@ using Warudo.Core.Localization;
 using Warudo.Core.Serializations;
 
 namespace FlameStream {
+    public enum AnchorParentType {
+        [Label("PARENT_WORLD")]
+        World = 0,
+        [Label("PARENT_CHARACTER")]
+        Character = 1,
+        [Label("PARENT_SCREEN")]
+        Screen = 2,
+        [Label("PARENT_CHARACTER_SHOULDER")]
+        CharacterShoulder = 3,
+        // Legacy compatibility alias for scenes saved with CharacterUpperArm = 3
+        [Hidden]
+        CharacterUpperArm = 3
+    }
+
     public enum RestHandParentType {
         [Label("PARENT_WORLD")]
         World = 0,
@@ -13,7 +27,9 @@ namespace FlameStream {
         Character = 1,
         [Label("PARENT_SCREEN")]
         Screen = 2,
-        [Label("PARENT_CHARACTER_UPPER_ARM")]
+        [Label("PARENT_CHARACTER_SHOULDER")]
+        CharacterShoulder = 3,
+        [Hidden]
         CharacterUpperArm = 3
     }
 
@@ -40,7 +56,7 @@ namespace FlameStream {
         [DataInput(15)]
         [Label("REST_HAND_PARENT")]
         [Description("REST_HAND_PARENT_DESC")]
-        public RestHandParentType ParentType = RestHandParentType.Character;
+        public AnchorParentType ParentType = AnchorParentType.World;
 
         [DataInput(20)]
         [Label("INITIAL_REST_POSITION")]

@@ -89,13 +89,19 @@ namespace FlameStream {
 
         T GetAsset<T>(ref Guid assetId, bool skipAutoCreate = false, string newAssetName = null) where T : Warudo.Core.Scenes.Asset {
             if (Scene == null) return null;
+            var category = (!string.IsNullOrEmpty(newAssetName) && newAssetName.StartsWith("🔒"))
+                ? "FS_ASSET_CATEGORY_INTERNAL".Localized()
+                : "FS_ASSET_CATEGORY_INPUT".Localized();
             if (assetId != Guid.Empty) {
                 var id = assetId;
                 var fetchResult = Scene.GetAssets<T>().FirstOrDefault(p => p.Id == id);
-                if (fetchResult != null) return fetchResult;
+                if (fetchResult != null) {
+                    try { Scene.AddAssetToGroup(fetchResult, category); } catch {}
+                    return fetchResult;
+                }
             }
             if (skipAutoCreate) return null;
-            var newAsset = Scene.AddAsset<T>();
+            var newAsset = Scene.AddAssetToGroup<T>(category);
             if (newAssetName != null) newAsset.Name = newAssetName;
             Scene.UpdateNewAssetName(newAsset);
             newAsset.Broadcast();

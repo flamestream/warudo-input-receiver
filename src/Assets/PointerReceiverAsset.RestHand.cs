@@ -36,20 +36,32 @@ namespace FlameStream {
         public AnchorAsset RestHandPoleAnchor => restHandPoleAnchor != null ? restHandPoleAnchor : (restHandPoleAnchor = GetRestHandPoleAnchor());
 
         public bool IsRestHandActive => IsEnabled && IsHandEnabled && RestHand != null && RestHand.Enabled;
-        public bool IsRestHandPoleActive => (IsRestHandActive || IsInRestHandVisualSetup) && RestHand != null && RestHand.UsePole;
-        public bool IsInRestHandVisualSetup => RestHand != null && RestHand.Enabled && ((RestHand.Target != null && RestHand.Target.InVisualSetupMode) || (RestHand.UsePole && RestHand.Pole != null && RestHand.Pole.InVisualSetupMode));
-        public bool IsInRestHandPoleVisualSetup => RestHand != null && RestHand.Enabled && RestHand.UsePole && RestHand.Pole != null && RestHand.Pole.InVisualSetupMode;
+        public bool IsRestHandPoleActive => (IsRestHandActive || IsInRestHandVisualSetup) && RestHand != null && (
+            RestHand.UsePole || 
+            (RestHand.ElbowPole != null && (RestHand.ElbowPole.UsePole || IsInRestHandPoleVisualSetup)) ||
+            IsInRestHandPoleVisualSetup
+        );
+        public bool IsInRestHandVisualSetup => RestHand != null && RestHand.Enabled && (
+            (RestHand.Target != null && RestHand.Target.InVisualSetupMode) || 
+            (RestHand.Pole != null && RestHand.Pole.InVisualSetupMode) ||
+            (RestHand.ElbowPole != null && RestHand.ElbowPole.Pole != null && RestHand.ElbowPole.Pole.InVisualSetupMode)
+        );
+        public bool IsInRestHandPoleVisualSetup => RestHand != null && RestHand.Enabled && (
+            (RestHand.Pole != null && RestHand.Pole.InVisualSetupMode) ||
+            (RestHand.ElbowPole != null && RestHand.ElbowPole.Pole != null && RestHand.ElbowPole.Pole.InVisualSetupMode)
+        );
 
         public AnchorAsset GetRestHandAnchor(bool skipAutoCreate = false) {
             bool shouldExist = RestHand != null && (RestHand.Enabled || (RestHand.Target != null && RestHand.Target.InVisualSetupMode));
             if (!shouldExist && !skipAutoCreate) {
                 return null;
             }
-            var anchor = GetAsset<AnchorAsset>(ref RestHandAnchorAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"⚓-{LAYER_NAME_PREFIX} Rest Hand IK");
+            var anchor = GetAsset<AnchorAsset>(ref RestHandAnchorAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"⚓-{LAYER_NAME_PREFIX} Rest Hand IK", category: "FS_ASSET_CATEGORY_INPUT".Localized());
             if (anchor != null && anchor.Name.StartsWith($"🔒⚓-{LAYER_NAME_PREFIX}")) {
                 anchor.Name = anchor.Name.Replace("🔒⚓-", "⚓-");
                 Scene?.UpdateNewAssetName(anchor);
                 anchor.Broadcast();
+                try { Scene?.AddAssetToGroup(anchor, "FS_ASSET_CATEGORY_INPUT".Localized()); } catch {}
             }
             if (isNewlyCreated && anchor != null) {
                 InitializeRestHandAnchor(anchor);
@@ -58,15 +70,20 @@ namespace FlameStream {
         }
 
         public AnchorAsset GetRestHandPoleAnchor(bool skipAutoCreate = false) {
-            bool shouldExist = RestHand != null && RestHand.Enabled && (RestHand.UsePole || (RestHand.Pole != null && RestHand.Pole.InVisualSetupMode));
+            bool shouldExist = RestHand != null && RestHand.Enabled && (
+                RestHand.UsePole || 
+                (RestHand.Pole != null && RestHand.Pole.InVisualSetupMode) ||
+                (RestHand.ElbowPole != null && (RestHand.ElbowPole.UsePole || (RestHand.ElbowPole.Pole != null && RestHand.ElbowPole.Pole.InVisualSetupMode)))
+            );
             if (!shouldExist && !skipAutoCreate) {
                 return null;
             }
-            var anchor = GetAsset<AnchorAsset>(ref RestHandPoleAnchorAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"⚓-{LAYER_NAME_PREFIX} Rest Hand Pole IK");
+            var anchor = GetAsset<AnchorAsset>(ref RestHandPoleAnchorAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"⚓-{LAYER_NAME_PREFIX} Rest Hand Pole IK", category: "FS_ASSET_CATEGORY_INPUT".Localized());
             if (anchor != null && anchor.Name.StartsWith($"🔒⚓-{LAYER_NAME_PREFIX}")) {
                 anchor.Name = anchor.Name.Replace("🔒⚓-", "⚓-");
                 Scene?.UpdateNewAssetName(anchor);
                 anchor.Broadcast();
+                try { Scene?.AddAssetToGroup(anchor, "FS_ASSET_CATEGORY_INPUT".Localized()); } catch {}
             }
             if (isNewlyCreated && anchor != null) {
                 InitializeRestHandPoleAnchor(anchor);
@@ -90,39 +107,50 @@ namespace FlameStream {
             }
         }
 
-        RestHandParentType currentRestHandParentType = RestHandParentType.Character;
+        AnchorParentType currentRestHandParentType = AnchorParentType.World;
 
-        public RestHandParentType GetAnchorParentType(AnchorAsset anchor) {
+        public AnchorParentType GetAnchorParentType(AnchorAsset anchor) {
             if (anchor == null || anchor.Attachable == null || anchor.Attachable.Parent == null) {
-                return RestHandParentType.World;
+                return AnchorParentType.World;
             }
             if (anchor.Attachable.Parent is CharacterAsset) {
-                return RestHandParentType.Character;
+                if (anchor.Attachable.AttachType == Warudo.Plugins.Core.Assets.Mixins.AttachType.HumanBodyBone) {
+                    var bone = anchor.Attachable.AttachToBone;
+                    if (bone == HumanBodyBones.RightShoulder || bone == HumanBodyBones.LeftShoulder ||
+                        bone == HumanBodyBones.UpperChest || bone == HumanBodyBones.Chest || bone == HumanBodyBones.Spine ||
+                        bone == HumanBodyBones.RightUpperArm || bone == HumanBodyBones.LeftUpperArm) {
+                        return AnchorParentType.CharacterShoulder;
+                    }
+                }
+                return AnchorParentType.Character;
             }
-            return RestHandParentType.Screen;
+            return AnchorParentType.Screen;
         }
 
-        public Transform GetAnchorParentTransform(RestHandParentType parentType, bool isRight) {
+        public Transform GetAnchorParentTransform(AnchorParentType parentType, bool isRight) {
             switch (parentType) {
-                case RestHandParentType.Character:
+                case AnchorParentType.Character:
                     return Character?.MainTransform ?? Character?.GameObject?.transform;
-                case RestHandParentType.CharacterUpperArm:
+                case AnchorParentType.CharacterShoulder:
                     var anim = Character?.Animator ?? Character?.CloneAnimator;
-                    return anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightUpperArm : HumanBodyBones.LeftUpperArm) : (Character?.MainTransform ?? Character?.GameObject?.transform);
-                case RestHandParentType.Screen:
+                    var shoulderBone = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightShoulder : HumanBodyBones.LeftShoulder) : null;
+                    if (shoulderBone != null) return shoulderBone;
+                    var torsoBone = anim != null ? (anim.GetBoneTransform(HumanBodyBones.UpperChest) ?? anim.GetBoneTransform(HumanBodyBones.Chest) ?? anim.GetBoneTransform(HumanBodyBones.Spine)) : null;
+                    return torsoBone ?? (Character?.MainTransform ?? Character?.GameObject?.transform);
+                case AnchorParentType.Screen:
                     var screen = screenAsset ?? GetSurfaceScreen();
                     return screen?.GameObject?.transform;
-                case RestHandParentType.World:
+                case AnchorParentType.World:
                 default:
                     return null;
             }
         }
 
-        public Transform GetRestHandParentTransform(RestHandParentType parentType) {
+        public Transform GetRestHandParentTransform(AnchorParentType parentType) {
             return GetAnchorParentTransform(parentType, !IsRightHanded);
         }
 
-        public void TransformAnchorLocalToWorld(RestHandParentType parentType, Vector3 localPos, Vector3 localRot, out Vector3 worldPos, out Quaternion worldRot, bool isRight) {
+        public void TransformAnchorLocalToWorld(AnchorParentType parentType, Vector3 localPos, Vector3 localRot, out Vector3 worldPos, out Quaternion worldRot, bool isRight) {
             var p = GetAnchorParentTransform(parentType, isRight);
             if (p != null) {
                 worldPos = p.position + p.rotation * localPos;
@@ -133,7 +161,7 @@ namespace FlameStream {
             }
         }
 
-        public void TransformAnchorWorldToLocal(RestHandParentType parentType, Vector3 worldPos, Quaternion worldRot, out Vector3 localPos, out Vector3 localRot, bool isRight) {
+        public void TransformAnchorWorldToLocal(AnchorParentType parentType, Vector3 worldPos, Quaternion worldRot, out Vector3 localPos, out Vector3 localRot, bool isRight) {
             var p = GetAnchorParentTransform(parentType, isRight);
             if (p != null) {
                 localPos = Quaternion.Inverse(p.rotation) * (worldPos - p.position);
@@ -145,35 +173,44 @@ namespace FlameStream {
             }
         }
 
-        public void TransformRestHandLocalToWorld(RestHandParentType parentType, Vector3 localPos, Vector3 localRot, out Vector3 worldPos, out Quaternion worldRot) {
+        public void TransformRestHandLocalToWorld(AnchorParentType parentType, Vector3 localPos, Vector3 localRot, out Vector3 worldPos, out Quaternion worldRot) {
             TransformAnchorLocalToWorld(parentType, localPos, localRot, out worldPos, out worldRot, !IsRightHanded);
         }
 
-        public void TransformRestHandWorldToLocal(RestHandParentType parentType, Vector3 worldPos, Quaternion worldRot, out Vector3 localPos, out Vector3 localRot) {
+        public void TransformRestHandWorldToLocal(AnchorParentType parentType, Vector3 worldPos, Quaternion worldRot, out Vector3 localPos, out Vector3 localRot) {
             TransformAnchorWorldToLocal(parentType, worldPos, worldRot, out localPos, out localRot, !IsRightHanded);
         }
 
-        public void AttachAnchorToParent(AnchorAsset anchor, RestHandParentType parentType, bool isRight) {
+        public void AttachAnchorToParent(AnchorAsset anchor, AnchorParentType parentType, bool isRight) {
             if (anchor == null) return;
             switch (parentType) {
-                case RestHandParentType.Character:
+                case AnchorParentType.Character:
                     anchor.Attachable.Parent = Character;
                     anchor.Attachable.AttachType = Warudo.Plugins.Core.Assets.Mixins.AttachType.TransformPath;
                     anchor.Attachable.AttachToTransform = null;
                     break;
-                case RestHandParentType.CharacterUpperArm:
+                case AnchorParentType.CharacterShoulder:
                     anchor.Attachable.Parent = Character;
                     anchor.Attachable.AttachType = Warudo.Plugins.Core.Assets.Mixins.AttachType.HumanBodyBone;
-                    anchor.Attachable.AttachToBone = isRight ? HumanBodyBones.RightUpperArm : HumanBodyBones.LeftUpperArm;
+                    var animCheck = Character?.Animator ?? Character?.CloneAnimator;
+                    var hasShoulder = animCheck != null && animCheck.GetBoneTransform(isRight ? HumanBodyBones.RightShoulder : HumanBodyBones.LeftShoulder) != null;
+                    if (hasShoulder) {
+                        anchor.Attachable.AttachToBone = isRight ? HumanBodyBones.RightShoulder : HumanBodyBones.LeftShoulder;
+                    } else {
+                        // Fallback to torso (UpperChest -> Chest -> Spine)
+                        var hasUpperChest = animCheck != null && animCheck.GetBoneTransform(HumanBodyBones.UpperChest) != null;
+                        var hasChest = animCheck != null && animCheck.GetBoneTransform(HumanBodyBones.Chest) != null;
+                        anchor.Attachable.AttachToBone = hasUpperChest ? HumanBodyBones.UpperChest : (hasChest ? HumanBodyBones.Chest : HumanBodyBones.Spine);
+                    }
                     anchor.Attachable.AttachToTransform = null;
                     break;
-                case RestHandParentType.Screen:
+                case AnchorParentType.Screen:
                     var screen = screenAsset ?? GetSurfaceScreen();
                     anchor.Attachable.Parent = screen;
                     anchor.Attachable.AttachType = Warudo.Plugins.Core.Assets.Mixins.AttachType.TransformPath;
                     anchor.Attachable.AttachToTransform = null;
                     break;
-                case RestHandParentType.World:
+                case AnchorParentType.World:
                     anchor.Attachable.Parent = null;
                     break;
             }
@@ -182,37 +219,43 @@ namespace FlameStream {
             }
         }
 
-        public void AttachAnchorToParent(AnchorAsset anchor, RestHandParentType parentType) {
+        public void AttachAnchorToParent(AnchorAsset anchor, AnchorParentType parentType) {
             AttachAnchorToParent(anchor, parentType, !IsRightHanded);
         }
 
-        void SetAnchorParentInitial(AnchorAsset anchor, RestHandParentType parentType, bool isRight) {
+        void SetAnchorParentInitial(AnchorAsset anchor, AnchorParentType parentType, bool isRight) {
             AttachAnchorToParent(anchor, parentType, isRight);
         }
 
-        void SetAnchorParentInitial(AnchorAsset anchor, RestHandParentType parentType) {
+        void SetAnchorParentInitial(AnchorAsset anchor, AnchorParentType parentType) {
             AttachAnchorToParent(anchor, parentType, !IsRightHanded);
         }
 
         void InitializeRestHandAnchor(AnchorAsset anchor) {
-            var parentType = RestHand?.ParentType ?? RestHandParentType.Character;
+            var parentType = RestHand?.ParentType ?? AnchorParentType.World;
             SetAnchorParentInitial(anchor, parentType, !IsRightHanded);
-            if (RestHand?.Target != null) {
+            if (RestHand?.Target != null && RestHand.Target.Position != Vector3.zero) {
                 anchor.Transform.Position = RestHand.Target.Position;
                 anchor.Transform.Rotation = KeyboardReceiverAsset.ApplyHandIKIntermediateRotation(IsRightHanded, RestHand.Target.Rotation);
             } else {
                 Vector3 defaultCharPos = IsRightHanded ? new Vector3(-0.25f, 0.65f, 0.25f) : new Vector3(0.25f, 0.65f, 0.25f);
-                TransformAnchorLocalToWorld(RestHandParentType.Character, defaultCharPos, Vector3.zero, out Vector3 worldPos, out Quaternion worldRot, !IsRightHanded);
+                TransformAnchorLocalToWorld(AnchorParentType.Character, defaultCharPos, Vector3.zero, out Vector3 worldPos, out Quaternion worldRot, !IsRightHanded);
                 TransformAnchorWorldToLocal(parentType, worldPos, worldRot, out Vector3 localPos, out Vector3 localRot, !IsRightHanded);
                 anchor.Transform.Position = localPos;
                 anchor.Transform.Rotation = KeyboardReceiverAsset.ApplyHandIKIntermediateRotation(IsRightHanded, localRot);
+                if (RestHand?.Target != null) {
+                    RestHand.Target.Position = localPos;
+                    RestHand.Target.Rotation = KeyboardReceiverAsset.RemoveHandIKIntermediateRotation(IsRightHanded, localRot);
+                    RestHand.Target.SetDataInput(nameof(RestHand.Target.Position), localPos, true);
+                    RestHand.Target.SetDataInput(nameof(RestHand.Target.Rotation), RestHand.Target.Rotation, true);
+                }
             }
             anchor.Transform.Scale = Vector3.one;
             anchor.Transform.Broadcast();
         }
 
         void InitializeRestHandPoleAnchor(AnchorAsset anchor) {
-            var parentType = RestHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+            var parentType = RestHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
             SetAnchorParentInitial(anchor, parentType, !IsRightHanded);
             if (RestHand?.ElbowPole?.Pole != null && RestHand.ElbowPole.Pole.Position != Vector3.zero) {
                 anchor.Transform.Position = RestHand.ElbowPole.Pole.Position;
@@ -222,15 +265,21 @@ namespace FlameStream {
                 TransformAnchorWorldToLocal(parentType, defaultWorld, Quaternion.identity, out Vector3 localPos, out Vector3 localRot, !IsRightHanded);
                 anchor.Transform.Position = localPos;
                 anchor.Transform.Rotation = localRot;
+                if (RestHand?.ElbowPole?.Pole != null) {
+                    RestHand.ElbowPole.Pole.Position = localPos;
+                    RestHand.ElbowPole.Pole.Rotation = localRot;
+                    RestHand.ElbowPole.Pole.SetDataInput(nameof(RestHand.ElbowPole.Pole.Position), localPos, true);
+                    RestHand.ElbowPole.Pole.SetDataInput(nameof(RestHand.ElbowPole.Pole.Rotation), localRot, true);
+                }
             }
             anchor.Transform.Scale = Vector3.one;
             anchor.Transform.Broadcast();
         }
 
-        RestHandParentType currentRestHandPoleParentType = RestHandParentType.Character;
+        AnchorParentType currentRestHandPoleParentType = AnchorParentType.World;
 
         public void OnRestHandParentTypeChange() {
-            var newParentType = RestHand?.ParentType ?? RestHandParentType.Character;
+            var newParentType = RestHand?.ParentType ?? AnchorParentType.World;
             var targetAnchor = GetRestHandAnchor(true);
 
             var oldParentType = targetAnchor != null
@@ -293,7 +342,7 @@ namespace FlameStream {
         }
 
         public void OnRestHandPoleParentTypeChange() {
-            var newParentType = RestHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+            var newParentType = RestHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
             var poleAnchor = GetRestHandPoleAnchor(true);
 
             var oldParentType = poleAnchor != null
@@ -366,6 +415,7 @@ namespace FlameStream {
             var ease = enable
                 ? (ActiveTransition != null ? ActiveTransition.Ease : Ease.OutQuad)
                 : (InactiveTransition != null ? InactiveTransition.Ease : Ease.Linear);
+            var delay = (enable && ActiveTransition != null) ? ActiveTransition.Delay : 0f;
 
             if (enable) {
                 var anchor = GetRestHandAnchor();
@@ -408,6 +458,10 @@ namespace FlameStream {
                     1.0f,
                     actualDuration
                 ).SetEase(ease);
+
+                if (delay > 0f) {
+                    tweenRestLimb.SetDelay(delay);
+                }
             } else {
                 float currentWeight = restLimb != null ? Mathf.Clamp01(restLimb.PositionWeight) : Mathf.Clamp01(currentRestLimbWeight);
                 float actualDuration = duration * currentWeight;
@@ -460,6 +514,7 @@ namespace FlameStream {
             var ease = enable
                 ? (ActiveTransition != null ? ActiveTransition.Ease : Ease.OutQuad)
                 : (InactiveTransition != null ? InactiveTransition.Ease : Ease.Linear);
+            var delay = (enable && ActiveTransition != null) ? ActiveTransition.Delay : 0f;
 
             if (enable) {
                 var poleAnchor = GetRestHandPoleAnchor();
@@ -498,6 +553,10 @@ namespace FlameStream {
                     1.0f,
                     actualDuration
                 ).SetEase(ease);
+
+                if (delay > 0f) {
+                    tweenRestPole.SetDelay(delay);
+                }
             } else {
                 float currentWeight = restLimb != null ? Mathf.Clamp01(restLimb.BendGoalWeight) : Mathf.Clamp01(currentRestPoleWeight);
                 float actualDuration = duration * currentWeight;
@@ -541,8 +600,8 @@ namespace FlameStream {
             if (RestHand == null) {
                 RestHand = StructuredData.Create<PointerHandRestSetup>();
             }
-            currentRestHandParentType = RestHand?.ParentType ?? RestHandParentType.Character;
-            currentRestHandPoleParentType = RestHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+            currentRestHandParentType = RestHand?.ParentType ?? AnchorParentType.World;
+            currentRestHandPoleParentType = RestHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
             if (RestHand?.ElbowPole != null) {
                 RestHand.ElbowPole.OnPoleSettingChange = () => OnRestHandSettingChange();
                 RestHand.ElbowPole.OnParentTypeChange = () => OnRestHandPoleParentTypeChange();
@@ -561,11 +620,11 @@ namespace FlameStream {
                 SetupRestHandPoleTransform();
             });
             Watch(nameof(Character), delegate {
-                if (RestHand?.ParentType == RestHandParentType.Character || RestHand?.ParentType == RestHandParentType.CharacterUpperArm) {
+                if (RestHand?.ParentType == AnchorParentType.Character || RestHand?.ParentType == AnchorParentType.CharacterShoulder) {
                     var targetAnchor = GetRestHandAnchor(true);
                     if (targetAnchor != null) AttachAnchorToParent(targetAnchor, RestHand.ParentType, !IsRightHanded);
                 }
-                if (RestHand?.ElbowPole?.ParentType == RestHandParentType.Character || RestHand?.ElbowPole?.ParentType == RestHandParentType.CharacterUpperArm) {
+                if (RestHand?.ElbowPole?.ParentType == AnchorParentType.Character || RestHand?.ElbowPole?.ParentType == AnchorParentType.CharacterShoulder) {
                     var poleAnchor = GetRestHandPoleAnchor(true);
                     if (poleAnchor != null) AttachAnchorToParent(poleAnchor, RestHand.ElbowPole.ParentType, !IsRightHanded);
                 }
@@ -573,8 +632,8 @@ namespace FlameStream {
         }
 
         void OnReadyRestHand() {
-            currentRestHandParentType = RestHand?.ParentType ?? RestHandParentType.Character;
-            currentRestHandPoleParentType = RestHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+            currentRestHandParentType = RestHand?.ParentType ?? AnchorParentType.World;
+            currentRestHandPoleParentType = RestHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
             if (RestHand?.ElbowPole != null) {
                 RestHand.ElbowPole.OnPoleSettingChange = () => OnRestHandSettingChange();
                 RestHand.ElbowPole.OnParentTypeChange = () => OnRestHandPoleParentTypeChange();
@@ -666,7 +725,7 @@ namespace FlameStream {
             };
 
             target.OnCreateAnchor = (tr, setupAnchor) => {
-                var parentType = RestHand?.ParentType ?? RestHandParentType.Character;
+                var parentType = RestHand?.ParentType ?? AnchorParentType.World;
                 SetAnchorParentInitial(setupAnchor, parentType, !IsRightHanded);
 
                 setupAnchor.Transform.Position = tr.Position;
@@ -686,9 +745,9 @@ namespace FlameStream {
             };
 
             target.OnResetAnchor = (tr, setupAnchor) => {
-                var parentType = RestHand?.ParentType ?? RestHandParentType.Character;
+                var parentType = RestHand?.ParentType ?? AnchorParentType.World;
                 Vector3 defaultCharPos = IsRightHanded ? new Vector3(-0.25f, 0.65f, 0.25f) : new Vector3(0.25f, 0.65f, 0.25f);
-                TransformRestHandLocalToWorld(RestHandParentType.Character, defaultCharPos, Vector3.zero, out Vector3 worldPos, out Quaternion worldRot);
+                TransformRestHandLocalToWorld(AnchorParentType.Character, defaultCharPos, Vector3.zero, out Vector3 worldPos, out Quaternion worldRot);
                 TransformRestHandWorldToLocal(parentType, worldPos, worldRot, out Vector3 localPos, out Vector3 localRot);
 
                 setupAnchor.Transform.Position = localPos;
@@ -735,6 +794,7 @@ namespace FlameStream {
 
             pole.OnEnterVisualSetup = (tr) => {
                 EnsureRestHandAnchors();
+                NeutralHandPosition?.EnterVisualSetup(false);
                 var livePole = GetRestHandPoleAnchor();
                 if (livePole != null) {
                     livePole.Transform.Position = tr.Position;
@@ -751,7 +811,7 @@ namespace FlameStream {
             };
 
             pole.OnCreateAnchor = (tr, setupAnchor) => {
-                var parentType = RestHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+                var parentType = RestHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
                 SetAnchorParentInitial(setupAnchor, parentType, !IsRightHanded);
 
                 setupAnchor.Transform.Position = tr.Position;
@@ -771,7 +831,7 @@ namespace FlameStream {
             };
 
             pole.OnResetAnchor = (tr, setupAnchor) => {
-                var parentType = RestHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+                var parentType = RestHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
                 Vector3 defaultWorldPos = GetDefaultElbowPoleWorldPosition(!IsRightHanded);
                 TransformAnchorWorldToLocal(parentType, defaultWorldPos, Quaternion.identity, out Vector3 localPos, out Vector3 localRot, !IsRightHanded);
 
@@ -804,6 +864,16 @@ namespace FlameStream {
                     }
                 }
                 OnRestHandSettingChange();
+
+                if (!isExitingVisualSetup) {
+                    isExitingVisualSetup = true;
+                    try {
+                        TriggerVisualSetupAnchor(NeutralHandPosition, isApplied);
+                    } finally {
+                        isExitingVisualSetup = false;
+                    }
+                }
+
                 Context.Service.NavigateToAsset(Id);
                 Context.Service.BroadcastOpenedScene();
                 RequestUiRefresh();
@@ -811,13 +881,13 @@ namespace FlameStream {
         }
 
         void EnsureRestHandAnchors() {
-            var targetParentType = RestHand?.ParentType ?? RestHandParentType.Character;
+            var targetParentType = RestHand?.ParentType ?? AnchorParentType.World;
             if (RestHand != null && (RestHand.Enabled || (RestHand.Target != null && RestHand.Target.InVisualSetupMode))) {
                 var targetAnchor = GetRestHandAnchor();
                 if (targetAnchor != null) AttachAnchorToParent(targetAnchor, targetParentType, !IsRightHanded);
             }
-            var poleParentType = RestHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
-            if (RestHand != null && (RestHand.UsePole || (RestHand.Pole != null && RestHand.Pole.InVisualSetupMode))) {
+            var poleParentType = RestHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
+            if (RestHand != null && (RestHand.UsePole || (RestHand.Pole != null && RestHand.Pole.InVisualSetupMode) || (RestHand.ElbowPole != null && (RestHand.ElbowPole.UsePole || (RestHand.ElbowPole.Pole != null && RestHand.ElbowPole.Pole.InVisualSetupMode))))) {
                 var poleAnchor = GetRestHandPoleAnchor();
                 if (poleAnchor != null) AttachAnchorToParent(poleAnchor, poleParentType, !IsRightHanded);
             }
@@ -845,9 +915,10 @@ namespace FlameStream {
                 }
             }
 
-            if (pole != null && RestHand?.Pole != null && RestHand.Pole.InVisualSetupMode && RestHand.Pole.setupAnchor != null) {
-                Vector3 polePos = RestHand.Pole.setupAnchor.Transform.Position;
-                Vector3 poleRot = RestHand.Pole.setupAnchor.Transform.Rotation;
+            var currentPoleSetup = RestHand?.ElbowPole?.Pole ?? RestHand?.Pole;
+            if (pole != null && currentPoleSetup != null && currentPoleSetup.InVisualSetupMode && currentPoleSetup.setupAnchor != null) {
+                Vector3 polePos = currentPoleSetup.setupAnchor.Transform.Position;
+                Vector3 poleRot = currentPoleSetup.setupAnchor.Transform.Rotation;
                 if (pole.Transform.Position != polePos || pole.Transform.Rotation != poleRot) {
                     pole.Transform.Position = polePos;
                     pole.Transform.Rotation = poleRot;
@@ -923,7 +994,7 @@ namespace FlameStream {
             var poleSetup = RestHand.ElbowPole;
             var pole = poleSetup?.Pole ?? RestHand.Pole;
             if (pole != null) {
-                var poleParentType = poleSetup?.ParentType ?? RestHandParentType.Character;
+                var poleParentType = poleSetup?.ParentType ?? AnchorParentType.World;
                 MirrorTransformAcrossCharacter(
                     pole.Position, 
                     pole.Rotation, 
@@ -982,7 +1053,7 @@ namespace FlameStream {
         public void MirrorActiveHandPoleTransform(bool wasRightHanded) {
             var pole = ActiveHand?.ElbowPole?.Pole;
             if (pole == null) return;
-            var parentType = ActiveHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+            var parentType = ActiveHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
 
             MirrorTransformAcrossCharacter(
                 pole.Position,
@@ -1023,7 +1094,7 @@ namespace FlameStream {
             }
         }
 
-        void MirrorTransformAcrossCharacter(Vector3 localPos, Vector3 localRot, RestHandParentType parentType, bool wasRight, bool newRight, out Vector3 newLocalPos, out Vector3 newLocalRot) {
+        void MirrorTransformAcrossCharacter(Vector3 localPos, Vector3 localRot, AnchorParentType parentType, bool wasRight, bool newRight, out Vector3 newLocalPos, out Vector3 newLocalRot) {
             if (Character != null) {
                 TransformAnchorLocalToWorld(parentType, localPos, localRot, out Vector3 worldPos, out Quaternion worldRot, wasRight);
 

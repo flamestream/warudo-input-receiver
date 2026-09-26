@@ -99,21 +99,24 @@ namespace FlameStream
 
             OnUpdateState();
 
-            if (Character == null) return;
-
             // OnReady: One-time execution before update events are sent
-            // Delay if a few tick is needed because things are for settled
+            // Delay if a few ticks are needed so scene references are fully settled
             if (onReadyCountdown > 0) {
                 --onReadyCountdown;
                 if (onReadyCountdown == 0) {
                     isReady = true;
                     OnReadyBasicSetup();
-                    OnReadyHand();
-                    OnReadyBody();
-                    OnReadyProp();
-                    OnReadyRestHand();
-                };
+                    if (Character != null) {
+                        OnReadyHand();
+                        OnReadyBody();
+                        OnReadyProp();
+                        OnReadyRestHand();
+                    }
+                    OnBasicSettingChange();
+                }
             }
+
+            if (Character == null) return;
 
             OnUpdateBasicSetup();
             OnUpdateHand();
@@ -195,6 +198,20 @@ namespace FlameStream
                 ActiveTransition = StructuredData.Create<ActiveTransition>();
                 SetDataInput(nameof(ActiveTransition), ActiveTransition, true);
             }
+            if (ActiveTransition != null) {
+                var delayPort = ActiveTransition.GetDataInputPort(nameof(ActiveTransition.Delay));
+                if (delayPort?.Properties != null) {
+                    delayPort.Properties.hidden = false;
+                }
+            }
+            Watch(nameof(ActiveTransition), delegate {
+                if (ActiveTransition != null) {
+                    var delayPort = ActiveTransition.GetDataInputPort(nameof(ActiveTransition.Delay));
+                    if (delayPort?.Properties != null) {
+                        delayPort.Properties.hidden = false;
+                    }
+                }
+            });
             if (InactiveTransition == null) {
                 InactiveTransition = StructuredData.Create<InactiveTransition>();
                 SetDataInput(nameof(InactiveTransition), InactiveTransition, true);
@@ -212,6 +229,12 @@ namespace FlameStream
             Watch(nameof(IsEnabled), delegate { OnBasicSettingChange(); });
             Watch(nameof(IsHandEnabled), delegate { OnBasicSettingChange(); });
             Watch(nameof(Character), delegate {
+                if (isReady && Character != null) {
+                    OnReadyHand();
+                    OnReadyBody();
+                    OnReadyProp();
+                    OnReadyRestHand();
+                }
                 ScreenSetup?.UpdateAutoSetupStatus();
                 BroadcastDataInput(nameof(ScreenSetup));
                 OnBasicSettingChange();
@@ -550,7 +573,7 @@ namespace FlameStream
                 enableDesc = "POINTER_ENABLE_DESC".Localized();
             }
 
-            if (isMissingRequirements && IsHandEnabled) {
+            if (isReady && isMissingRequirements && IsHandEnabled) {
                 IsHandEnabled = false;
                 SetDataInput(nameof(IsHandEnabled), false, true);
                 BroadcastDataInput(nameof(IsHandEnabled));
@@ -572,6 +595,12 @@ namespace FlameStream
             SetDataInputPropertyAndBroadcast(nameof(RestHand), hidden: false);
             SetDataInputPropertyAndBroadcast(nameof(ActiveTransition), hidden: false);
             SetDataInputPropertyAndBroadcast(nameof(InactiveTransition), hidden: false);
+            if (ActiveTransition != null) {
+                var delayPort = ActiveTransition.GetDataInputPort(nameof(ActiveTransition.Delay));
+                if (delayPort?.Properties != null) {
+                    delayPort.Properties.hidden = false;
+                }
+            }
 
             OnSurfaceSettingChange();
 
@@ -926,6 +955,11 @@ namespace FlameStream
                 return null;
             }
 
+            if (string.IsNullOrEmpty(category)) {
+                bool isLocked = !string.IsNullOrEmpty(newAssetName) && newAssetName.StartsWith("🔒");
+                category = isLocked ? "FS_ASSET_CATEGORY_INTERNAL".Localized() : "FS_ASSET_CATEGORY_INPUT".Localized();
+            }
+
             if (assetId != Guid.Empty) {
                 var id = assetId;
                 var fetchResult = Scene.GetAssets<T>().FirstOrDefault(p => p.Id == id);
@@ -951,9 +985,7 @@ namespace FlameStream
 
             if (skipAutoCreate) return null;
 
-            var newAsset = !string.IsNullOrEmpty(category)
-                ? Scene.AddAssetToGroup<T>(category)
-                : Scene.AddAsset<T>();
+            var newAsset = Scene.AddAssetToGroup<T>(category);
             newAsset.Name = newAssetName ?? $"📦-{LAYER_NAME_PREFIX} {nameof(T)}";
             Scene.UpdateNewAssetName(newAsset);
             newAsset.Broadcast();

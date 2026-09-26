@@ -75,8 +75,8 @@ namespace FlameStream {
         }
 
         protected override void OnDestroy() {
-            base.OnDestroy();
             StopReceiver();
+            base.OnDestroy();
         }
 
         public override void OnUpdate() {
@@ -90,36 +90,51 @@ namespace FlameStream {
         /// Background task loop for listener
         /// </summary>
         /// <param name="udpClient">Client waiting for messages</param>
-        protected void Listen(UdpClient udpClient) {
+        protected void Listen(UdpClient client) {
             // Create an IPEndPoint object to store the sender's information
             IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
 
             try {
-                // Loop until the UdpClient object is closed
-                while (udpClient != null && udpClient.Client != null)
+                // Loop until the UdpClient object is closed or receiver is deactivated
+                while (Active && client != null && client.Client != null)
                 {
                     try {
                         // Receive data from the port and print it to the console
-                        byte[] data = udpClient.Receive(ref remoteEP);
-                        lastState = Encoding.ASCII.GetString(data);
+                        byte[] data = client.Receive(ref remoteEP);
+                        if (data != null && data.Length > 0) {
+                            lastState = Encoding.ASCII.GetString(data);
+                        }
 
                     } catch (SocketException ex) {
                         if (Active) {
                             SetMessage(ex.Message);
                         } else {
-                            SetMessage("MSG_STOPPED_LISTENING");
+                            break;
                         }
+                    } catch (ObjectDisposedException) {
+                        break;
+                    } catch (NullReferenceException) {
+                        // Mono's UdpClient.Receive throws NullReferenceException when Client is disposed/closed while blocking
+                        break;
+                    } catch (Exception) {
+                        if (!Active) break;
                     }
                 }
-            } catch (ObjectDisposedException) {
-                // This will happen, since the client will be closed as we wait for thread to die.
+            } catch (Exception) {
+                // Safely absorb any shutdown exceptions on the background listener thread
             }
         }
 
         protected bool StartReceiver() {
             try {
                 Log($"Starting receiver on port {Port}");
-                udpClient = new UdpClient(Port);
+
+                // Enable SO_REUSEADDR so port can be rebound immediately across scene changes
+                var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+                socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                socket.Bind(new IPEndPoint(IPAddress.Any, Port));
+
+                udpClient = new UdpClient { Client = socket };
                 listenTask = Task.Run(() => Listen(udpClient));
 
                 SetActive(true);
@@ -138,12 +153,27 @@ namespace FlameStream {
         protected void StopReceiver() {
             SetActive(false);
 
-            if (udpClient != null) {
+            var client = udpClient;
+            udpClient = null;
+            var task = listenTask;
+            listenTask = null;
+
+            if (client != null) {
                 Log("Stopping receiver");
-                udpClient.Close();
-                udpClient = null;
-                listenTask.Wait();
-                listenTask = null;
+                try {
+                    client.Close();
+                } catch (Exception ex) {
+                    Log($"Error closing UDP client: {ex.Message}");
+                }
+            }
+
+            if (task != null) {
+                try {
+                    // Allow the background thread up to 500ms to exit cleanly
+                    task.Wait(500);
+                } catch (Exception) {
+                    // Absorb AggregateException / task cancellation during teardown
+                }
             }
 
             lastState = null;

@@ -43,21 +43,34 @@ namespace FlameStream
         public float ActivePoleWeight => currentActivePoleWeight;
         bool lastIsRightHanded = true;
 
-        public bool IsActiveHandPoleActive => (IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound && Character != null || IsInActiveHandPoleVisualSetup) && ActiveHand != null && ActiveHand.ElbowPole != null && ActiveHand.ElbowPole.UsePole;
-        public bool IsInActiveHandPoleVisualSetup => ActiveHand != null && ActiveHand.ElbowPole != null && ActiveHand.ElbowPole.UsePole && ActiveHand.ElbowPole.Pole != null && ActiveHand.ElbowPole.Pole.InVisualSetupMode;
+        public bool IsActiveHandPoleActive => (IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound && Character != null || IsInActiveHandPoleVisualSetup) && ActiveHand != null && ActiveHand.ElbowPole != null && (ActiveHand.ElbowPole.UsePole || IsInActiveHandPoleVisualSetup);
+        public bool IsInActiveHandPoleVisualSetup => ActiveHand != null && ActiveHand.ElbowPole != null && ActiveHand.ElbowPole.Pole != null && ActiveHand.ElbowPole.Pole.InVisualSetupMode;
+        protected bool isExitingVisualSetup = false;
 
-        RestHandParentType currentActiveHandPoleParentType = RestHandParentType.Character;
+        protected void TriggerVisualSetupAnchor(VisualSetupTransform tr, bool isApply) {
+            if (tr == null || !tr.InVisualSetupMode) return;
+            if (tr.setupAnchor != null) {
+                if (isApply) tr.setupAnchor.ApplyTrigger();
+                else tr.setupAnchor.CancelTrigger();
+            }
+            if (tr.InVisualSetupMode) {
+                tr.ExitVisualSetup(isApply);
+            }
+        }
+
+        AnchorParentType currentActiveHandPoleParentType = AnchorParentType.World;
 
         public AnchorAsset GetActiveHandPoleAnchor(bool skipAutoCreate = false) {
             bool shouldExist = ActiveHand != null && ActiveHand.ElbowPole != null && (ActiveHand.ElbowPole.UsePole || (ActiveHand.ElbowPole.Pole != null && ActiveHand.ElbowPole.Pole.InVisualSetupMode));
             if (!shouldExist && !skipAutoCreate) {
                 return null;
             }
-            var anchor = GetAsset<AnchorAsset>(ref ActiveHandPoleAnchorAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"⚓-{LAYER_NAME_PREFIX} Active Hand Pole IK");
+            var anchor = GetAsset<AnchorAsset>(ref ActiveHandPoleAnchorAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"⚓-{LAYER_NAME_PREFIX} Active Hand Pole IK", category: "FS_ASSET_CATEGORY_INPUT".Localized());
             if (anchor != null && anchor.Name.StartsWith($"🔒⚓-{LAYER_NAME_PREFIX}")) {
                 anchor.Name = anchor.Name.Replace("🔒⚓-", "⚓-");
                 Scene?.UpdateNewAssetName(anchor);
                 anchor.Broadcast();
+                try { Scene?.AddAssetToGroup(anchor, "FS_ASSET_CATEGORY_INPUT".Localized()); } catch {}
             }
             if (isNewlyCreated && anchor != null) {
                 InitializeActiveHandPoleAnchor(anchor);
@@ -66,7 +79,7 @@ namespace FlameStream
         }
 
         void InitializeActiveHandPoleAnchor(AnchorAsset anchor) {
-            var parentType = ActiveHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+            var parentType = ActiveHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
             SetAnchorParentInitial(anchor, parentType, IsRightHanded);
             if (ActiveHand?.ElbowPole?.Pole != null && ActiveHand.ElbowPole.Pole.Position != Vector3.zero) {
                 anchor.Transform.Position = ActiveHand.ElbowPole.Pole.Position;
@@ -76,6 +89,12 @@ namespace FlameStream
                 TransformAnchorWorldToLocal(parentType, defaultWorld, Quaternion.identity, out Vector3 localPos, out Vector3 localRot, IsRightHanded);
                 anchor.Transform.Position = localPos;
                 anchor.Transform.Rotation = localRot;
+                if (ActiveHand?.ElbowPole?.Pole != null) {
+                    ActiveHand.ElbowPole.Pole.Position = localPos;
+                    ActiveHand.ElbowPole.Pole.Rotation = localRot;
+                    ActiveHand.ElbowPole.Pole.SetDataInput(nameof(ActiveHand.ElbowPole.Pole.Position), localPos, true);
+                    ActiveHand.ElbowPole.Pole.SetDataInput(nameof(ActiveHand.ElbowPole.Pole.Rotation), localRot, true);
+                }
             }
             anchor.Transform.Scale = Vector3.one;
             anchor.Transform.Broadcast();
@@ -115,13 +134,13 @@ namespace FlameStream
                     ActiveHand.IsRightHanded = IsRightHanded;
                     ActiveHand.SetDataInput(nameof(ActiveHand.IsRightHanded), IsRightHanded, true);
                 }
-                OnInputAffectingHandSetupChange();
                 OnHandSideChange();
+                OnInputAffectingHandSetupChange();
                 OnRestHandSettingChange();
             });
             Watch(nameof(Character), delegate {
                 OnInputAffectingHandSetupChange();
-                if (ActiveHand?.ElbowPole?.ParentType == RestHandParentType.Character || ActiveHand?.ElbowPole?.ParentType == RestHandParentType.CharacterUpperArm) {
+                if (ActiveHand?.ElbowPole?.ParentType == AnchorParentType.Character || ActiveHand?.ElbowPole?.ParentType == AnchorParentType.CharacterShoulder) {
                     var poleAnchor = GetActiveHandPoleAnchor(true);
                     if (poleAnchor != null) AttachAnchorToParent(poleAnchor, ActiveHand.ElbowPole.ParentType, IsRightHanded);
                 }
@@ -175,7 +194,7 @@ namespace FlameStream
             lastIsRightHanded = IsRightHanded;
             SetupHandDynamicRotation();
 
-            currentActiveHandPoleParentType = ActiveHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+            currentActiveHandPoleParentType = ActiveHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
             if (ActiveHand?.ElbowPole != null) {
                 ActiveHand.ElbowPole.Parent = this;
                 ActiveHand.ElbowPole.IsActiveHand = true;
@@ -462,6 +481,15 @@ namespace FlameStream
             SetupRestHandTransform();
             SetupRestHandPoleTransform();
             UpdateRestHandAnchorTransforms();
+
+            // Re-target and transition rest hand to the new limb if active
+            bool currentRestActive = IsRestHandActive || IsInRestHandVisualSetup;
+            lastRestHandActive = currentRestActive;
+            TransitionRestHand(currentRestActive);
+
+            bool currentRestPoleActive = IsRestHandPoleActive;
+            lastRestPoleActive = currentRestPoleActive;
+            TransitionRestPole(currentRestPoleActive);
         }
 
         PoseState GetHandState(int source, bool button1) {
@@ -518,6 +546,7 @@ namespace FlameStream
             var ease = isEnabled
                 ? (ActiveTransition != null ? ActiveTransition.Ease : Ease.Linear)
                 : (InactiveTransition != null ? InactiveTransition.Ease : Ease.Linear);
+            var delay = (instant || !isEnabled || ActiveTransition == null) ? 0f : ActiveTransition.Delay;
 
             if (isEnabled) {
                 // When transitioning to active, ensure the weights are at 0 before connecting the anchors to then transition them to 1
@@ -550,6 +579,10 @@ namespace FlameStream
                         1.0f,
                         actualDuration
                     ).SetEase(ease);
+
+                    if (delay > 0f) {
+                        tween.SetDelay(delay);
+                    }
                 }
             } else {
                 TransitionActivePole(false, instant);
@@ -602,6 +635,7 @@ namespace FlameStream
             var ease = shouldTarget
                 ? (ActiveTransition != null ? ActiveTransition.Ease : Ease.OutQuad)
                 : (InactiveTransition != null ? InactiveTransition.Ease : Ease.Linear);
+            float delay = (instant || !shouldTarget || ActiveTransition == null) ? 0f : ActiveTransition.Delay;
 
             if (shouldTarget) {
                 var poleAnchor = GetActiveHandPoleAnchor();
@@ -640,6 +674,10 @@ namespace FlameStream
                     1.0f,
                     actualDuration
                 ).SetEase(ease);
+
+                if (delay > 0f) {
+                    tweenActivePole.SetDelay(delay);
+                }
             } else {
                 float currentWeight = dominantLimb != null ? Mathf.Clamp01(dominantLimb.BendGoalWeight) : Mathf.Clamp01(currentActivePoleWeight);
                 float actualDuration = duration * currentWeight;
@@ -680,7 +718,7 @@ namespace FlameStream
         }
 
         public void OnActiveHandPoleParentTypeChange() {
-            var newParentType = ActiveHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+            var newParentType = ActiveHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
             var poleAnchor = GetActiveHandPoleAnchor(true);
 
             var oldParentType = poleAnchor != null
@@ -765,7 +803,7 @@ namespace FlameStream
             };
 
             pole.OnCreateAnchor = (tr, setupAnchor) => {
-                var parentType = ActiveHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+                var parentType = ActiveHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
                 SetAnchorParentInitial(setupAnchor, parentType, IsRightHanded);
 
                 setupAnchor.Transform.Position = tr.Position;
@@ -785,7 +823,7 @@ namespace FlameStream
             };
 
             pole.OnResetAnchor = (tr, setupAnchor) => {
-                var parentType = ActiveHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+                var parentType = ActiveHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
                 Vector3 defaultWorldPos = GetDefaultElbowPoleWorldPosition(IsRightHanded);
                 TransformAnchorWorldToLocal(parentType, defaultWorldPos, Quaternion.identity, out Vector3 localPos, out Vector3 localRot, IsRightHanded);
 
@@ -808,10 +846,7 @@ namespace FlameStream
             };
 
             pole.OnExitVisualSetup = (isApplied) => {
-                if (isApplied) {
-                    NeutralHandPosition?.setupAnchor?.ApplyTrigger();
-                } else {
-                    NeutralHandPosition?.setupAnchor?.CancelTrigger();
+                if (!isApplied) {
                     var livePole = GetActiveHandPoleAnchor(true);
                     var currentPole = ActiveHand?.ElbowPole?.Pole;
                     if (livePole != null && currentPole != null) {
@@ -821,6 +856,16 @@ namespace FlameStream
                     }
                 }
                 OnInputAffectingHandSetupChange();
+
+                if (!isExitingVisualSetup) {
+                    isExitingVisualSetup = true;
+                    try {
+                        TriggerVisualSetupAnchor(NeutralHandPosition, isApplied);
+                    } finally {
+                        isExitingVisualSetup = false;
+                    }
+                }
+
                 Context.Service.NavigateToAsset(Id);
                 Context.Service.BroadcastOpenedScene();
                 RequestUiRefresh();
@@ -828,7 +873,7 @@ namespace FlameStream
         }
 
         void EnsureActiveHandAnchors() {
-            var poleParentType = ActiveHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+            var poleParentType = ActiveHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
             if (ActiveHand != null && (ActiveHand.ElbowPole != null && (ActiveHand.ElbowPole.UsePole || (ActiveHand.ElbowPole.Pole != null && ActiveHand.ElbowPole.Pole.InVisualSetupMode)))) {
                 var poleAnchor = GetActiveHandPoleAnchor();
                 if (poleAnchor != null) AttachAnchorToParent(poleAnchor, poleParentType, IsRightHanded);
@@ -878,17 +923,37 @@ namespace FlameStream
 
 
         void HandleNeutralEnterVisualSetup() {
-            if (inSetupMode || IsInActiveHandPoleVisualSetup) return;
+            if (inSetupMode || IsInActiveHandPoleVisualSetup || IsInRestHandPoleVisualSetup) return;
             EnterSetupModeMinimal();
             GetHandState(0, false)?.Transform.EnterVisualSetup(false);
         }
 
         void HandleNeutralExitVisualSetup(bool isApply) {
-            if (!inSetupMode) return;
-            ExitSetupModeMinimal();
-            setupModeHandState?.Transform.ExitVisualSetup(isApply);
-            setupModeBodyState?.Transform.ExitVisualSetup(isApply);
-            setupModePropState?.Transform.ExitVisualSetup(isApply);
+            if (isExitingVisualSetup) return;
+            isExitingVisualSetup = true;
+            try {
+                if (IsInActiveHandPoleVisualSetup) {
+                    TriggerVisualSetupAnchor(ActiveHand?.ElbowPole?.Pole, isApply);
+                }
+                if (IsInRestHandPoleVisualSetup) {
+                    var restPole = RestHand?.ElbowPole?.Pole ?? RestHand?.Pole;
+                    TriggerVisualSetupAnchor(restPole, isApply);
+                }
+                if (setupModeHandState != null || setupModeBodyState != null || setupModePropState != null || inSetupMode) {
+                    var handTr = setupModeHandState?.Transform;
+                    var bodyTr = setupModeBodyState?.Transform;
+                    var propTr = setupModePropState?.Transform;
+                    TriggerVisualSetupAnchor(handTr, isApply);
+                    TriggerVisualSetupAnchor(bodyTr, isApply);
+                    TriggerVisualSetupAnchor(propTr, isApply);
+                    ExitSetupModeMinimal();
+                }
+            } finally {
+                isExitingVisualSetup = false;
+            }
+            Context.Service.NavigateToAsset(Id);
+            Context.Service.BroadcastOpenedScene();
+            RequestUiRefresh();
         }
 
         void HandleDynamicRotationEnterVisualSetup() {
@@ -899,7 +964,7 @@ namespace FlameStream
 
         void HandleDynamicRotationExitVisualSetup(bool isApply) {
             if (!inSetupMode) return;
-            setupModeHandState?.Transform.ExitVisualSetup(isApply);
+            TriggerVisualSetupAnchor(setupModeHandState?.Transform, isApply);
             ExitSetupModeMinimal();
         }
 
@@ -932,21 +997,25 @@ namespace FlameStream
             tweenHandPosition?.Kill();
             tweenHandRotation?.Kill();
 
-            if (isApply) {
-                NeutralHandPosition.setupAnchor?.ApplyTrigger();
-                setupModeBodyState?.Transform.setupAnchor?.ApplyTrigger();
-                setupModePropState?.Transform.setupAnchor?.ApplyTrigger();
-            } else {
-                NeutralHandPosition.setupAnchor?.CancelTrigger();
-                setupModeBodyState?.Transform.setupAnchor?.CancelTrigger();
-                setupModePropState?.Transform.setupAnchor?.CancelTrigger();
+            if (!isExitingVisualSetup) {
+                isExitingVisualSetup = true;
+                try {
+                    TriggerVisualSetupAnchor(NeutralHandPosition, isApply);
+                    TriggerVisualSetupAnchor(setupModeBodyState?.Transform, isApply);
+                    TriggerVisualSetupAnchor(setupModePropState?.Transform, isApply);
+                } finally {
+                    isExitingVisualSetup = false;
+                }
             }
             lastHandState = null;
+            Context.Service.NavigateToAsset(Id);
+            Context.Service.BroadcastOpenedScene();
+            RequestUiRefresh();
         }
 
         void HandleHandCreateAnchor(PoseState p, VisualSetupTransform tr, VisualSetupAnchorAsset a) {
             CleanDestroy(handSetupRootAnchor);
-            handSetupRootAnchor = Scene.AddAsset<AnchorAsset>();
+            handSetupRootAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INTERNAL".Localized());
             handSetupRootAnchor.Attachable.Parent = cursorAnchorAsset;
             var title = "SETUP_ANCHOR_NAME_HAND_ROOT".Localized();
             handSetupRootAnchor.Name = $"🔒⌛⚓-{title}";

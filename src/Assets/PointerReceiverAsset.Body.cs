@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using DG.Tweening;
 using UnityEngine;
+using Warudo.Core;
 using Warudo.Core.Data;
 using Warudo.Core.Localization;
 using Warudo.Plugins.Core.Assets.Utility;
@@ -341,16 +342,20 @@ namespace FlameStream
             tweenHandPosition?.Kill();
             tweenHandRotation?.Kill();
 
-            if (isApply) {
-                NeutralHandPosition.setupAnchor?.ApplyTrigger();
-                setupModeHandState?.Transform.setupAnchor?.ApplyTrigger();
-                setupModePropState?.Transform.setupAnchor?.ApplyTrigger();
-            } else {
-                NeutralHandPosition.setupAnchor?.CancelTrigger();
-                setupModeHandState?.Transform.setupAnchor?.CancelTrigger();
-                setupModePropState?.Transform.setupAnchor?.CancelTrigger();
+            if (!isExitingVisualSetup) {
+                isExitingVisualSetup = true;
+                try {
+                    TriggerVisualSetupAnchor(NeutralHandPosition, isApply);
+                    TriggerVisualSetupAnchor(setupModeHandState?.Transform, isApply);
+                    TriggerVisualSetupAnchor(setupModePropState?.Transform, isApply);
+                } finally {
+                    isExitingVisualSetup = false;
+                }
             }
             lastBodyState = null;
+            Context.Service.NavigateToAsset(Id);
+            Context.Service.BroadcastOpenedScene();
+            RequestUiRefresh();
         }
 
         void HandleBodyDynamicRotationEnterVisualSetup() {
@@ -364,7 +369,7 @@ namespace FlameStream
         }
 
         void HandleBodyCreateAnchor(PoseState p, VisualSetupTransform tr, VisualSetupAnchorAsset a) {
-            bodySetupRootAnchor = Scene.AddAsset<AnchorAsset>();
+            bodySetupRootAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INTERNAL".Localized());
             var title = "SETUP_ANCHOR_NAME_BODY_ROOT".Localized();
             bodySetupRootAnchor.Name = $"🔒⌛⚓-{title}";
             Scene.UpdateNewAssetName(bodySetupRootAnchor);

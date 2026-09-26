@@ -251,21 +251,25 @@ namespace FlameStream
             tweenPropRotation?.Kill();
             tweenPropScale?.Kill();
 
-            if (isApply) {
-                NeutralHandPosition.setupAnchor?.ApplyTrigger();
-                setupModeHandState?.Transform.setupAnchor?.ApplyTrigger();
-                setupModeBodyState?.Transform.setupAnchor?.ApplyTrigger();
-            } else {
-                NeutralHandPosition.setupAnchor?.CancelTrigger();
-                setupModeHandState?.Transform.setupAnchor?.CancelTrigger();
-                setupModeBodyState?.Transform.setupAnchor?.CancelTrigger();
+            if (!isExitingVisualSetup) {
+                isExitingVisualSetup = true;
+                try {
+                    TriggerVisualSetupAnchor(NeutralHandPosition, isApply);
+                    TriggerVisualSetupAnchor(setupModeHandState?.Transform, isApply);
+                    TriggerVisualSetupAnchor(setupModeBodyState?.Transform, isApply);
+                } finally {
+                    isExitingVisualSetup = false;
+                }
             }
             lastPropState = null;
+            Context.Service.NavigateToAsset(Id);
+            Context.Service.BroadcastOpenedScene();
+            RequestUiRefresh();
         }
 
         void HandlePropCreateAnchor(GameObjectState p, VisualSetupTransform tr, VisualSetupAnchorAsset a) {
             CleanDestroy(propSetupRootAnchor);
-            propSetupRootAnchor = Scene.AddAsset<AnchorAsset>();
+            propSetupRootAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INTERNAL".Localized());
             propSetupRootAnchor.Attachable.Parent = handAnchor;
             var title = "SETUP_ANCHOR_NAME_PROP_ROOT".Localized();
             propSetupRootAnchor.Name = $"🔒⌛⚓-{title}";
@@ -281,7 +285,7 @@ namespace FlameStream
         }
 
         PropAsset GetProp(bool skipAutoCreate = false) {
-            return GetAsset<PropAsset>(ref PenPropAssetId, skipAutoCreate, newAssetName: $"📦-{LAYER_NAME_PREFIX} Hand Prop");
+            return GetAsset<PropAsset>(ref PenPropAssetId, skipAutoCreate, newAssetName: $"📦-{LAYER_NAME_PREFIX} Hand Prop", category: "FS_ASSET_CATEGORY_INPUT".Localized());
         }
 
         async UniTask<AutoCompleteList> GetPropSources() {
