@@ -74,9 +74,7 @@ namespace FlameStream {
 
         // Visual guide objects
         GameObject debugRestSphere;
-        GameObject debugOrbitCircle;
         Material debugRestSphereMat;
-        Material debugOrbitCircleMat;
 
         public Vector3 Evaluate(Vector3 v) {
             Vector3 result = Vector3.zero;
@@ -303,47 +301,14 @@ result: {result}
             debugRestSphereMat.SetColor("_EmissionColor", new Color(0.8f, 0f, 0f));
             debugRestSphere.GetComponent<Renderer>().material = debugRestSphereMat;
 
-            // 2. 80% opacity red circle centered at anchorPos
-            debugOrbitCircle = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            debugOrbitCircle.name = "DynamicRotation_DebugOrbitCircle";
-            var col2 = debugOrbitCircle.GetComponent("Collider");
-            if (col2 != null) UnityEngine.Object.Destroy(col2);
-
-            if (parentTransform != null) {
-                debugOrbitCircle.transform.SetParent(parentTransform, false);
-            }
-
-            debugOrbitCircleMat = new Material(Shader.Find("Standard"));
-            debugOrbitCircleMat.SetFloat("_Mode", 3);
-            debugOrbitCircleMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            debugOrbitCircleMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            debugOrbitCircleMat.SetInt("_ZWrite", 0);
-            debugOrbitCircleMat.DisableKeyword("_ALPHATEST_ON");
-            debugOrbitCircleMat.EnableKeyword("_ALPHABLEND_ON");
-            debugOrbitCircleMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-            debugOrbitCircleMat.renderQueue = 3000;
-            debugOrbitCircleMat.color = new Color(1f, 0f, 0f, 0.8f);
-            debugOrbitCircle.GetComponent<Renderer>().material = debugOrbitCircleMat;
-
             UpdateDebugVisuals();
         }
 
         public void UpdateDebugVisuals() {
-            if (debugOrbitCircle == null || debugRestSphere == null) return;
+            if (debugRestSphere == null) return;
 
             Vector3 restPos = GetRestPosition != null ? GetRestPosition() : Vector3.zero;
-            Vector3 anchorPos = setupAnchor != null ? setupAnchor.Transform.Position : restPos;
-
             debugRestSphere.transform.localPosition = restPos;
-            debugOrbitCircle.transform.localPosition = anchorPos;
-
-            Vector3 delta = restPos - anchorPos;
-            float radius = delta.magnitude;
-            float diameter = Mathf.Max(radius * 2f, 0.05f);
-
-            debugOrbitCircle.transform.localScale = new Vector3(diameter, 0.0005f, diameter);
-
-            debugOrbitCircle.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
         }
 
         public void DestroyDebugVisuals() {
@@ -351,17 +316,9 @@ result: {result}
                 UnityEngine.Object.Destroy(debugRestSphere);
                 debugRestSphere = null;
             }
-            if (debugOrbitCircle != null) {
-                UnityEngine.Object.Destroy(debugOrbitCircle);
-                debugOrbitCircle = null;
-            }
             if (debugRestSphereMat != null) {
                 UnityEngine.Object.Destroy(debugRestSphereMat);
                 debugRestSphereMat = null;
-            }
-            if (debugOrbitCircleMat != null) {
-                UnityEngine.Object.Destroy(debugOrbitCircleMat);
-                debugOrbitCircleMat = null;
             }
         }
 
