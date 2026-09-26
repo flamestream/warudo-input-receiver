@@ -67,6 +67,7 @@ namespace FlameStream {
         public string LocalizationKey;
         public Func<Vector3> GetRestPosition;
         public Func<GameObjectAsset> GetParentAnchor;
+        public Func<bool> GetIsRightHanded;
         public Action<DynamicVector3> OnEnterVisualSetup;
         public Action<bool> OnExitVisualSetup;
 
@@ -229,32 +230,32 @@ result: {result}
             SphereCenterOffset = anchorPos - restPos;
             BroadcastDataInput(nameof(SphereCenterOffset));
 
-            // R is vector from sphere center to resting hand
+            // R is vector from pivot anchor to resting hand on screen plane
             Vector3 R = restPos - anchorPos;
             if (R.sqrMagnitude < 0.0001f) {
-                R = new Vector3(0f, 0f, 0.3f);
+                R = new Vector3(0f, 0.3f, 0f);
             }
 
             string rx = R.x.ToString("0.######", CultureInfo.InvariantCulture);
             string ry = R.y.ToString("0.######", CultureInfo.InvariantCulture);
-            string rz = R.z.ToString("0.######", CultureInfo.InvariantCulture);
 
             if (X == null) X = StructuredData.Create<DistanceInputMathExpression>();
             if (Y == null) Y = StructuredData.Create<DistanceInputMathExpression>();
             if (Z == null) Z = StructuredData.Create<DistanceInputMathExpression>();
 
-            // Pitch (X): sagittal vertical tilt in Y-Z plane
-            X.Expression = $"-(atan2({ry} + dy, {rz} + dz) - atan2({ry}, {rz})) * (180 / pi)";
+            bool isRight = GetIsRightHanded != null ? GetIsRightHanded() : true;
+            string sign = isRight ? "-" : "";
+
+            // Planar Sweep (X): in-plane rotation around pivot on tablet surface
+            X.Expression = $"{sign}(atan2({rx} - dx, {ry} - dy) - atan2({rx}, {ry})) * (180 / pi)";
             X.OnExpressionChange();
             X.BroadcastDataInput(nameof(X.Expression));
 
-            // Yaw (Y): horizontal sweep in X-Z plane
-            Y.Expression = $"(atan2({rx} + dx, {rz} + dz) - atan2({rx}, {rz})) * (180 / pi)";
+            Y.Expression = "0";
             Y.OnExpressionChange();
             Y.BroadcastDataInput(nameof(Y.Expression));
 
-            // Roll (Z): frontal bank in X-Y plane
-            Z.Expression = $"-(atan2({ry} + dy, {rx} + dx) - atan2({ry}, {rx})) * (180 / pi)";
+            Z.Expression = "0";
             Z.OnExpressionChange();
             Z.BroadcastDataInput(nameof(Z.Expression));
 
@@ -329,19 +330,7 @@ result: {result}
 
             debugOrbitCircle.transform.localScale = new Vector3(diameter, 0.0005f, diameter);
 
-            if (delta.sqrMagnitude > 0.0001f) {
-                Vector3 normal = Vector3.Cross(delta, Vector3.right);
-                if (normal.sqrMagnitude < 0.001f) {
-                    normal = Vector3.Cross(delta, Vector3.up);
-                }
-                if (normal.sqrMagnitude > 0.001f) {
-                    debugOrbitCircle.transform.localRotation = Quaternion.FromToRotation(Vector3.up, normal.normalized);
-                } else {
-                    debugOrbitCircle.transform.localRotation = Quaternion.identity;
-                }
-            } else {
-                debugOrbitCircle.transform.localRotation = Quaternion.identity;
-            }
+            debugOrbitCircle.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
         }
 
         public void DestroyDebugVisuals() {

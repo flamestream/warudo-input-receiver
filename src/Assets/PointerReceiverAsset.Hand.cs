@@ -64,6 +64,7 @@ namespace FlameStream
             HandDynamicRotation.AutoRotationEvaluator = CalculateAutoHandRotation;
             HandDynamicRotation.GetParentAnchor = () => screenAsset ?? GetSurfaceScreen();
             HandDynamicRotation.GetRestPosition = () => NeutralHandPosition != null ? NeutralHandPosition.Position : Vector3.zero;
+            HandDynamicRotation.GetIsRightHanded = () => IsRightHanded;
             HandDynamicRotation.OnEnterVisualSetup = (dr) => { HandleDynamicRotationEnterVisualSetup(); };
             HandDynamicRotation.OnExitVisualSetup = (isApplied) => { HandleDynamicRotationExitVisualSetup(isApplied); };
         }
@@ -434,10 +435,12 @@ namespace FlameStream
         void HandleDynamicRotationEnterVisualSetup() {
             if (inSetupMode) return;
             EnterSetupModeMinimal();
+            GetHandState(0, false)?.Transform.EnterVisualSetup(false);
         }
 
         void HandleDynamicRotationExitVisualSetup(bool isApply) {
             if (!inSetupMode) return;
+            setupModeHandState?.Transform.ExitVisualSetup(isApply);
             ExitSetupModeMinimal();
         }
 

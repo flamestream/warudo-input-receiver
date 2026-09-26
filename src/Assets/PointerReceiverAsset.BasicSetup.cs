@@ -424,14 +424,21 @@ namespace FlameStream
             if (charTr == null) return Vector3.zero;
 
             bool isRight = IsRightHanded;
-            var anim = Character.Animator ?? Character.CloneAnimator;
-            var elbowBone = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightLowerArm : HumanBodyBones.LeftLowerArm) : null;
-            Vector3 elbowWorld = elbowBone != null ? elbowBone.position : GetNaturalRestingElbowWorldPosition();
+            Vector2 elbowScreen2D;
 
-            Quaternion screenRot = screenAsset.GameObject != null ? screenAsset.GameObject.transform.rotation : Quaternion.Euler(screenAsset.Transform.Rotation);
-            Vector3 screenPos = screenAsset.GameObject != null ? screenAsset.GameObject.transform.position : screenAsset.Transform.Position;
-            Vector3 elbowScreen = Quaternion.Inverse(screenRot) * (elbowWorld - screenPos);
-            Vector2 elbowScreen2D = new Vector2(elbowScreen.x, elbowScreen.y);
+            if (HandDynamicRotation != null && HandDynamicRotation.SphereCenterOffset != Vector3.zero && NeutralHandPosition != null) {
+                Vector3 calibratedPivot = NeutralHandPosition.Position + HandDynamicRotation.SphereCenterOffset;
+                elbowScreen2D = new Vector2(calibratedPivot.x, calibratedPivot.y);
+            } else {
+                var anim = Character.Animator ?? Character.CloneAnimator;
+                var elbowBone = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightLowerArm : HumanBodyBones.LeftLowerArm) : null;
+                Vector3 elbowWorld = elbowBone != null ? elbowBone.position : GetNaturalRestingElbowWorldPosition();
+
+                Quaternion screenRot = screenAsset.GameObject != null ? screenAsset.GameObject.transform.rotation : Quaternion.Euler(screenAsset.Transform.Rotation);
+                Vector3 screenPos = screenAsset.GameObject != null ? screenAsset.GameObject.transform.position : screenAsset.Transform.Position;
+                Vector3 elbowScreen = Quaternion.Inverse(screenRot) * (elbowWorld - screenPos);
+                elbowScreen2D = new Vector2(elbowScreen.x, elbowScreen.y);
+            }
 
             Vector2 cursorScreen2D = new Vector2(cursorScreenPosition.x, cursorScreenPosition.y);
             Vector2 toElbow = elbowScreen2D - cursorScreen2D;
