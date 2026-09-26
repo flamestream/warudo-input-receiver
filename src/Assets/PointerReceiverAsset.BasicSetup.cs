@@ -85,6 +85,7 @@ namespace FlameStream
             tweenActivePole?.Kill();
             DestroyActiveHandPoleAnchor();
             OnDestroyRestHand();
+            OnDestroyHand();
             if (originalScreenParent != null && screenAsset != null && screenAsset.GameObject != null) {
                 try {
                     screenAsset.GameObject.transform.SetParent(originalScreenParent, true);
@@ -899,7 +900,10 @@ namespace FlameStream
         }
 
         public void TriggerOtherEnterSetupModes(int source, bool button1) {
-            NeutralHandPosition.EnterVisualSetup(false);
+            if (NeutralHandPosition != null) {
+                NeutralHandPosition.ShowOriginIndicator = (setupModeHandState == null && setupModeBodyState == null && setupModePropState == null);
+                NeutralHandPosition.EnterVisualSetup(false);
+            }
             if (setupModeHandState == null) {
                 GetHandState(source, button1)?.Transform.EnterVisualSetup(false);
             }

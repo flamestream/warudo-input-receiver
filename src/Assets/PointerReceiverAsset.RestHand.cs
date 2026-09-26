@@ -735,6 +735,7 @@ namespace FlameStream {
                 setupAnchor.Name = $"⌛⚓-{handSide} Hand Rest Target";
                 setupAnchor.Instructions = "REST_HAND_TARGET_INSTRUCTIONS".Localized();
                 setupAnchor.Transform.Broadcast();
+                setupAnchor.HideResetButton();
 
                 var liveAnchor = GetRestHandAnchor();
                 if (liveAnchor != null) {
@@ -742,18 +743,6 @@ namespace FlameStream {
                     liveAnchor.Transform.Rotation = KeyboardReceiverAsset.ApplyHandIKIntermediateRotation(IsRightHanded, tr.Rotation);
                     liveAnchor.Transform.Broadcast();
                 }
-            };
-
-            target.OnResetAnchor = (tr, setupAnchor) => {
-                var parentType = RestHand?.ParentType ?? AnchorParentType.World;
-                Vector3 defaultCharPos = IsRightHanded ? new Vector3(-0.25f, 0.65f, 0.25f) : new Vector3(0.25f, 0.65f, 0.25f);
-                TransformRestHandLocalToWorld(AnchorParentType.Character, defaultCharPos, Vector3.zero, out Vector3 worldPos, out Quaternion worldRot);
-                TransformRestHandWorldToLocal(parentType, worldPos, worldRot, out Vector3 localPos, out Vector3 localRot);
-
-                setupAnchor.Transform.Position = localPos;
-                setupAnchor.Transform.Rotation = localRot;
-                setupAnchor.Transform.Scale = Vector3.one;
-                setupAnchor.Transform.Broadcast();
             };
 
             target.OnApplyAnchor = (tr, setupAnchor) => {
@@ -794,7 +783,10 @@ namespace FlameStream {
 
             pole.OnEnterVisualSetup = (tr) => {
                 EnsureRestHandAnchors();
-                NeutralHandPosition?.EnterVisualSetup(false);
+                if (NeutralHandPosition != null) {
+                    NeutralHandPosition.ShowOriginIndicator = false;
+                    NeutralHandPosition.EnterVisualSetup(false);
+                }
                 var livePole = GetRestHandPoleAnchor();
                 if (livePole != null) {
                     livePole.Transform.Position = tr.Position;

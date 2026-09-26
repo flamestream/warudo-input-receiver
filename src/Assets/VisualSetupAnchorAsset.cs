@@ -159,5 +159,14 @@ namespace FlameStream {
                 }
             }
         }
+
+        public void HideResetButton() {
+            var port = GetTriggerPort(nameof(ResetTrigger));
+            if (port != null && port.Properties != null) {
+                port.Properties.alwaysHidden = true;
+                port.Properties.hidden = true;
+                BroadcastTriggerProperties(nameof(ResetTrigger));
+            }
+        }
     }
 }

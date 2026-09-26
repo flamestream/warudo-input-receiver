@@ -62,16 +62,29 @@ namespace FlameStream {
         public Color? DefaultOriginSphereColor = null;
         public float OriginIndicatorSize = 0.035f;
         public Vector3 OriginIndicatorOffset = Vector3.zero;
+        public Func<Transform> OriginIndicatorParentGetter;
+        public Transform OriginIndicatorParent;
         public GameObject originIndicatorGo;
         public Material originIndicatorMat;
         public bool ShowAnimation = false;
+
+        public Transform GetOriginIndicatorParent() {
+            Transform parent = OriginIndicatorParentGetter?.Invoke() ?? OriginIndicatorParent;
+            if (parent == null && setupAnchor?.Attachable?.Parent != null) {
+                parent = setupAnchor.Attachable.Parent.GameObject?.transform;
+            }
+            if (parent == null && setupAnchor != null && setupAnchor.GameObject != null) {
+                parent = setupAnchor.GameObject.transform.parent ?? setupAnchor.GameObject.transform;
+            }
+            return parent;
+        }
 
         public void SetOriginIndicatorVisible(bool visible) {
             ShowOriginIndicator = visible;
             if (originIndicatorGo != null) {
                 originIndicatorGo.SetActive(visible);
             } else if (visible && setupAnchor != null && setupAnchor.GameObject != null) {
-                var parent = setupAnchor.GameObject.transform.parent ?? setupAnchor.GameObject.transform;
+                var parent = GetOriginIndicatorParent();
                 CreateOriginIndicator(parent, OriginIndicatorOffset);
             }
         }
@@ -79,6 +92,23 @@ namespace FlameStream {
         public void SetOriginAlwaysOnTop(bool alwaysOnTop) {
             OriginAlwaysOnTop = alwaysOnTop;
             UpdateOriginIndicatorMaterial();
+        }
+
+        public void UpdateOriginIndicatorScale() {
+            if (originIndicatorGo == null) return;
+            float radiusFactor = setupAnchor?.OriginSphere?.RadiusFactor ?? 1.0f;
+            float targetSize = OriginIndicatorSize * radiusFactor;
+            Transform parent = originIndicatorGo.transform.parent;
+            if (parent != null && parent.lossyScale != Vector3.one) {
+                Vector3 lossy = parent.lossyScale;
+                originIndicatorGo.transform.localScale = new Vector3(
+                    lossy.x != 0 ? targetSize / lossy.x : targetSize,
+                    lossy.y != 0 ? targetSize / lossy.y : targetSize,
+                    lossy.z != 0 ? targetSize / lossy.z : targetSize
+                );
+            } else {
+                originIndicatorGo.transform.localScale = Vector3.one * targetSize;
+            }
         }
 
         public void UpdateOriginIndicatorMaterial() {
@@ -131,8 +161,7 @@ namespace FlameStream {
             originIndicatorGo.transform.SetParent(parentTransform, false);
             originIndicatorGo.transform.localPosition = localPos ?? OriginIndicatorOffset;
             originIndicatorGo.transform.localRotation = Quaternion.identity;
-            float radiusFactor = setupAnchor?.OriginSphere?.RadiusFactor ?? 1.0f;
-            originIndicatorGo.transform.localScale = Vector3.one * (OriginIndicatorSize * radiusFactor);
+            UpdateOriginIndicatorScale();
 
             UpdateOriginIndicatorMaterial();
             originIndicatorGo.SetActive(ShowOriginIndicator);
@@ -186,10 +215,7 @@ namespace FlameStream {
                 SetOriginAlwaysOnTop(onTop);
             };
             setupAnchor.OnOriginSphereChange = () => {
-                if (originIndicatorGo != null) {
-                    float r = setupAnchor?.OriginSphere?.RadiusFactor ?? 1.0f;
-                    originIndicatorGo.transform.localScale = Vector3.one * (OriginIndicatorSize * r);
-                }
+                UpdateOriginIndicatorScale();
                 UpdateOriginIndicatorMaterial();
             };
 
@@ -198,7 +224,7 @@ namespace FlameStream {
             Scene.UpdateNewAssetName(setupAnchor);
 
             if (ShowOriginIndicator && setupAnchor != null && setupAnchor.GameObject != null) {
-                var parent = setupAnchor.GameObject.transform.parent ?? setupAnchor.GameObject.transform;
+                var parent = GetOriginIndicatorParent();
                 CreateOriginIndicator(parent);
             }
 
@@ -324,7 +350,6 @@ namespace FlameStream {
 
         protected override void OnCreate() {
             base.OnCreate();
-            DefaultOriginSphereColor = new Color(0f, 0.85f, 1f, 0.95f);
             Watch(nameof(Position), delegate {
                 Position.z = 0;
                 BroadcastDataInput(nameof(Position));

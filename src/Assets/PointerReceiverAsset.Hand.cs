@@ -42,6 +42,8 @@ namespace FlameStream
         float currentActivePoleWeight = 0f;
         public float ActivePoleWeight => currentActivePoleWeight;
         bool lastIsRightHanded = true;
+        GameObject cursorIndicatorGo;
+        Material cursorIndicatorMat;
 
         public bool IsActiveHandPoleActive => (IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound && Character != null || IsInActiveHandPoleVisualSetup) && ActiveHand != null && ActiveHand.ElbowPole != null && (ActiveHand.ElbowPole.UsePole || IsInActiveHandPoleVisualSetup);
         public bool IsInActiveHandPoleVisualSetup => ActiveHand != null && ActiveHand.ElbowPole != null && ActiveHand.ElbowPole.Pole != null && ActiveHand.ElbowPole.Pole.InVisualSetupMode;
@@ -152,6 +154,7 @@ namespace FlameStream
                 SetupHandDynamicRotation();
             });
             SetupHandDynamicRotation();
+            SetupHandStateTransforms();
 
             if (ActiveHand?.ElbowPole != null) {
                 ActiveHand.ElbowPole.Parent = this;
@@ -164,6 +167,26 @@ namespace FlameStream
                 ActiveHand.ElbowPole.OnPoleTransformChange = () => SetupActiveHandPoleTransform();
             }
             SetupActiveHandPoleTransform();
+        }
+
+        void SetupHandStateTransforms() {
+            if (HandMouseMode != null) {
+                HandMouseMode.Transform.DefaultOriginSphereColor = null;
+                HandMouseMode.Transform.OriginIndicatorParentGetter = null;
+                if (HandMouseMode.ActiveState != null) {
+                    HandMouseMode.ActiveState.Transform.DefaultOriginSphereColor = null;
+                    HandMouseMode.ActiveState.Transform.OriginIndicatorParentGetter = null;
+                }
+            }
+
+            if (HandPenMode != null) {
+                HandPenMode.Transform.DefaultOriginSphereColor = null;
+                HandPenMode.Transform.OriginIndicatorParentGetter = null;
+                if (HandPenMode.ActiveState != null) {
+                    HandPenMode.ActiveState.Transform.DefaultOriginSphereColor = null;
+                    HandPenMode.ActiveState.Transform.OriginIndicatorParentGetter = null;
+                }
+            }
         }
 
         void SetupHandDynamicRotation() {
@@ -193,6 +216,7 @@ namespace FlameStream
         void OnReadyHand() {
             lastIsRightHanded = IsRightHanded;
             SetupHandDynamicRotation();
+            SetupHandStateTransforms();
 
             currentActiveHandPoleParentType = ActiveHand?.ElbowPole?.ParentType ?? AnchorParentType.World;
             if (ActiveHand?.ElbowPole != null) {
@@ -209,14 +233,10 @@ namespace FlameStream
             SetupActiveHandPoleTransform();
 
             NeutralHandPosition.LocalizationKey = "NEUTRAL_POSITION";
-            NeutralHandPosition.DefaultOriginSphereColor = new Color(0f, 0.85f, 1f, 0.95f);
             NeutralHandPosition.OnEnterVisualSetup = (tr) => { HandleNeutralEnterVisualSetup(); };
             NeutralHandPosition.OnExitVisualSetup = (a) => { HandleNeutralExitVisualSetup(a); };
             NeutralHandPosition.OnCreateAnchor = (tr, a) => {
                 a.Attachable.Parent = screenAsset ?? GetSurfaceScreen();
-                if (a.OriginSphere != null) {
-                    a.OriginSphere.SetDefaults(new Color(0f, 0.85f, 1f, 0.95f), 1.0f, true);
-                }
             };
 
             HandMouseMode.OnAnimationChange = (p) => { HandleHandAnimationChange((PoseState)p); };
@@ -786,7 +806,10 @@ namespace FlameStream
 
             pole.OnEnterVisualSetup = (tr) => {
                 EnsureActiveHandAnchors();
-                NeutralHandPosition?.EnterVisualSetup(false);
+                if (NeutralHandPosition != null) {
+                    NeutralHandPosition.ShowOriginIndicator = false;
+                    NeutralHandPosition.EnterVisualSetup(false);
+                }
                 var livePole = GetActiveHandPoleAnchor();
                 if (livePole != null) {
                     livePole.Transform.Position = tr.Position;
@@ -924,6 +947,7 @@ namespace FlameStream
 
         void HandleNeutralEnterVisualSetup() {
             if (inSetupMode || IsInActiveHandPoleVisualSetup || IsInRestHandPoleVisualSetup) return;
+            NeutralHandPosition.ShowOriginIndicator = true;
             EnterSetupModeMinimal();
             GetHandState(0, false)?.Transform.EnterVisualSetup(false);
         }
@@ -932,6 +956,9 @@ namespace FlameStream
             if (isExitingVisualSetup) return;
             isExitingVisualSetup = true;
             try {
+                if (HandDynamicRotation != null && HandDynamicRotation.InVisualSetupMode) {
+                    HandDynamicRotation.ExitVisualSetup(isApply);
+                }
                 if (IsInActiveHandPoleVisualSetup) {
                     TriggerVisualSetupAnchor(ActiveHand?.ElbowPole?.Pole, isApply);
                 }
@@ -950,6 +977,7 @@ namespace FlameStream
                 }
             } finally {
                 isExitingVisualSetup = false;
+                if (NeutralHandPosition != null) NeutralHandPosition.ShowOriginIndicator = true;
             }
             Context.Service.NavigateToAsset(Id);
             Context.Service.BroadcastOpenedScene();
@@ -959,12 +987,15 @@ namespace FlameStream
         void HandleDynamicRotationEnterVisualSetup() {
             if (inSetupMode) return;
             EnterSetupModeMinimal();
-            GetHandState(0, false)?.Transform.EnterVisualSetup(false);
+            if (NeutralHandPosition != null) {
+                NeutralHandPosition.ShowOriginIndicator = false;
+                NeutralHandPosition.EnterVisualSetup(false);
+            }
         }
 
         void HandleDynamicRotationExitVisualSetup(bool isApply) {
             if (!inSetupMode) return;
-            TriggerVisualSetupAnchor(setupModeHandState?.Transform, isApply);
+            TriggerVisualSetupAnchor(NeutralHandPosition, isApply);
             ExitSetupModeMinimal();
         }
 
@@ -992,6 +1023,7 @@ namespace FlameStream
             if (setupModeHandState == null) return;
 
             CleanDestroy(handSetupRootAnchor);
+            DestroyCursorIndicator();
             ExitSetupModeMinimal();
             setupModeHandState = null;
             tweenHandPosition?.Kill();
@@ -1016,6 +1048,7 @@ namespace FlameStream
         void HandleHandCreateAnchor(PoseState p, VisualSetupTransform tr, VisualSetupAnchorAsset a) {
             CleanDestroy(handSetupRootAnchor);
             handSetupRootAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INTERNAL".Localized());
+            if (cursorAnchorAsset == null) cursorAnchorAsset = GetCursorAnchor();
             handSetupRootAnchor.Attachable.Parent = cursorAnchorAsset;
             var title = "SETUP_ANCHOR_NAME_HAND_ROOT".Localized();
             handSetupRootAnchor.Name = $"🔒⌛⚓-{title}";
@@ -1023,6 +1056,109 @@ namespace FlameStream
 
             a.Attachable.Parent = handSetupRootAnchor;
             a.Animation = p.Animation;
+
+            CreateCursorIndicator(a);
+
+            a.OnShowOriginChange = (show) => {
+                tr.SetOriginIndicatorVisible(show);
+                if (cursorIndicatorGo != null) cursorIndicatorGo.SetActive(show);
+            };
+            a.OnAlwaysOnTopChange = (onTop) => {
+                tr.SetOriginAlwaysOnTop(onTop);
+                UpdateCursorIndicatorVisuals(a);
+            };
+            a.OnOriginSphereChange = () => {
+                tr.UpdateOriginIndicatorScale();
+                tr.UpdateOriginIndicatorMaterial();
+                UpdateCursorIndicatorVisuals(a);
+            };
+        }
+
+        void CreateCursorIndicator(VisualSetupAnchorAsset setupAnchor) {
+            DestroyCursorIndicator();
+            if (cursorAnchorAsset == null) cursorAnchorAsset = GetCursorAnchor();
+            if (cursorAnchorAsset == null || cursorAnchorAsset.GameObject == null) return;
+
+            cursorIndicatorGo = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            cursorIndicatorGo.name = "CursorIndicator_Yellow";
+            var col = cursorIndicatorGo.GetComponent<Collider>();
+            if (col != null) UnityEngine.Object.Destroy(col);
+
+            cursorIndicatorGo.transform.SetParent(cursorAnchorAsset.GameObject.transform, false);
+            cursorIndicatorGo.transform.localPosition = Vector3.zero;
+            cursorIndicatorGo.transform.localRotation = Quaternion.identity;
+
+            UpdateCursorIndicatorVisuals(setupAnchor);
+            cursorIndicatorGo.SetActive(setupAnchor != null ? setupAnchor.ShowOrigin : true);
+        }
+
+        void UpdateCursorIndicatorVisuals(VisualSetupAnchorAsset setupAnchor) {
+            if (cursorIndicatorGo == null) return;
+
+            float radiusFactor = setupAnchor?.OriginSphere?.RadiusFactor ?? 1.0f;
+            float targetSize = 0.035f * radiusFactor;
+            Transform parent = cursorIndicatorGo.transform.parent;
+            if (parent != null && parent.lossyScale != Vector3.one) {
+                Vector3 lossy = parent.lossyScale;
+                cursorIndicatorGo.transform.localScale = new Vector3(
+                    lossy.x != 0 ? targetSize / lossy.x : targetSize,
+                    lossy.y != 0 ? targetSize / lossy.y : targetSize,
+                    lossy.z != 0 ? targetSize / lossy.z : targetSize
+                );
+            } else {
+                cursorIndicatorGo.transform.localScale = Vector3.one * targetSize;
+            }
+
+            if (cursorIndicatorMat != null) {
+                UnityEngine.Object.Destroy(cursorIndicatorMat);
+                cursorIndicatorMat = null;
+            }
+
+            Color yellowColor = new Color(1f, 0.9f, 0f, 0.95f);
+            bool glow = setupAnchor?.OriginSphere?.Glow ?? true;
+            bool alwaysOnTop = setupAnchor?.AlwaysOnTop ?? false;
+
+            if (alwaysOnTop) {
+                var overlayShader = Shader.Find("GUI/Text Shader") ?? Shader.Find("Hidden/Internal-Colored");
+                if (overlayShader != null) {
+                    cursorIndicatorMat = new Material(overlayShader);
+                    cursorIndicatorMat.color = yellowColor;
+                } else {
+                    cursorIndicatorMat = new Material(Shader.Find("Standard"));
+                    cursorIndicatorMat.color = yellowColor;
+                    if (glow) {
+                        cursorIndicatorMat.EnableKeyword("_EMISSION");
+                        cursorIndicatorMat.SetColor("_EmissionColor", new Color(yellowColor.r * 0.85f, yellowColor.g * 0.85f, yellowColor.b * 0.85f));
+                    }
+                    cursorIndicatorMat.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
+                }
+                cursorIndicatorMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Overlay + 1000;
+            } else {
+                cursorIndicatorMat = new Material(Shader.Find("Standard"));
+                cursorIndicatorMat.color = yellowColor;
+                if (glow) {
+                    cursorIndicatorMat.EnableKeyword("_EMISSION");
+                    cursorIndicatorMat.SetColor("_EmissionColor", new Color(yellowColor.r * 0.85f, yellowColor.g * 0.85f, yellowColor.b * 0.85f));
+                }
+            }
+
+            var rend = cursorIndicatorGo.GetComponent<Renderer>();
+            if (rend != null) rend.material = cursorIndicatorMat;
+        }
+
+        void DestroyCursorIndicator() {
+            if (cursorIndicatorGo != null) {
+                UnityEngine.Object.Destroy(cursorIndicatorGo);
+                cursorIndicatorGo = null;
+            }
+            if (cursorIndicatorMat != null) {
+                UnityEngine.Object.Destroy(cursorIndicatorMat);
+                cursorIndicatorMat = null;
+            }
+        }
+
+        void OnDestroyHand() {
+            DestroyCursorIndicator();
         }
 
         void HandleHandAnimationChange(PoseState p) {
