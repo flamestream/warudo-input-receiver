@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using DG.Tweening;
 using UnityEngine;
+using Warudo.Core;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
 using Warudo.Core.Localization;
@@ -17,6 +18,10 @@ namespace FlameStream
         [Hidden]
         public Guid HandAnchorAssetId;
 
+        [DataInput]
+        [Hidden]
+        public Guid ActiveHandPoleAnchorAssetId;
+
         public PoseState handState;
         PoseState lastHandState;
         PoseState setupModeHandState;
@@ -29,8 +34,60 @@ namespace FlameStream
         AnchorAsset handAnchor;
         public AnchorAsset HandAnchor => handAnchor != null ? handAnchor : (handAnchor = GetHandIK());
         AnchorAsset handSetupRootAnchor;
+        AnchorAsset activeHandPoleAnchor;
+        public AnchorAsset ActiveHandPoleAnchor => activeHandPoleAnchor != null ? activeHandPoleAnchor : (activeHandPoleAnchor = GetActiveHandPoleAnchor());
         Tween tweenLeftIK;
         Tween tweenRightIK;
+        Tween tweenActivePole;
+        float currentActivePoleWeight = 0f;
+        public float ActivePoleWeight => currentActivePoleWeight;
+        bool lastIsRightHanded = true;
+
+        public bool IsActiveHandPoleActive => (IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound && Character != null || IsInActiveHandPoleVisualSetup) && ActiveHand != null && ActiveHand.ElbowPole != null && ActiveHand.ElbowPole.UsePole;
+        public bool IsInActiveHandPoleVisualSetup => ActiveHand != null && ActiveHand.ElbowPole != null && ActiveHand.ElbowPole.UsePole && ActiveHand.ElbowPole.Pole != null && ActiveHand.ElbowPole.Pole.InVisualSetupMode;
+
+        RestHandParentType currentActiveHandPoleParentType = RestHandParentType.Character;
+
+        public AnchorAsset GetActiveHandPoleAnchor(bool skipAutoCreate = false) {
+            bool shouldExist = ActiveHand != null && ActiveHand.ElbowPole != null && (ActiveHand.ElbowPole.UsePole || (ActiveHand.ElbowPole.Pole != null && ActiveHand.ElbowPole.Pole.InVisualSetupMode));
+            if (!shouldExist && !skipAutoCreate) {
+                return null;
+            }
+            var anchor = GetAsset<AnchorAsset>(ref ActiveHandPoleAnchorAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"⚓-{LAYER_NAME_PREFIX} Active Hand Pole IK");
+            if (anchor != null && anchor.Name.StartsWith($"🔒⚓-{LAYER_NAME_PREFIX}")) {
+                anchor.Name = anchor.Name.Replace("🔒⚓-", "⚓-");
+                Scene?.UpdateNewAssetName(anchor);
+                anchor.Broadcast();
+            }
+            if (isNewlyCreated && anchor != null) {
+                InitializeActiveHandPoleAnchor(anchor);
+            }
+            return anchor;
+        }
+
+        void InitializeActiveHandPoleAnchor(AnchorAsset anchor) {
+            var parentType = ActiveHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+            SetAnchorParentInitial(anchor, parentType, IsRightHanded);
+            if (ActiveHand?.ElbowPole?.Pole != null && ActiveHand.ElbowPole.Pole.Position != Vector3.zero) {
+                anchor.Transform.Position = ActiveHand.ElbowPole.Pole.Position;
+                anchor.Transform.Rotation = ActiveHand.ElbowPole.Pole.Rotation;
+            } else {
+                Vector3 defaultWorld = GetDefaultElbowPoleWorldPosition(IsRightHanded);
+                TransformAnchorWorldToLocal(parentType, defaultWorld, Quaternion.identity, out Vector3 localPos, out Vector3 localRot, IsRightHanded);
+                anchor.Transform.Position = localPos;
+                anchor.Transform.Rotation = localRot;
+            }
+            anchor.Transform.Scale = Vector3.one;
+            anchor.Transform.Broadcast();
+        }
+
+        public void DestroyActiveHandPoleAnchor() {
+            if (ActiveHandPoleAnchorAssetId != Guid.Empty) {
+                try { Scene?.RemoveAsset(ActiveHandPoleAnchorAssetId); } catch {}
+                ActiveHandPoleAnchorAssetId = Guid.Empty;
+                activeHandPoleAnchor = null;
+            }
+        }
 
         public void OnHandDelegationChanged() {
             if (activeCoordinator != null) {
@@ -43,12 +100,32 @@ namespace FlameStream
 
 
         void OnCreateMoveHand() {
-            Watch(nameof(IsEnabled), delegate { OnInputAffectingHandSetupChange(); });
-            Watch(nameof(IsHandEnabled), delegate { OnInputAffectingHandSetupChange(); });
-            Watch(nameof(IsRightHanded), delegate { OnInputAffectingHandSetupChange(); });
-            Watch(nameof(Character), delegate { OnInputAffectingHandSetupChange(); });
-
-            Watch(nameof(IsRightHanded), delegate { OnHandSideChange(); });
+            Watch(nameof(IsEnabled), delegate {
+                OnInputAffectingHandSetupChange();
+                bool isHandActive = IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound && Character != null;
+                TransitionActivePole(isHandActive);
+            });
+            Watch(nameof(IsHandEnabled), delegate {
+                OnInputAffectingHandSetupChange();
+                bool isHandActive = IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound && Character != null;
+                TransitionActivePole(isHandActive);
+            });
+            Watch(nameof(IsRightHanded), delegate {
+                if (ActiveHand != null && ActiveHand.IsRightHanded != IsRightHanded) {
+                    ActiveHand.IsRightHanded = IsRightHanded;
+                    ActiveHand.SetDataInput(nameof(ActiveHand.IsRightHanded), IsRightHanded, true);
+                }
+                OnInputAffectingHandSetupChange();
+                OnHandSideChange();
+                OnRestHandSettingChange();
+            });
+            Watch(nameof(Character), delegate {
+                OnInputAffectingHandSetupChange();
+                if (ActiveHand?.ElbowPole?.ParentType == RestHandParentType.Character || ActiveHand?.ElbowPole?.ParentType == RestHandParentType.CharacterUpperArm) {
+                    var poleAnchor = GetActiveHandPoleAnchor(true);
+                    if (poleAnchor != null) AttachAnchorToParent(poleAnchor, ActiveHand.ElbowPole.ParentType, IsRightHanded);
+                }
+            });
 
             Watch(nameof(HandMouseMode), delegate { OnHandStateSettingChange(); });
             Watch(nameof(HandPenMode), delegate { OnHandStateSettingChange(); });
@@ -56,6 +133,18 @@ namespace FlameStream
                 SetupHandDynamicRotation();
             });
             SetupHandDynamicRotation();
+
+            if (ActiveHand?.ElbowPole != null) {
+                ActiveHand.ElbowPole.Parent = this;
+                ActiveHand.ElbowPole.IsActiveHand = true;
+                ActiveHand.ElbowPole.OnPoleSettingChange = () => {
+                    bool isHandActive = IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound && Character != null;
+                    TransitionActivePole(isHandActive);
+                };
+                ActiveHand.ElbowPole.OnParentTypeChange = () => OnActiveHandPoleParentTypeChange();
+                ActiveHand.ElbowPole.OnPoleTransformChange = () => SetupActiveHandPoleTransform();
+            }
+            SetupActiveHandPoleTransform();
         }
 
         void SetupHandDynamicRotation() {
@@ -83,7 +172,22 @@ namespace FlameStream
         }
 
         void OnReadyHand() {
+            lastIsRightHanded = IsRightHanded;
             SetupHandDynamicRotation();
+
+            currentActiveHandPoleParentType = ActiveHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+            if (ActiveHand?.ElbowPole != null) {
+                ActiveHand.ElbowPole.Parent = this;
+                ActiveHand.ElbowPole.IsActiveHand = true;
+                ActiveHand.ElbowPole.OnPoleSettingChange = () => {
+                    bool isHandActive = IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound && Character != null;
+                    TransitionActivePole(isHandActive);
+                };
+                ActiveHand.ElbowPole.OnParentTypeChange = () => OnActiveHandPoleParentTypeChange();
+                ActiveHand.ElbowPole.OnPoleTransformChange = () => SetupActiveHandPoleTransform();
+                ActiveHand.ElbowPole.SyncUI();
+            }
+            SetupActiveHandPoleTransform();
 
             NeutralHandPosition.LocalizationKey = "NEUTRAL_POSITION";
             NeutralHandPosition.DefaultOriginSphereColor = new Color(0f, 0.85f, 1f, 0.95f);
@@ -127,13 +231,42 @@ namespace FlameStream
                         dominantLimb.IkTarget = handAnchor;
                         dominantLimb.PositionWeight = 1.0f;
                         dominantLimb.RotationWeight = 1.0f;
-                        dominantLimb.BendGoalWeight = 1.0f;
+                        dominantLimb.BendGoalWeight = (ActiveHand != null && ActiveHand.ElbowPole != null && ActiveHand.ElbowPole.UsePole) ? 1.0f : 0.0f;
                         dominantLimb.Broadcast();
                     }
                 }
             }
 
-            if (IsInRestHandVisualSetup) {
+            if (IsInActiveHandPoleVisualSetup && Character != null) {
+                var dominantLimb = IsRightHanded ? Character.RightHandIK : Character.LeftHandIK;
+                if (dominantLimb != null && activeCoordinator == null) {
+                    dominantLimb.BendGoalTarget = ActiveHandPoleAnchor;
+                    dominantLimb.BendGoalWeight = 1.0f;
+                    dominantLimb.Broadcast();
+                }
+                var pole = ActiveHand?.ElbowPole?.Pole;
+                var livePole = GetActiveHandPoleAnchor(true);
+                if (livePole != null && pole != null && pole.setupAnchor != null) {
+                    Vector3 polePos = pole.setupAnchor.Transform.Position;
+                    Vector3 poleRot = pole.setupAnchor.Transform.Rotation;
+                    if (livePole.Transform.Position != polePos || livePole.Transform.Rotation != poleRot) {
+                        livePole.Transform.Position = polePos;
+                        livePole.Transform.Rotation = poleRot;
+                        livePole.Transform.Broadcast();
+                    }
+                }
+            }
+
+            var nonDominantLimb = IsRightHanded ? Character?.LeftHandIK : Character?.RightHandIK;
+            if (nonDominantLimb != null && nonDominantLimb.IkTarget == handAnchor) {
+                nonDominantLimb.IkTarget = null;
+                nonDominantLimb.PositionWeight = 0f;
+                nonDominantLimb.RotationWeight = 0f;
+                nonDominantLimb.BendGoalWeight = 0f;
+                nonDominantLimb.Broadcast();
+            }
+
+            if (IsInRestHandVisualSetup || IsInActiveHandPoleVisualSetup) {
                 handState = null;
             } else if (inSetupMode) {
                 handState = setupModeHandState;
@@ -224,7 +357,7 @@ namespace FlameStream
             OnHandStateChange();
         }
 
-        void OnInputAffectingHandSetupChange(bool instant = false) {
+        public void OnInputAffectingHandSetupChange(bool instant = false) {
             if (!isReady) return;
 
             var isHandActive = IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound && Character != null;
@@ -268,9 +401,41 @@ namespace FlameStream
             }
         }
 
-        void OnHandSideChange() {
+        public void OnHandSideChange() {
             if (!isReady) return;
             if (Character == null) return;
+
+            bool wasRightHanded = lastIsRightHanded;
+            if (wasRightHanded != IsRightHanded) {
+                MirrorRestHandTransforms(wasRightHanded);
+                MirrorActiveHandPoleTransform(wasRightHanded);
+                lastIsRightHanded = IsRightHanded;
+            }
+
+            // Clear old dominant hand IK
+            var oldDominantLimb = !IsRightHanded ? Character.RightHandIK : Character.LeftHandIK;
+            if (oldDominantLimb != null && (oldDominantLimb.IkTarget == handAnchor || oldDominantLimb.BendGoalTarget == activeHandPoleAnchor)) {
+                if (oldDominantLimb.IkTarget == handAnchor) oldDominantLimb.IkTarget = null;
+                if (oldDominantLimb.BendGoalTarget == activeHandPoleAnchor) oldDominantLimb.BendGoalTarget = null;
+                oldDominantLimb.PositionWeight = 0f;
+                oldDominantLimb.RotationWeight = 0f;
+                oldDominantLimb.BendGoalWeight = 0f;
+                oldDominantLimb.Enabled = false;
+                oldDominantLimb.Broadcast();
+            }
+
+            // Clear old rest hand IK
+            var oldRestLimb = IsRightHanded ? Character.RightHandIK : Character.LeftHandIK;
+            if (oldRestLimb != null && (oldRestLimb.IkTarget == restHandAnchor || oldRestLimb.BendGoalTarget == restHandPoleAnchor)) {
+                if (oldRestLimb.IkTarget == restHandAnchor) oldRestLimb.IkTarget = null;
+                if (oldRestLimb.BendGoalTarget == restHandPoleAnchor) oldRestLimb.BendGoalTarget = null;
+                oldRestLimb.PositionWeight = 0f;
+                oldRestLimb.RotationWeight = 0f;
+                oldRestLimb.BendGoalWeight = 0f;
+                oldRestLimb.Enabled = false;
+                oldRestLimb.Broadcast();
+            }
+
             var matchingLayerNames = new List<string> {
                 HandMouseMode.GetAnimationLayerId(LAYER_NAME_PREFIX),
                 HandMouseMode.ActiveState.GetAnimationLayerId(LAYER_NAME_PREFIX),
@@ -290,6 +455,10 @@ namespace FlameStream
             }
 
             Character.SetDataInput($"{nameof(Character.OverlappingAnimations)}", layers, true);
+            if (activeHandPoleAnchor != null && ActiveHand?.ElbowPole != null) {
+                AttachAnchorToParent(activeHandPoleAnchor, ActiveHand.ElbowPole.ParentType, IsRightHanded);
+            }
+            SetupActiveHandPoleTransform();
             SetupRestHandTransform();
             SetupRestHandPoleTransform();
             UpdateRestHandAnchorTransforms();
@@ -313,7 +482,7 @@ namespace FlameStream
         }
 
         AnchorAsset GetHandIK(bool skipAutoCreate = false) {
-            return GetAsset<AnchorAsset>(ref HandAnchorAssetId, skipAutoCreate, newAssetName: $"🔒⚓-{LAYER_NAME_PREFIX} Hand IK");
+            return GetAsset<AnchorAsset>(ref HandAnchorAssetId, skipAutoCreate, newAssetName: $"🔒⚓-{LAYER_NAME_PREFIX} Hand IK", category: "FS_ASSET_CATEGORY_INTERNAL".Localized());
         }
 
         public void DestroyHandIK() {
@@ -326,6 +495,8 @@ namespace FlameStream
             }
             HandAnchorAssetId = Guid.Empty;
             handAnchor = null;
+            tweenActivePole?.Kill();
+            DestroyActiveHandPoleAnchor();
         }
 
         void EnableLimb(bool isEnabled, LimbIKData limb, AnchorAsset anchor, ref Tween tween, bool instant = false) {
@@ -340,43 +511,74 @@ namespace FlameStream
                 return;
             }
 
-            var targetValue = isEnabled ? 1.0f : 0.0f;
             tween?.Kill();
-            var duration = instant ? 0f : (ActiveTransition != null ? ActiveTransition.Time : 0f);
-            var ease = ActiveTransition != null ? ActiveTransition.Ease : Ease.Linear;
+            var duration = instant ? 0f : (isEnabled
+                ? (ActiveTransition != null ? ActiveTransition.Time : 0.5f)
+                : (InactiveTransition != null ? InactiveTransition.Time : 0.5f));
+            var ease = isEnabled
+                ? (ActiveTransition != null ? ActiveTransition.Ease : Ease.Linear)
+                : (InactiveTransition != null ? InactiveTransition.Ease : Ease.Linear);
 
             if (isEnabled) {
-                limb.Enabled = true;
-                limb.IkTarget = anchor;
-                limb.Broadcast();
-            }
+                // When transitioning to active, ensure the weights are at 0 before connecting the anchors to then transition them to 1
+                if (limb.IkTarget != anchor || !limb.Enabled) {
+                    limb.PositionWeight = 0f;
+                    limb.RotationWeight = 0f;
+                    limb.Enabled = true;
+                    limb.IkTarget = anchor;
+                    limb.Broadcast();
+                }
 
-            if (duration <= 0f) {
-                limb.PositionWeight = targetValue;
-                limb.RotationWeight = targetValue;
-                limb.BendGoalWeight = targetValue;
-                if (!isEnabled) {
+                TransitionActivePole(true, instant);
+
+                float currentWeight = Mathf.Clamp01(limb.PositionWeight);
+                float remaining = 1.0f - currentWeight;
+                float actualDuration = duration * remaining;
+
+                if (actualDuration <= 0f) {
+                    limb.PositionWeight = 1.0f;
+                    limb.RotationWeight = 1.0f;
+                    limb.Broadcast();
+                } else {
+                    tween = DOTween.To(
+                        () => limb.PositionWeight,
+                        delegate(float it) {
+                            limb.PositionWeight = it;
+                            limb.RotationWeight = it;
+                            limb.Broadcast();
+                        },
+                        1.0f,
+                        actualDuration
+                    ).SetEase(ease);
+                }
+            } else {
+                TransitionActivePole(false, instant);
+
+                // When turning off IK, if for some reason the weight was not at 1.0, transition from there to 0 instead of putting to 1 and when going to 0
+                float currentWeight = Mathf.Clamp01(limb.PositionWeight);
+                float actualDuration = duration * currentWeight;
+
+                if (currentWeight <= 0.001f || actualDuration <= 0f) {
+                    limb.PositionWeight = 0f;
+                    limb.RotationWeight = 0f;
                     if (limb.IkTarget == handAnchor || limb.IkTarget == anchor || limb.IkTarget == null) {
                         limb.IkTarget = null;
                         limb.Enabled = false;
                     }
+                    limb.Broadcast();
                     DestroyHandIK();
                     DestroyCursorAnchor();
-                }
-                limb.Broadcast();
-            } else {
-                tween = DOTween.To(
-                    () => limb.PositionWeight,
-                    delegate(float it) {
-                        limb.PositionWeight = it;
-                        limb.RotationWeight = it;
-                        limb.BendGoalWeight = it;
-                        limb.Broadcast();
-                    },
-                    targetValue,
-                    duration
-                ).SetEase(ease).OnComplete(() => {
-                    if (!isEnabled) {
+                } else {
+                    tween = DOTween.To(
+                        () => limb.PositionWeight,
+                        delegate(float it) {
+                            limb.PositionWeight = it;
+                            limb.RotationWeight = it;
+                            limb.Broadcast();
+                        },
+                        0.0f,
+                        actualDuration
+                    ).SetEase(ease).OnComplete(() => {
                         if (limb.IkTarget == handAnchor || limb.IkTarget == anchor || limb.IkTarget == null) {
                             limb.IkTarget = null;
                             limb.Enabled = false;
@@ -384,8 +586,252 @@ namespace FlameStream
                         }
                         DestroyHandIK();
                         DestroyCursorAnchor();
+                    });
+                }
+            }
+        }
+
+        public void TransitionActivePole(bool enable, bool instant = false) {
+            tweenActivePole?.Kill();
+            bool shouldTarget = enable && ActiveHand != null && ActiveHand.ElbowPole != null && ActiveHand.ElbowPole.UsePole;
+            var dominantLimb = Character != null ? (IsRightHanded ? Character.RightHandIK : Character.LeftHandIK) : null;
+
+            float duration = instant ? 0f : (shouldTarget
+                ? (ActiveTransition != null ? ActiveTransition.Time : 0.5f)
+                : (InactiveTransition != null ? InactiveTransition.Time : 0.5f));
+            var ease = shouldTarget
+                ? (ActiveTransition != null ? ActiveTransition.Ease : Ease.OutQuad)
+                : (InactiveTransition != null ? InactiveTransition.Ease : Ease.Linear);
+
+            if (shouldTarget) {
+                var poleAnchor = GetActiveHandPoleAnchor();
+                if (dominantLimb != null && activeCoordinator == null) {
+                    if (dominantLimb.BendGoalTarget != poleAnchor) {
+                        dominantLimb.BendGoalWeight = 0f;
+                        currentActivePoleWeight = 0f;
                     }
+                    dominantLimb.BendGoalTarget = poleAnchor;
+                    dominantLimb.Broadcast();
+                }
+
+                float currentWeight = dominantLimb != null ? Mathf.Clamp01(dominantLimb.BendGoalWeight) : Mathf.Clamp01(currentActivePoleWeight);
+                float remaining = 1.0f - currentWeight;
+                float actualDuration = duration * remaining;
+
+                if (actualDuration <= 0f) {
+                    currentActivePoleWeight = 1.0f;
+                    if (dominantLimb != null && activeCoordinator == null) {
+                        dominantLimb.BendGoalWeight = 1.0f;
+                        dominantLimb.Broadcast();
+                    }
+                    return;
+                }
+
+                currentActivePoleWeight = currentWeight;
+                tweenActivePole = DOTween.To(
+                    () => currentActivePoleWeight,
+                    (w) => {
+                        currentActivePoleWeight = w;
+                        if (dominantLimb != null && activeCoordinator == null) {
+                            dominantLimb.BendGoalWeight = w;
+                            dominantLimb.Broadcast();
+                        }
+                    },
+                    1.0f,
+                    actualDuration
+                ).SetEase(ease);
+            } else {
+                float currentWeight = dominantLimb != null ? Mathf.Clamp01(dominantLimb.BendGoalWeight) : Mathf.Clamp01(currentActivePoleWeight);
+                float actualDuration = duration * currentWeight;
+
+                if (currentWeight <= 0.001f || actualDuration <= 0f) {
+                    currentActivePoleWeight = 0f;
+                    if (dominantLimb != null && activeCoordinator == null) {
+                        dominantLimb.BendGoalWeight = 0f;
+                        if (dominantLimb.BendGoalTarget == activeHandPoleAnchor) {
+                            dominantLimb.BendGoalTarget = null;
+                        }
+                        dominantLimb.Broadcast();
+                    }
+                    DestroyActiveHandPoleAnchor();
+                    return;
+                }
+
+                currentActivePoleWeight = currentWeight;
+                tweenActivePole = DOTween.To(
+                    () => currentActivePoleWeight,
+                    (w) => {
+                        currentActivePoleWeight = w;
+                        if (dominantLimb != null && activeCoordinator == null) {
+                            dominantLimb.BendGoalWeight = w;
+                            dominantLimb.Broadcast();
+                        }
+                    },
+                    0.0f,
+                    actualDuration
+                ).SetEase(ease).OnComplete(() => {
+                    if (dominantLimb != null && dominantLimb.BendGoalTarget == activeHandPoleAnchor && activeCoordinator == null) {
+                        dominantLimb.BendGoalTarget = null;
+                        dominantLimb.Broadcast();
+                    }
+                    DestroyActiveHandPoleAnchor();
                 });
+            }
+        }
+
+        public void OnActiveHandPoleParentTypeChange() {
+            var newParentType = ActiveHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+            var poleAnchor = GetActiveHandPoleAnchor(true);
+
+            var oldParentType = poleAnchor != null
+                ? GetAnchorParentType(poleAnchor)
+                : currentActiveHandPoleParentType;
+
+            if (newParentType == oldParentType) {
+                currentActiveHandPoleParentType = newParentType;
+                return;
+            }
+
+            var pole = ActiveHand?.ElbowPole?.Pole;
+            if (pole != null) {
+                Vector3 currentPolePos = poleAnchor != null ? poleAnchor.Transform.Position : pole.Position;
+                Vector3 currentPoleRot = poleAnchor != null ? poleAnchor.Transform.Rotation : pole.Rotation;
+
+                TransformAnchorLocalToWorld(oldParentType, currentPolePos, currentPoleRot, out Vector3 poleWorldPos, out Quaternion poleWorldRot, IsRightHanded);
+                TransformAnchorWorldToLocal(newParentType, poleWorldPos, poleWorldRot, out Vector3 newPolePos, out Vector3 newPoleRot, IsRightHanded);
+
+                pole.Position = newPolePos;
+                pole.Rotation = newPoleRot;
+                pole.Scale = Vector3.one;
+                pole.SetDataInput(nameof(pole.Position), newPolePos, true);
+                pole.SetDataInput(nameof(pole.Rotation), newPoleRot, true);
+                pole.Broadcast();
+
+                if (poleAnchor != null) {
+                    AttachAnchorToParent(poleAnchor, newParentType, IsRightHanded);
+                    poleAnchor.Transform.Position = newPolePos;
+                    poleAnchor.Transform.Rotation = newPoleRot;
+                    poleAnchor.Transform.Scale = Vector3.one;
+                    poleAnchor.Transform.Broadcast();
+                    if (poleAnchor.GameObject != null) {
+                        poleAnchor.GameObject.transform.localPosition = newPolePos;
+                        poleAnchor.GameObject.transform.localRotation = Quaternion.Euler(newPoleRot);
+                        poleAnchor.GameObject.transform.localScale = Vector3.one;
+                    }
+                }
+
+                if (pole.setupAnchor != null) {
+                    AttachAnchorToParent(pole.setupAnchor, newParentType, IsRightHanded);
+                    pole.setupAnchor.Transform.Position = newPolePos;
+                    pole.setupAnchor.Transform.Rotation = newPoleRot;
+                    pole.setupAnchor.Transform.Scale = Vector3.one;
+                    pole.setupAnchor.Transform.Broadcast();
+                    if (pole.setupAnchor.GameObject != null) {
+                        pole.setupAnchor.GameObject.transform.localPosition = newPolePos;
+                        pole.setupAnchor.GameObject.transform.localRotation = Quaternion.Euler(newPoleRot);
+                        pole.setupAnchor.GameObject.transform.localScale = Vector3.one;
+                    }
+                }
+            }
+
+            currentActiveHandPoleParentType = newParentType;
+            RequestUiRefresh();
+        }
+
+        public void SetupActiveHandPoleTransform() {
+            var pole = ActiveHand?.ElbowPole?.Pole;
+            if (pole == null) return;
+            pole.LocalizationKey = "INITIAL_POLE_TRANSFORM";
+            pole.HideScale();
+            pole.CollapsedSelf = true;
+            pole.ShowOriginIndicator = false;
+
+            pole.OnEnterVisualSetup = (tr) => {
+                EnsureActiveHandAnchors();
+                NeutralHandPosition?.EnterVisualSetup(false);
+                var livePole = GetActiveHandPoleAnchor();
+                if (livePole != null) {
+                    livePole.Transform.Position = tr.Position;
+                    livePole.Transform.Rotation = tr.Rotation;
+                    livePole.Transform.Broadcast();
+                }
+                var dominantLimb = Character != null ? (IsRightHanded ? Character.RightHandIK : Character.LeftHandIK) : null;
+                if (dominantLimb != null && activeCoordinator == null) {
+                    dominantLimb.BendGoalTarget = livePole;
+                    currentActivePoleWeight = 1.0f;
+                    dominantLimb.BendGoalWeight = 1.0f;
+                    dominantLimb.Broadcast();
+                }
+            };
+
+            pole.OnCreateAnchor = (tr, setupAnchor) => {
+                var parentType = ActiveHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+                SetAnchorParentInitial(setupAnchor, parentType, IsRightHanded);
+
+                setupAnchor.Transform.Position = tr.Position;
+                setupAnchor.Transform.Rotation = tr.Rotation;
+                setupAnchor.Transform.Scale = Vector3.one;
+                var handSide = IsRightHanded ? "Right" : "Left";
+                setupAnchor.Name = $"⌛⚓-{handSide} Hand Active Pole";
+                setupAnchor.Instructions = "ACTIVE_HAND_POLE_INSTRUCTIONS".Localized();
+                setupAnchor.Transform.Broadcast();
+
+                var livePole = GetActiveHandPoleAnchor();
+                if (livePole != null) {
+                    livePole.Transform.Position = tr.Position;
+                    livePole.Transform.Rotation = tr.Rotation;
+                    livePole.Transform.Broadcast();
+                }
+            };
+
+            pole.OnResetAnchor = (tr, setupAnchor) => {
+                var parentType = ActiveHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+                Vector3 defaultWorldPos = GetDefaultElbowPoleWorldPosition(IsRightHanded);
+                TransformAnchorWorldToLocal(parentType, defaultWorldPos, Quaternion.identity, out Vector3 localPos, out Vector3 localRot, IsRightHanded);
+
+                setupAnchor.Transform.Position = localPos;
+                setupAnchor.Transform.Rotation = localRot;
+                setupAnchor.Transform.Scale = Vector3.one;
+                setupAnchor.Transform.Broadcast();
+            };
+
+            pole.OnApplyAnchor = (tr, setupAnchor) => {
+                tr.Position = setupAnchor.Transform.Position;
+                tr.Rotation = setupAnchor.Transform.Rotation;
+                tr.Scale = Vector3.one;
+                var livePole = GetActiveHandPoleAnchor(true);
+                if (livePole != null) {
+                    livePole.Transform.Position = tr.Position;
+                    livePole.Transform.Rotation = tr.Rotation;
+                    livePole.Transform.Broadcast();
+                }
+            };
+
+            pole.OnExitVisualSetup = (isApplied) => {
+                if (isApplied) {
+                    NeutralHandPosition?.setupAnchor?.ApplyTrigger();
+                } else {
+                    NeutralHandPosition?.setupAnchor?.CancelTrigger();
+                    var livePole = GetActiveHandPoleAnchor(true);
+                    var currentPole = ActiveHand?.ElbowPole?.Pole;
+                    if (livePole != null && currentPole != null) {
+                        livePole.Transform.Position = currentPole.Position;
+                        livePole.Transform.Rotation = currentPole.Rotation;
+                        livePole.Transform.Broadcast();
+                    }
+                }
+                OnInputAffectingHandSetupChange();
+                Context.Service.NavigateToAsset(Id);
+                Context.Service.BroadcastOpenedScene();
+                RequestUiRefresh();
+            };
+        }
+
+        void EnsureActiveHandAnchors() {
+            var poleParentType = ActiveHand?.ElbowPole?.ParentType ?? RestHandParentType.Character;
+            if (ActiveHand != null && (ActiveHand.ElbowPole != null && (ActiveHand.ElbowPole.UsePole || (ActiveHand.ElbowPole.Pole != null && ActiveHand.ElbowPole.Pole.InVisualSetupMode)))) {
+                var poleAnchor = GetActiveHandPoleAnchor();
+                if (poleAnchor != null) AttachAnchorToParent(poleAnchor, poleParentType, IsRightHanded);
             }
         }
 
@@ -432,7 +878,7 @@ namespace FlameStream
 
 
         void HandleNeutralEnterVisualSetup() {
-            if (inSetupMode) return;
+            if (inSetupMode || IsInActiveHandPoleVisualSetup) return;
             EnterSetupModeMinimal();
             GetHandState(0, false)?.Transform.EnterVisualSetup(false);
         }

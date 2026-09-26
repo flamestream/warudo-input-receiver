@@ -80,6 +80,10 @@ namespace FlameStream
             DestroyDebugSpheres(true);
             CleanDestroy(bodySetupRootAnchor);
             GameObject.Destroy(calculator);
+            tweenLeftIK?.Kill();
+            tweenRightIK?.Kill();
+            tweenActivePole?.Kill();
+            DestroyActiveHandPoleAnchor();
             OnDestroyRestHand();
             if (originalScreenParent != null && screenAsset != null && screenAsset.GameObject != null) {
                 try {
@@ -157,6 +161,50 @@ namespace FlameStream
                 HasConfiguredScreenTransform = true;
                 SetDataInput(nameof(HasConfiguredScreenTransform), true, true);
             }
+
+            if (CursorMode == null) {
+                CursorMode = StructuredData.Create<CursorMode>();
+                CursorMode.CursorSmoothness = CursorSmoothness;
+                SetDataInput(nameof(CursorMode), CursorMode, true);
+            }
+            if (CursorSmoothness != 0.05f && CursorMode.CursorSmoothness == 0.05f) {
+                CursorMode.CursorSmoothness = CursorSmoothness;
+            } else {
+                CursorSmoothness = CursorMode.CursorSmoothness;
+            }
+            CursorMode.Watch(nameof(CursorMode.CursorSmoothness), delegate {
+                CursorSmoothness = CursorMode.CursorSmoothness;
+            });
+            Watch(nameof(CursorSmoothness), delegate {
+                if (CursorMode != null && CursorMode.CursorSmoothness != CursorSmoothness) {
+                    CursorMode.CursorSmoothness = CursorSmoothness;
+                }
+            });
+
+            if (ActiveHand == null) {
+                ActiveHand = StructuredData.Create<PointerActiveHandSetup>();
+                ActiveHand.IsRightHanded = IsRightHanded;
+                ActiveHand.CollapsedSelf = false;
+                SetDataInput(nameof(ActiveHand), ActiveHand, true);
+            }
+            ActiveHand.Parent = this;
+            ActiveHand.CollapsedSelf = false;
+            ActiveHand.IsRightHanded = IsRightHanded;
+
+            if (ActiveTransition == null) {
+                ActiveTransition = StructuredData.Create<ActiveTransition>();
+                SetDataInput(nameof(ActiveTransition), ActiveTransition, true);
+            }
+            if (InactiveTransition == null) {
+                InactiveTransition = StructuredData.Create<InactiveTransition>();
+                SetDataInput(nameof(InactiveTransition), InactiveTransition, true);
+            }
+            Watch(nameof(ActiveHand), delegate {
+                if (ActiveHand != null) {
+                    ActiveHand.Parent = this;
+                }
+                SetupActiveHandPoleTransform();
+            });
 
             Watch(nameof(DisplayName), delegate { OnSurfaceSettingChange(); });
             // OnSurfaceSettingChange(); // No need; will be called by #OnBasicSettingChange
@@ -310,7 +358,7 @@ namespace FlameStream
                 ? IK_BASIS_RIGHT_HANDED
                 : IK_BASIS_LEFT_HANDED;
 
-            if (inSetupMode || IsInRestHandVisualSetup || IsInScreenVisualSetup) {
+            if (inSetupMode || IsInRestHandVisualSetup || IsInActiveHandPoleVisualSetup || IsInScreenVisualSetup) {
                 anchorTransform.Position = NeutralHandPosition.setupAnchor?.Transform.Position ?? NeutralHandPosition.Position;
                 cursorScreenPosition = anchorTransform.Position;
 
@@ -327,7 +375,9 @@ namespace FlameStream
 
                 var targetPlanarPosition = screenAsset.GetChildCursorPosition(adjustedX, adjustedY) * PointerFactorCorrection;
 
-                if (CursorSmoothness == 0) {
+                var smoothness = CursorMode != null ? CursorMode.CursorSmoothness : CursorSmoothness;
+
+                if (smoothness == 0) {
                     cursorMoveTween?.Kill();
                     cursorScreenPosition = targetPlanarPosition;
                 } else if (adjustedX != lastAdjustedX || adjustedY != lastAdjustedY) {
@@ -336,7 +386,7 @@ namespace FlameStream
                         () => cursorScreenPosition,
                         delegate(Vector3 it) { cursorScreenPosition = it; },
                         targetPlanarPosition,
-                        CursorSmoothness
+                        smoothness
                     ).SetEase(Ease.Linear);
                 }
 
@@ -445,12 +495,13 @@ namespace FlameStream
             return new Vector3(targetRotX, 0f, 0f);
         }
 
-        public Vector3 GetNaturalRestingElbowWorldPosition() {
+        public Vector3 GetNaturalRestingElbowWorldPosition() => GetNaturalRestingElbowWorldPosition(IsRightHanded);
+
+        public Vector3 GetNaturalRestingElbowWorldPosition(bool isRight) {
             if (Character == null) return Vector3.zero;
             var charTr = Character.MainTransform ?? Character.GameObject?.transform;
             if (charTr == null) return Vector3.zero;
 
-            bool isRight = IsRightHanded;
             var anim = Character.Animator ?? Character.CloneAnimator;
             var shoulder = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightUpperArm : HumanBodyBones.LeftUpperArm) : null;
             var elbow = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightLowerArm : HumanBodyBones.LeftLowerArm) : null;
@@ -470,19 +521,59 @@ namespace FlameStream
             return shoulderPos + deltaDrop + deltaOut + deltaFwd;
         }
 
+        public Vector3 GetDefaultElbowPoleWorldPosition(bool isRight) {
+            var charTr = Character?.MainTransform ?? Character?.GameObject?.transform;
+            Vector3 forward = charTr != null ? charTr.forward : Vector3.forward;
+            Vector3 right = charTr != null ? charTr.right : Vector3.right;
+
+            var anim = Character?.Animator ?? Character?.CloneAnimator;
+            var elbowBone = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightLowerArm : HumanBodyBones.LeftLowerArm) : null;
+            Vector3 baseElbowWorld = elbowBone != null ? elbowBone.position : GetNaturalRestingElbowWorldPosition(isRight);
+
+            return baseElbowWorld - forward * 0.25f + (isRight ? right : -right) * 0.05f;
+        }
+
         protected override void Log(string msg) {
             Debug.Log($"[FlameStream.Asset.PointerReceiver] {msg}");
         }
 
         void OnBasicSettingChange() {
-            SetDataInputPropertyAndBroadcast(nameof(Character), hidden: !IsHandEnabled);
-            SetDataInputPropertyAndBroadcast(nameof(IsRightHanded), hidden: !IsHandEnabled);
-            SetDataInputPropertyAndBroadcast(nameof(DisplayName), hidden: !IsHandEnabled);
-            SetDataInputPropertyAndBroadcast(nameof(CursorSmoothness), hidden: !IsHandEnabled);
-            OnSurfaceSettingChange();
+            bool isMissingRequirements = Character == null || string.IsNullOrEmpty(DisplayName);
+            string enableDesc;
+            if (Character == null && string.IsNullOrEmpty(DisplayName)) {
+                enableDesc = "BASIC_SETUP_REQUIRED_CHAR_AND_DISPLAY_DESC".Localized();
+            } else if (Character == null) {
+                enableDesc = "BASIC_SETUP_REQUIRED_CHAR_DESC".Localized();
+            } else if (string.IsNullOrEmpty(DisplayName)) {
+                enableDesc = "BASIC_SETUP_REQUIRED_DISPLAY_DESC".Localized();
+            } else {
+                enableDesc = "POINTER_ENABLE_DESC".Localized();
+            }
 
-            SetDataInputPropertyAndBroadcast(nameof(CursorMode), hidden: !IsHandEnabled);
-            SetDataInputPropertyAndBroadcast(nameof(ScreenSetup), hidden: !IsHandEnabled);
+            if (isMissingRequirements && IsHandEnabled) {
+                IsHandEnabled = false;
+                SetDataInput(nameof(IsHandEnabled), false, true);
+                BroadcastDataInput(nameof(IsHandEnabled));
+            }
+
+            SetDataInputPropertyAndBroadcast(
+                nameof(IsHandEnabled),
+                disabled: isMissingRequirements,
+                description: enableDesc
+            );
+
+            // Basic Setup ports are NEVER hidden based on IsHandEnabled
+            SetDataInputPropertyAndBroadcast(nameof(Character), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(DisplayName), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(ScreenSetup), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(CursorMode), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(ActiveHand), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(CursorSmoothness), hidden: true);
+            SetDataInputPropertyAndBroadcast(nameof(RestHand), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(ActiveTransition), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(InactiveTransition), hidden: false);
+
+            OnSurfaceSettingChange();
 
             isBasicSetupComplete = IsHandEnabled && Character != null && monitor != null;
             SetDataInputPropertyAndBroadcast(nameof(HandMouseMode), hidden: !isBasicSetupComplete);
@@ -526,8 +617,6 @@ namespace FlameStream
                 if (cursorAnchorAsset != null) {
                     cursorAnchorAsset.Attachable.Parent = screenAsset;
                 }
-            } else {
-                DestroyCursorAnchor();
             }
 
             // Monitor data check
@@ -826,10 +915,10 @@ namespace FlameStream
         }
 
         AnchorAsset GetCursorAnchor(bool skipAutoCreate = false) {
-            return GetAsset<AnchorAsset>(ref CursorAnchorAssetId, skipAutoCreate, newAssetName: $"🔒⚓-{LAYER_NAME_PREFIX}🎯");
+            return GetAsset<AnchorAsset>(ref CursorAnchorAssetId, skipAutoCreate, newAssetName: $"🔒⚓-{LAYER_NAME_PREFIX}🎯", category: "FS_ASSET_CATEGORY_INTERNAL".Localized());
         }
 
-        T GetAsset<T>(ref Guid assetId, out bool isNewlyCreated, bool skipAutoCreate = false, string newAssetName = null) where T : Asset  {
+        T GetAsset<T>(ref Guid assetId, out bool isNewlyCreated, bool skipAutoCreate = false, string newAssetName = null, string category = null) where T : Asset  {
             isNewlyCreated = false;
 
             // Return null if Scene is not ready yet (during creation)
@@ -841,6 +930,9 @@ namespace FlameStream
                 var id = assetId;
                 var fetchResult = Scene.GetAssets<T>().FirstOrDefault(p => p.Id == id);
                 if (fetchResult != null) {
+                    if (!string.IsNullOrEmpty(category)) {
+                        try { Scene.AddAssetToGroup(fetchResult, category); } catch {}
+                    }
                     return fetchResult;
                 }
             }
@@ -850,13 +942,18 @@ namespace FlameStream
                 var existing = Scene.GetAssets<T>().FirstOrDefault(p => p.Name == newAssetName || (p.Name != null && p.Name.Contains(newAssetName)));
                 if (existing != null) {
                     assetId = existing.Id;
+                    if (!string.IsNullOrEmpty(category)) {
+                        try { Scene.AddAssetToGroup(existing, category); } catch {}
+                    }
                     return existing;
                 }
             }
 
             if (skipAutoCreate) return null;
 
-            var newAsset = Scene.AddAsset<T>();
+            var newAsset = !string.IsNullOrEmpty(category)
+                ? Scene.AddAssetToGroup<T>(category)
+                : Scene.AddAsset<T>();
             newAsset.Name = newAssetName ?? $"📦-{LAYER_NAME_PREFIX} {nameof(T)}";
             Scene.UpdateNewAssetName(newAsset);
             newAsset.Broadcast();
@@ -866,8 +963,8 @@ namespace FlameStream
             return newAsset;
         }
 
-        T GetAsset<T>(ref Guid assetId, bool skipAutoCreate = false, string newAssetName = null) where T : Asset  {
-            return GetAsset<T>(ref assetId, out bool _isNewlyCreated, skipAutoCreate, newAssetName);
+        T GetAsset<T>(ref Guid assetId, bool skipAutoCreate = false, string newAssetName = null, string category = null) where T : Asset  {
+            return GetAsset<T>(ref assetId, out bool _isNewlyCreated, skipAutoCreate, newAssetName, category);
         }
 
         GameObject GetDebugSphereCursorPosition(bool skipAutoCreate = false) {

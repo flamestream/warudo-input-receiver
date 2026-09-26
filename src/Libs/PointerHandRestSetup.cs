@@ -7,12 +7,14 @@ using Warudo.Core.Serializations;
 
 namespace FlameStream {
     public enum RestHandParentType {
-        [Label("REST_HAND_PARENT_WORLD")]
-        World,
-        [Label("REST_HAND_PARENT_CHARACTER")]
-        Character,
-        [Label("REST_HAND_PARENT_SCREEN")]
-        Screen
+        [Label("PARENT_WORLD")]
+        World = 0,
+        [Label("PARENT_CHARACTER")]
+        Character = 1,
+        [Label("PARENT_SCREEN")]
+        Screen = 2,
+        [Label("PARENT_CHARACTER_UPPER_ARM")]
+        CharacterUpperArm = 3
     }
 
     public class PointerHandRestSetup : StructuredData<PointerReceiverAsset>, ICollapsibleStructuredData {
@@ -41,18 +43,22 @@ namespace FlameStream {
         public RestHandParentType ParentType = RestHandParentType.Character;
 
         [DataInput(20)]
-        [Label("REST_HAND_TARGET")]
-        [Description("REST_HAND_TARGET_DESC")]
+        [Label("INITIAL_REST_POSITION")]
+        [Description("INITIAL_REST_POSITION_DESC")]
         public CollapsibleVisualSetupTransform Target;
 
-        [DataInput(25)]
-        [Label("USE_POLE")]
-        [Description("USE_POLE_DESC")]
+        [DataInput(30)]
+        [Label("ELBOW_POLE_SETUP")]
+        [Description("ELBOW_POLE_SETUP_DESC")]
+        public PointerElbowPoleSetup ElbowPole;
+
+        // Legacy compatibility fields for scenes that stored UsePole / Pole on PointerHandRestSetup
+        [DataInput]
+        [Hidden]
         public bool UsePole = false;
 
-        [DataInput(30)]
-        [Label("REST_HAND_POLE")]
-        [Description("REST_HAND_POLE_DESC")]
+        [DataInput]
+        [Hidden]
         public CollapsibleVisualSetupTransform Pole;
 
         public string GetHeader() => "REST_HAND_SETUP".Localized();
@@ -73,16 +79,28 @@ namespace FlameStream {
             Target.CollapsedSelf = true;
             Target.ShowOriginIndicator = false;
 
-            if (Pole == null) {
-                Pole = StructuredData.Create<CollapsibleVisualSetupTransform>();
-                Pole.Position = rightHanded ? new Vector3(-0.4f, 0.65f, -0.2f) : new Vector3(0.4f, 0.65f, -0.2f);
-                Pole.Rotation = Vector3.zero;
-                Pole.Scale = Vector3.one;
-                Pole.SetDataInput(nameof(Pole.Scale), Vector3.one, true);
+            if (ElbowPole == null) {
+                ElbowPole = StructuredData.Create<PointerElbowPoleSetup>();
+                ElbowPole.Parent = Parent;
+                ElbowPole.IsActiveHand = false;
+                ElbowPole.UsePole = UsePole;
+                if (Pole != null) {
+                    ElbowPole.Pole = Pole;
+                } else if (ElbowPole.Pole != null) {
+                    ElbowPole.Pole.Position = rightHanded ? new Vector3(-0.4f, 0.65f, -0.2f) : new Vector3(0.4f, 0.65f, -0.2f);
+                }
+                SetDataInput(nameof(ElbowPole), ElbowPole, true);
             }
-            Pole.HideScale();
-            Pole.CollapsedSelf = true;
-            Pole.ShowOriginIndicator = false;
+            ElbowPole.Parent = Parent;
+            ElbowPole.IsActiveHand = false;
+
+            Watch(nameof(UsePole), delegate {
+                if (ElbowPole != null && ElbowPole.UsePole != UsePole) {
+                    ElbowPole.UsePole = UsePole;
+                    ElbowPole.SetDataInput(nameof(ElbowPole.UsePole), UsePole, true);
+                    ElbowPole.BroadcastDataInput(nameof(ElbowPole.UsePole));
+                }
+            });
 
             Watch(nameof(Enabled), delegate {
                 SyncUI();
@@ -91,14 +109,14 @@ namespace FlameStream {
             Watch(nameof(ParentType), delegate {
                 Parent?.OnRestHandParentTypeChange();
             });
-            Watch(nameof(UsePole), delegate {
-                SyncUI();
-                Parent?.OnRestHandSettingChange();
-            });
             Watch(nameof(Target), delegate {
                 Parent?.SetupRestHandTransform();
             });
-            Watch(nameof(Pole), delegate {
+            Watch(nameof(ElbowPole), delegate {
+                if (ElbowPole != null) {
+                    ElbowPole.Parent = Parent;
+                    ElbowPole.IsActiveHand = false;
+                }
                 Parent?.SetupRestHandPoleTransform();
             });
 
@@ -108,8 +126,7 @@ namespace FlameStream {
         public void SyncUI() {
             var parentTypePort = GetDataInputPort(nameof(ParentType));
             var targetPort = GetDataInputPort(nameof(Target));
-            var usePolePort = GetDataInputPort(nameof(UsePole));
-            var polePort = GetDataInputPort(nameof(Pole));
+            var elbowPolePort = GetDataInputPort(nameof(ElbowPole));
 
             if (parentTypePort != null) {
                 parentTypePort.Properties.hidden = !Enabled;
@@ -119,15 +136,12 @@ namespace FlameStream {
                 targetPort.Properties.hidden = !Enabled;
                 BroadcastDataInputProperties(nameof(Target));
             }
-            if (usePolePort != null) {
-                usePolePort.Properties.hidden = !Enabled;
-                BroadcastDataInputProperties(nameof(UsePole));
-            }
-            if (polePort != null) {
-                polePort.Properties.hidden = !Enabled || !UsePole;
-                BroadcastDataInputProperties(nameof(Pole));
+            if (elbowPolePort != null) {
+                elbowPolePort.Properties.hidden = !Enabled;
+                BroadcastDataInputProperties(nameof(ElbowPole));
             }
 
+            ElbowPole?.SyncUI();
             RequestUiRefresh();
             Parent?.RequestUiRefresh();
         }

@@ -28,7 +28,14 @@ namespace FlameStream
 
     public class ActiveTransition : Transition {
         public ActiveTransition() {
-            Time = 0.2f;
+            Time = 0.5f;
+            Ease = Ease.Linear;
+        }
+    }
+
+    public class InactiveTransition : Transition {
+        public InactiveTransition() {
+            Time = 0.5f;
             Ease = Ease.Linear;
         }
     }

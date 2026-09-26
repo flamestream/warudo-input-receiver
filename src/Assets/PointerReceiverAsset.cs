@@ -70,10 +70,6 @@ namespace FlameStream {
         public bool IsHandEnabled;
 
         [DataInput]
-        [Label("ACTIVE_TRANSITION")]
-        public ActiveTransition ActiveTransition;
-
-        [DataInput]
         [Label("CHARACTER")]
         [Description("CHARACTER_DESC")]
         public CharacterAsset Character;
@@ -168,10 +164,6 @@ namespace FlameStream {
 
 
         [DataInput]
-        [Label("RIGHT_HANDED")]
-        public bool IsRightHanded = true;
-
-        [DataInput]
         [AutoComplete(nameof(AutoCompleteDisplayName), true, "")]
         [Label("SCREEN_DISPLAY")]
         public string DisplayName;
@@ -189,18 +181,37 @@ namespace FlameStream {
         public PointerDrawingScreenSetup ScreenSetup;
 
         [DataInput]
-        [Label("CURSOR_SMOOTHNESS")]
-        [FloatSlider(0f, 0.1f, 0.01f)]
-        public float CursorSmoothness = 0.05f;
+        [Label("CURSOR_SETUP")]
+        [Description("CURSOR_SETUP_DESC")]
+        public CursorMode CursorMode;
 
         [DataInput]
-        [Label("CURSOR_MODE")]
-        public CursorMode CursorMode;
+        [Label("ACTIVE_HAND_SETUP")]
+        [Description("ACTIVE_HAND_SETUP_DESC")]
+        public PointerActiveHandSetup ActiveHand;
 
         [DataInput]
         [Label("REST_HAND_SETUP")]
         [Description("REST_HAND_SETUP_DESC")]
         public PointerHandRestSetup RestHand;
+
+        [DataInput]
+        [Label("ACTIVE_TRANSITION")]
+        [Description("ACTIVE_TRANSITION_DESC")]
+        public ActiveTransition ActiveTransition;
+
+        [DataInput]
+        [Label("INACTIVE_TRANSITION")]
+        [Description("INACTIVE_TRANSITION_DESC")]
+        public InactiveTransition InactiveTransition;
+
+        [DataInput]
+        [Hidden]
+        public bool IsRightHanded = true;
+
+        [DataInput]
+        [Hidden]
+        public float CursorSmoothness = 0.05f;
 
         /// <summary>
         /// HAND MOVEMENT
