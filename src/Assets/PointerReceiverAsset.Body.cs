@@ -100,7 +100,12 @@ namespace FlameStream
                     // Dynamic extra offset
                     bodyDistanceFactor = screenAsset.GameObject.transform.InverseTransformPoint(targetBodyPosition) - screenAsset.GameObject.transform.InverseTransformPoint(Character.Transform.Position);
                     bodyDistanceFactor.x *= -1;
-                    bodyRotation += BodyDynamicRotation.Evaluate(bodyDistanceFactor);
+                    Vector3 evalBodyDelta = IsRightHanded ? bodyDistanceFactor : new Vector3(-bodyDistanceFactor.x, bodyDistanceFactor.y, bodyDistanceFactor.z);
+                    Vector3 bodyDynamicRot = BodyDynamicRotation.Evaluate(evalBodyDelta);
+                    if (!IsRightHanded) {
+                        bodyDynamicRot = new Vector3(bodyDynamicRot.x, -bodyDynamicRot.y, -bodyDynamicRot.z);
+                    }
+                    bodyRotation += bodyDynamicRot;
 
                     // Body movement style
                     var distanceFactor = bodyDistanceFactor.magnitude;

@@ -200,7 +200,7 @@ namespace FlameStream
                 bool isRight = IsRightHanded;
                 var anim = Character != null ? (Character.Animator ?? Character.CloneAnimator) : null;
                 var elbowBone = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightLowerArm : HumanBodyBones.LeftLowerArm) : null;
-                Vector3 elbowWorld = elbowBone != null ? elbowBone.position : GetNaturalRestingElbowWorldPosition();
+                Vector3 elbowWorld = elbowBone != null ? elbowBone.position : GetNaturalRestingElbowWorldPosition(isRight);
                 var s = screenAsset ?? GetSurfaceScreen();
                 if (s != null) {
                     Quaternion screenRot = s.GameObject != null ? s.GameObject.transform.rotation : Quaternion.Euler(s.Transform.Rotation);
@@ -444,10 +444,15 @@ namespace FlameStream
             if (!isReady) return;
             if (Character == null) return;
 
+            cachedAutoHandRotX = float.NaN;
+            cachedAutoHandRotation = Vector3.zero;
+            autoHandSettleCountdown = 0;
+
             bool wasRightHanded = lastIsRightHanded;
             if (wasRightHanded != IsRightHanded) {
                 MirrorRestHandTransforms(wasRightHanded);
                 MirrorActiveHandPoleTransform(wasRightHanded);
+                MirrorActiveHandTransforms(wasRightHanded);
                 lastIsRightHanded = IsRightHanded;
             }
 
@@ -510,6 +515,31 @@ namespace FlameStream
             bool currentRestPoleActive = IsRestHandPoleActive;
             lastRestPoleActive = currentRestPoleActive;
             TransitionRestPole(currentRestPoleActive);
+
+            if (inSetupMode) {
+                CalculateSetupHandOffsets();
+                CalculateSetupBodyOffsets();
+            } else {
+                OnHandStateChange();
+                OnBodyStateChange();
+            }
+
+            if (cursorAnchorAsset != null) {
+                cursorAnchorAsset.Transform.Rotation = IsRightHanded ? IK_BASIS_RIGHT_HANDED : IK_BASIS_LEFT_HANDED;
+                cursorAnchorAsset.Transform.Broadcast();
+                if (cursorAnchorAsset.GameObject != null) {
+                    cursorAnchorAsset.GameObject.transform.localRotation = Quaternion.Euler(cursorAnchorAsset.Transform.Rotation);
+                }
+            }
+            if (handAnchor != null) {
+                handAnchor.Transform.Position = handPositionOffset;
+                handAnchor.Transform.Rotation = handRotationOffset;
+                handAnchor.Transform.Broadcast();
+                if (handAnchor.GameObject != null) {
+                    handAnchor.GameObject.transform.localPosition = handPositionOffset;
+                    handAnchor.GameObject.transform.localRotation = Quaternion.Euler(handRotationOffset);
+                }
+            }
         }
 
         PoseState GetHandState(int source, bool button1) {

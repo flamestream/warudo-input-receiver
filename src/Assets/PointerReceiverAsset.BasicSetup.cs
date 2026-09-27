@@ -86,12 +86,6 @@ namespace FlameStream
             DestroyActiveHandPoleAnchor();
             OnDestroyRestHand();
             OnDestroyHand();
-            if (originalScreenParent != null && screenAsset != null && screenAsset.GameObject != null) {
-                try {
-                    screenAsset.GameObject.transform.SetParent(originalScreenParent, true);
-                } catch {}
-                originalScreenParent = null;
-            }
             ScreenSetup?.Transform?.DestroyAnchor();
         }
 
@@ -305,6 +299,11 @@ namespace FlameStream
                     screenAsset.Transform.Rotation = anchorTr.Rotation;
                     screenAsset.Transform.Scale = anchorTr.Scale;
                     screenAsset.Transform.Broadcast();
+                    if (screenAsset.GameObject != null) {
+                        screenAsset.GameObject.transform.position = anchorTr.Position;
+                        screenAsset.GameObject.transform.rotation = Quaternion.Euler(anchorTr.Rotation);
+                        screenAsset.GameObject.transform.localScale = anchorTr.Scale;
+                    }
                 }
             }
 
@@ -500,7 +499,7 @@ namespace FlameStream
             bool isRight = IsRightHanded;
             var anim = Character.Animator ?? Character.CloneAnimator;
             var elbowBone = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightLowerArm : HumanBodyBones.LeftLowerArm) : null;
-            Vector3 elbowWorld = elbowBone != null ? elbowBone.position : GetNaturalRestingElbowWorldPosition();
+            Vector3 elbowWorld = elbowBone != null ? elbowBone.position : GetNaturalRestingElbowWorldPosition(isRight);
 
             Quaternion screenRot = screenAsset.GameObject != null ? screenAsset.GameObject.transform.rotation : Quaternion.Euler(screenAsset.Transform.Rotation);
             Vector3 screenPos = screenAsset.GameObject != null ? screenAsset.GameObject.transform.position : screenAsset.Transform.Position;
@@ -741,8 +740,6 @@ namespace FlameStream
         }
 
 
-        private Transform originalScreenParent = null;
-
         public void SetupDrawingScreenTransform() {
             if (ScreenSetup == null) return;
             if (ScreenSetup.Transform == null) {
@@ -771,6 +768,11 @@ namespace FlameStream
                 if (screenAsset == null) {
                     screenAsset = GetSurfaceScreen();
                 }
+                if (screenAsset != null) {
+                    t.Position = screenAsset.Transform.Position;
+                    t.Rotation = screenAsset.Transform.Rotation;
+                    t.Scale = screenAsset.Transform.Scale;
+                }
             };
 
             tr.OnCreateAnchor = (t, setupAnchor) => {
@@ -781,11 +783,6 @@ namespace FlameStream
                 setupAnchor.Transform.Scale = t.Scale;
                 setupAnchor.SetHideScale(false);
                 setupAnchor.Transform.Broadcast();
-
-                if (screenAsset != null && screenAsset.GameObject != null && setupAnchor.GameObject != null) {
-                    originalScreenParent = screenAsset.GameObject.transform.parent;
-                    screenAsset.GameObject.transform.SetParent(setupAnchor.GameObject.transform, true);
-                }
             };
 
             tr.OnResetAnchor = (t, setupAnchor) => {
@@ -799,10 +796,6 @@ namespace FlameStream
             };
 
             tr.OnApplyAnchor = (t, setupAnchor) => {
-                if (screenAsset != null && screenAsset.GameObject != null && originalScreenParent != null) {
-                    screenAsset.GameObject.transform.SetParent(originalScreenParent, true);
-                    originalScreenParent = null;
-                }
                 t.Position = setupAnchor.Transform.Position;
                 t.Rotation = setupAnchor.Transform.Rotation;
                 t.Scale = setupAnchor.Transform.Scale;
@@ -816,14 +809,15 @@ namespace FlameStream
                     screenAsset.Transform.Rotation = t.Rotation;
                     screenAsset.Transform.Scale = t.Scale;
                     screenAsset.Transform.Broadcast();
+                    if (screenAsset.GameObject != null) {
+                        screenAsset.GameObject.transform.position = t.Position;
+                        screenAsset.GameObject.transform.rotation = Quaternion.Euler(t.Rotation);
+                        screenAsset.GameObject.transform.localScale = t.Scale;
+                    }
                 }
             };
 
             tr.OnExitVisualSetup = (isApplied) => {
-                if (screenAsset != null && screenAsset.GameObject != null && originalScreenParent != null) {
-                    screenAsset.GameObject.transform.SetParent(originalScreenParent, true);
-                    originalScreenParent = null;
-                }
                 if (!isApplied && screenAsset != null) {
                     screenAsset.Transform.Position = tr.Position;
                     screenAsset.Transform.Rotation = tr.Rotation;
@@ -856,12 +850,6 @@ namespace FlameStream
         }
 
         public void DestroySurfaceScreen() {
-            if (originalScreenParent != null && screenAsset != null && screenAsset.GameObject != null) {
-                try {
-                    screenAsset.GameObject.transform.SetParent(originalScreenParent, true);
-                } catch {}
-                originalScreenParent = null;
-            }
             var screen = screenAsset ?? (SurfaceScreenAssetId != Guid.Empty ? Scene?.GetAssets<DrawingScreenAsset>().FirstOrDefault(s => s.Id == SurfaceScreenAssetId) : null);
             if (screen != null) {
                 CleanDestroy(screen);

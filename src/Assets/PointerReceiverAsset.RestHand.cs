@@ -1086,6 +1086,124 @@ namespace FlameStream {
             }
         }
 
+        public void MirrorActiveHandTransforms(bool wasRightHanded) {
+            if (NeutralHandPosition != null) {
+                Vector3 newPos = new Vector3(-NeutralHandPosition.Position.x, NeutralHandPosition.Position.y, NeutralHandPosition.Position.z);
+                NeutralHandPosition.Position = newPos;
+                NeutralHandPosition.SetDataInput(nameof(NeutralHandPosition.Position), newPos, true);
+                NeutralHandPosition.Broadcast();
+
+                if (NeutralHandPosition.setupAnchor != null) {
+                    NeutralHandPosition.setupAnchor.Transform.Position = newPos;
+                    NeutralHandPosition.setupAnchor.Transform.Broadcast();
+                    if (NeutralHandPosition.setupAnchor.GameObject != null) {
+                        NeutralHandPosition.setupAnchor.GameObject.transform.localPosition = newPos;
+                    }
+                }
+            }
+
+            if (HandDynamicRotation != null && HandDynamicRotation.SphereCenterOffset != Vector3.zero) {
+                Vector3 newOffset = new Vector3(-HandDynamicRotation.SphereCenterOffset.x, HandDynamicRotation.SphereCenterOffset.y, HandDynamicRotation.SphereCenterOffset.z);
+                HandDynamicRotation.SphereCenterOffset = newOffset;
+                HandDynamicRotation.SetDataInput(nameof(HandDynamicRotation.SphereCenterOffset), newOffset, true);
+                HandDynamicRotation.BroadcastDataInput(nameof(HandDynamicRotation.SphereCenterOffset));
+
+                if (HandDynamicRotation.setupAnchor != null) {
+                    var restPos = NeutralHandPosition != null ? NeutralHandPosition.Position : Vector3.zero;
+                    Vector3 newAnchorPos = restPos + newOffset;
+                    HandDynamicRotation.setupAnchor.Transform.Position = newAnchorPos;
+                    HandDynamicRotation.setupAnchor.Transform.Broadcast();
+                    if (HandDynamicRotation.setupAnchor.GameObject != null) {
+                        HandDynamicRotation.setupAnchor.GameObject.transform.localPosition = newAnchorPos;
+                    }
+                }
+            }
+
+            if (BodyDynamicRotation != null && BodyDynamicRotation.SphereCenterOffset != Vector3.zero) {
+                Vector3 newOffset = new Vector3(-BodyDynamicRotation.SphereCenterOffset.x, BodyDynamicRotation.SphereCenterOffset.y, BodyDynamicRotation.SphereCenterOffset.z);
+                BodyDynamicRotation.SphereCenterOffset = newOffset;
+                BodyDynamicRotation.SetDataInput(nameof(BodyDynamicRotation.SphereCenterOffset), newOffset, true);
+                BodyDynamicRotation.BroadcastDataInput(nameof(BodyDynamicRotation.SphereCenterOffset));
+
+                if (BodyDynamicRotation.setupAnchor != null) {
+                    var restPos = NeutralHandPosition != null ? NeutralHandPosition.Position : Vector3.zero;
+                    Vector3 newAnchorPos = restPos + newOffset;
+                    BodyDynamicRotation.setupAnchor.Transform.Position = newAnchorPos;
+                    BodyDynamicRotation.setupAnchor.Transform.Broadcast();
+                    if (BodyDynamicRotation.setupAnchor.GameObject != null) {
+                        BodyDynamicRotation.setupAnchor.GameObject.transform.localPosition = newAnchorPos;
+                    }
+                }
+            }
+
+            // Mirror Hand Movement Displacements
+            MirrorBasePoseState(HandMouseMode);
+            MirrorBasePoseState(HandPenMode);
+
+            // Mirror Prop Control Displacements
+            MirrorBaseState(PropMouseMode);
+            MirrorBaseState(PropPenMode);
+
+            // Mirror Body Movement Displacements
+            MirrorBasePoseState(BodyMouseMode);
+            MirrorBasePoseState(BodyPenMode);
+
+            cursorScreenPosition = new Vector3(-cursorScreenPosition.x, cursorScreenPosition.y, cursorScreenPosition.z);
+            if (cursorAnchorAsset != null) {
+                cursorAnchorAsset.Transform.Position = cursorScreenPosition;
+                cursorAnchorAsset.Transform.Broadcast();
+                if (cursorAnchorAsset.GameObject != null) {
+                    cursorAnchorAsset.GameObject.transform.localPosition = cursorScreenPosition;
+                }
+            }
+
+            if (debugSphereNeutralPosition != null && screenAsset != null) {
+                debugSphereNeutralPosition.transform.localPosition = new Vector3(
+                    (NeutralHandPosition != null ? NeutralHandPosition.Position.x : 0f) / screenAsset.Transform.Scale.x,
+                    (NeutralHandPosition != null ? NeutralHandPosition.Position.y : 0f) / screenAsset.Transform.Scale.y,
+                    (NeutralHandPosition != null ? NeutralHandPosition.Position.z : 0f) / screenAsset.Transform.Scale.z
+                );
+            }
+        }
+
+        void MirrorBasePoseState(BasePoseState state) {
+            if (state == null) return;
+            MirrorGameObjectStateTransform(state);
+            if (state.ActiveState != null) {
+                MirrorGameObjectStateTransform(state.ActiveState);
+            }
+        }
+
+        void MirrorBaseState(BaseState state) {
+            if (state == null) return;
+            MirrorGameObjectStateTransform(state);
+            if (state.ActiveState != null) {
+                MirrorGameObjectStateTransform(state.ActiveState);
+            }
+        }
+
+        void MirrorGameObjectStateTransform(GameObjectState state) {
+            if (state?.Transform == null) return;
+            Vector3 newPos = new Vector3(-state.Transform.Position.x, state.Transform.Position.y, state.Transform.Position.z);
+            Vector3 newRot = Helper.NormalizeRotationAngles(new Vector3(state.Transform.Rotation.x, -state.Transform.Rotation.y, -state.Transform.Rotation.z));
+
+            state.Transform.Position = newPos;
+            state.Transform.Rotation = newRot;
+            state.Transform.SetDataInput(nameof(state.Transform.Position), newPos, true);
+            state.Transform.SetDataInput(nameof(state.Transform.Rotation), newRot, true);
+            state.Transform.Broadcast();
+
+            if (state.Transform.setupAnchor != null) {
+                state.Transform.setupAnchor.Transform.Position = newPos;
+                state.Transform.setupAnchor.Transform.Rotation = newRot;
+                state.Transform.setupAnchor.Transform.Broadcast();
+                if (state.Transform.setupAnchor.GameObject != null) {
+                    state.Transform.setupAnchor.GameObject.transform.localPosition = newPos;
+                    state.Transform.setupAnchor.GameObject.transform.localRotation = Quaternion.Euler(newRot);
+                }
+            }
+        }
+
         void MirrorTransformAcrossCharacter(Vector3 localPos, Vector3 localRot, AnchorParentType parentType, bool wasRight, bool newRight, out Vector3 newLocalPos, out Vector3 newLocalRot) {
             if (Character != null) {
                 TransformAnchorLocalToWorld(parentType, localPos, localRot, out Vector3 worldPos, out Quaternion worldRot, wasRight);
