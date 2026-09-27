@@ -923,7 +923,7 @@ namespace FlameStream
         }
 
         DrawingScreenAsset GetSurfaceScreen(bool skipAutoCreate = false) {
-            var screen = GetAsset<DrawingScreenAsset>(ref SurfaceScreenAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"📦-{LAYER_NAME_PREFIX} Screen");
+            var screen = GetAsset<DrawingScreenAsset>(ref SurfaceScreenAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"📦-{LAYER_NAME_PREFIX} Screen", category: "FS_ASSET_CATEGORY_INPUT".Localized());
             if (screen != null) {
                 if (isNewlyCreated && ScreenSetup?.Transform != null) {
                     screen.Transform.Position = ScreenSetup.Transform.Position;
@@ -937,6 +937,10 @@ namespace FlameStream
 
         AnchorAsset GetCursorAnchor(bool skipAutoCreate = false) {
             return GetAsset<AnchorAsset>(ref CursorAnchorAssetId, skipAutoCreate, newAssetName: $"🔒⚓-{LAYER_NAME_PREFIX}🎯", category: "FS_ASSET_CATEGORY_INTERNAL".Localized());
+        }
+
+        public void AssignAssetToCategory(Asset asset, string category) {
+            Helper.AssignAssetToCategory(Scene, asset, category);
         }
 
         T GetAsset<T>(ref Guid assetId, out bool isNewlyCreated, bool skipAutoCreate = false, string newAssetName = null, string category = null) where T : Asset  {
@@ -956,9 +960,7 @@ namespace FlameStream
                 var id = assetId;
                 var fetchResult = Scene.GetAssets<T>().FirstOrDefault(p => p.Id == id);
                 if (fetchResult != null) {
-                    if (!string.IsNullOrEmpty(category)) {
-                        try { Scene.AddAssetToGroup(fetchResult, category); } catch {}
-                    }
+                    AssignAssetToCategory(fetchResult, category);
                     return fetchResult;
                 }
             }
@@ -968,9 +970,7 @@ namespace FlameStream
                 var existing = Scene.GetAssets<T>().FirstOrDefault(p => p.Name == newAssetName || (p.Name != null && p.Name.Contains(newAssetName)));
                 if (existing != null) {
                     assetId = existing.Id;
-                    if (!string.IsNullOrEmpty(category)) {
-                        try { Scene.AddAssetToGroup(existing, category); } catch {}
-                    }
+                    AssignAssetToCategory(existing, category);
                     return existing;
                 }
             }
@@ -980,6 +980,7 @@ namespace FlameStream
             var newAsset = Scene.AddAssetToGroup<T>(category);
             newAsset.Name = newAssetName ?? $"📦-{LAYER_NAME_PREFIX} {nameof(T)}";
             Scene.UpdateNewAssetName(newAsset);
+            AssignAssetToCategory(newAsset, category);
             newAsset.Broadcast();
             assetId = newAsset.Id;
 

@@ -72,7 +72,7 @@ namespace FlameStream
                 anchor.Name = anchor.Name.Replace("🔒⚓-", "⚓-");
                 Scene?.UpdateNewAssetName(anchor);
                 anchor.Broadcast();
-                try { Scene?.AddAssetToGroup(anchor, "FS_ASSET_CATEGORY_INPUT".Localized()); } catch {}
+                Helper.AssignAssetToCategory(Scene, anchor, "FS_ASSET_CATEGORY_INPUT".Localized());
             }
             if (isNewlyCreated && anchor != null) {
                 InitializeActiveHandPoleAnchor(anchor);

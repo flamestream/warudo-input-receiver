@@ -96,7 +96,7 @@ namespace FlameStream {
                 var id = assetId;
                 var fetchResult = Scene.GetAssets<T>().FirstOrDefault(p => p.Id == id);
                 if (fetchResult != null) {
-                    try { Scene.AddAssetToGroup(fetchResult, category); } catch {}
+                    Helper.AssignAssetToCategory(Scene, fetchResult, category);
                     return fetchResult;
                 }
             }
@@ -104,6 +104,7 @@ namespace FlameStream {
             var newAsset = Scene.AddAssetToGroup<T>(category);
             if (newAssetName != null) newAsset.Name = newAssetName;
             Scene.UpdateNewAssetName(newAsset);
+            Helper.AssignAssetToCategory(Scene, newAsset, category);
             newAsset.Broadcast();
             assetId = newAsset.Id;
             return newAsset;

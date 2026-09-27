@@ -162,5 +162,16 @@ namespace FlameStream {
 
             character.DataInputPortCollection.SetValueAtPath($"{nameof(character.OverlappingAnimations)}.{index}.Animation", animationClipUri, true);
         }
+
+        /// <summary>
+        /// Moves an asset to the specified first-level category/folder in Warudo's asset list hierarchy and broadcasts the update.
+        /// </summary>
+        public static void AssignAssetToCategory(Warudo.Core.Scenes.Scene scene, Warudo.Core.Scenes.Asset asset, string category) {
+            if (scene == null || asset == null || string.IsNullOrEmpty(category)) return;
+            try {
+                scene.AssetHierarchy?.AssignAtFirstLevel(asset.IdString, category);
+                Warudo.Core.Context.Service?.BroadcastAssetHierarchy();
+            } catch {}
+        }
     }
 }
