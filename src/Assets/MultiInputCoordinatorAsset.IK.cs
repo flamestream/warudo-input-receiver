@@ -202,7 +202,7 @@ namespace FlameStream {
             float now = Time.time;
 
             // Check Mouse Input
-            if (MouseReceiver != null && MouseReceiver.IsEnabled) {
+            if (MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled) {
                 if (!hasInitializedMouse) {
                     lastMouseX = MouseReceiver.X;
                     lastMouseY = MouseReceiver.Y;
@@ -227,7 +227,7 @@ namespace FlameStream {
             }
 
             // Check Pen Input
-            if (PenReceiver != null && PenReceiver.IsEnabled) {
+            if (PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled) {
                 if (!hasInitializedPen) {
                     lastPenX = PenReceiver.X;
                     lastPenY = PenReceiver.Y;
@@ -273,8 +273,8 @@ namespace FlameStream {
             bool keyPressRight = (now - lastKeyboardRightTime < 0.1f);
 
             // Check if active mouse or pen movement/clicks occurred recently (within 0.15s)
-            bool activeMouse = MouseReceiver != null && MouseReceiver.IsEnabled && (now - lastMouseActivityTime < 0.15f);
-            bool activePen = PenReceiver != null && PenReceiver.IsEnabled && (now - lastPenActivityTime < 0.15f);
+            bool activeMouse = MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled && (now - lastMouseActivityTime < 0.15f);
+            bool activePen = PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled && (now - lastPenActivityTime < 0.15f);
 
             bool mouseTimedOut = EnableInactivityReturn && MouseReturnTimeout > 0f && (now - lastMouseActivityTime >= MouseReturnTimeout);
             bool penTimedOut = EnableInactivityReturn && PenReturnTimeout > 0f && (now - lastPenActivityTime >= PenReturnTimeout);
@@ -291,8 +291,8 @@ namespace FlameStream {
                 // Key press moves only the hand of that key.
                 // Idle timer returns both hands to keyboard.
 
-                bool mouseClaimsLeft = MouseReceiver != null && MouseReceiver.IsEnabled && !isMouseRight;
-                bool penClaimsLeft = PenReceiver != null && PenReceiver.IsEnabled && !isPenRight;
+                bool mouseClaimsLeft = MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled && !isMouseRight;
+                bool penClaimsLeft = PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled && !isPenRight;
 
                 if (keyPressLeft) {
                     nextLeft = CoordinatorHandState.Keyboard;
@@ -306,8 +306,8 @@ namespace FlameStream {
                     nextLeft = CoordinatorHandState.Keyboard;
                 }
 
-                bool mouseClaimsRight = MouseReceiver != null && MouseReceiver.IsEnabled && isMouseRight;
-                bool penClaimsRight = PenReceiver != null && PenReceiver.IsEnabled && isPenRight;
+                bool mouseClaimsRight = MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled && isMouseRight;
+                bool penClaimsRight = PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled && isPenRight;
 
                 if (keyPressRight) {
                     nextRight = CoordinatorHandState.Keyboard;

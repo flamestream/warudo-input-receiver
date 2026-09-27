@@ -544,7 +544,7 @@ namespace FlameStream
 
         PoseState GetHandState(int source, bool button1) {
 
-            if (!IsHandEnabled) return null;
+            if (!IsEnabled || !IsHandEnabled) return null;
 
             var st = HandPenMode.Enabled && source == 2
                     ? (BasePoseState)HandPenMode
@@ -585,6 +585,9 @@ namespace FlameStream
                 if (!isEnabled) {
                     DestroyHandIK();
                     DestroyCursorAnchor();
+                    if (!IsEnabled && (ScreenSetup?.RemoveOnDisable ?? false)) {
+                        DestroySurfaceScreen();
+                    }
                 }
                 return;
             }
@@ -651,6 +654,9 @@ namespace FlameStream
                     limb.Broadcast();
                     DestroyHandIK();
                     DestroyCursorAnchor();
+                    if (!IsEnabled && (ScreenSetup?.RemoveOnDisable ?? false)) {
+                        DestroySurfaceScreen();
+                    }
                 } else {
                     tween = DOTween.To(
                         () => limb.PositionWeight,
@@ -669,6 +675,9 @@ namespace FlameStream
                         }
                         DestroyHandIK();
                         DestroyCursorAnchor();
+                        if (!IsEnabled && (ScreenSetup?.RemoveOnDisable ?? false)) {
+                            DestroySurfaceScreen();
+                        }
                     });
                 }
             }

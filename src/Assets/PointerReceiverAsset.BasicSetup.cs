@@ -604,7 +604,7 @@ namespace FlameStream
 
             OnSurfaceSettingChange();
 
-            isBasicSetupComplete = IsHandEnabled && Character != null && monitor != null;
+            isBasicSetupComplete = IsEnabled && IsHandEnabled && Character != null && monitor != null;
             SetDataInputPropertyAndBroadcast(nameof(HandMouseMode), hidden: !isBasicSetupComplete);
             SetDataInputPropertyAndBroadcast(nameof(HandPenMode), hidden: !isBasicSetupComplete);
             SetDataInputPropertyAndBroadcast(nameof(HandDynamicRotation), hidden: !isBasicSetupComplete);
@@ -626,13 +626,18 @@ namespace FlameStream
 
             bool isRemoveWanted = !IsEnabled && (ScreenSetup?.RemoveOnDisable ?? false);
             if (isRemoveWanted) {
-                DestroySurfaceScreen();
-                DestroyCursorAnchor();
-                return;
+                var dominantLimb = Character != null ? (IsRightHanded ? Character.RightHandIK : Character.LeftHandIK) : null;
+                bool isLimbActive = dominantLimb != null && (dominantLimb.PositionWeight > 0.001f || dominantLimb.Enabled);
+                bool isTweening = (tweenRightIK != null && tweenRightIK.IsActive()) || (tweenLeftIK != null && tweenLeftIK.IsActive());
+                if (!isLimbActive && !isTweening) {
+                    DestroySurfaceScreen();
+                    DestroyCursorAnchor();
+                    return;
+                }
             }
 
             // Screen check
-            screenAsset = GetSurfaceScreen();
+            screenAsset = GetSurfaceScreen(skipAutoCreate: isRemoveWanted);
             if (screenAsset == null) return;
 
             // Ensure screen stays enabled even if pointer asset is disabled
