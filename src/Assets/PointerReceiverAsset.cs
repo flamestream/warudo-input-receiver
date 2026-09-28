@@ -50,13 +50,7 @@ namespace FlameStream {
             }
         }
 
-        [DataInput]
-        [Label("DATA_SOURCE_RECEIVER")]
-        [Description("DATA_SOURCE_RECEIVER_DESC")]
-        public PointerReceiverAsset DataSourceReceiver;
-
-        [Markdown]
-        public string SourceStatus = "";
+        public string LayerPrefix { get; set; } = LAYER_NAME_PREFIX;
 
         /// <summary>
         /// BASIC SETUP
@@ -81,6 +75,7 @@ namespace FlameStream {
             if (activeCoordinator == coordinator) return;
             activeCoordinator = coordinator;
             OnHandDelegationChanged();
+            OnCoordinatorStateChanged();
             RequestUiRefresh();
         }
 
@@ -88,19 +83,51 @@ namespace FlameStream {
             if (activeCoordinator != coordinator) return;
             activeCoordinator = null;
             OnHandDelegationChanged();
+            OnCoordinatorStateChanged();
             RequestUiRefresh();
         }
 
-        public string GetSourceStatusMessage() {
-            if (!IsEnabled) return "";
-            if (DataSourceReceiver != null && DataSourceReceiver != this) {
-                if (isDataSourceFallbackActive) {
-                    return string.Format("DATA_SOURCE_FALLBACK_ACTIVE".Localized(), DataSourceReceiver.Name, Port);
-                } else {
-                    return string.Format("DATA_SOURCE_SHARING_ACTIVE".Localized(), DataSourceReceiver.Name);
+        protected override bool ShouldStartReceiver() {
+            if (activeCoordinator != null && activeCoordinator.IsEnabled) {
+                return false;
+            }
+            return true;
+        }
+
+        public void OnCoordinatorStateChanged() {
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled;
+            SetDataInputPropertyAndBroadcast(
+                nameof(IsEnabled),
+                disabled: isPuppeteered,
+                description: isPuppeteered
+                    ? string.Format("IK_DELEGATED_TO".Localized(), "ENABLE".Localized(), activeCoordinator.Name)
+                    : "POINTER_ENABLE_DESC".Localized()
+            );
+
+            if (isPuppeteered) {
+                if (IsSocketListening) {
+                    StopReceiver();
+                    StartReceiver();
+                }
+            } else if (IsEnabled && !IsSocketListening) {
+                StopReceiver();
+                StartReceiver();
+            }
+
+            if (isPuppeteered && activeCoordinator.EnableHands) {
+                OnSurfaceSettingChange();
+                OnPropEnabledChanged();
+                OnBodyEnabledChanged();
+                SynchronizeHandAnimationLayers();
+            } else {
+                CleanupCharacterAnimationLayers();
+                if (ScreenSetup?.RemoveOnDisable ?? false) {
+                    DestroySurfaceScreen();
+                    DestroyCursorAnchor();
                 }
             }
-            return "";
+            OnBasicSettingChange();
+            RequestUiRefresh();
         }
 
         public string GetDelegationStatusMessage() {
@@ -125,9 +152,9 @@ namespace FlameStream {
 
                 var allReceivers = Scene?.GetAssets<PointerReceiverAsset>();
                 if (allReceivers != null) {
-                    bool conflict = allReceivers.Any(p => p != this && p.Character == Character && p.IsEnabled && p.IsHandEnabled && p.IsRightHanded == IsRightHanded && p.ActiveCoordinator == null);
-                    if (conflict) {
-                        return string.Format("IK_CONFLICT_DETECTED".Localized(), Character.Name);
+                    bool multipleActivePointers = allReceivers.Any(p => p != this && p.Character == Character && p.IsEnabled && p.IsHandEnabled && p.ActiveCoordinator == null);
+                    if (multipleActivePointers) {
+                        return "⚠️ " + "IK_CONFLICT_MULTIPLE_POINTERS".Localized();
                     }
                 }
                 var allKeyboards = Scene?.GetAssets<KeyboardReceiverAsset>();
@@ -149,12 +176,6 @@ namespace FlameStream {
         }
 
         public void UpdateUiStatus() {
-            var newSource = GetSourceStatusMessage();
-            if (SourceStatus != newSource) {
-                SourceStatus = newSource;
-                BroadcastDataInput(nameof(SourceStatus));
-            }
-
             var newDelegation = GetDelegationStatusMessage();
             if (DelegationStatus != newDelegation) {
                 DelegationStatus = newDelegation;

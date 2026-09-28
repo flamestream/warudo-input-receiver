@@ -27,7 +27,7 @@ namespace FlameStream
         [DisabledIf(nameof(IsHandTrackingDisabled))]
         public bool IsHandEnabled;
 
-        public bool IsHandTrackingDisabled() => IsCharacterMissing() || IsBasicSetupNotDone();
+        public bool IsHandTrackingDisabled() => (activeCoordinator != null && activeCoordinator.IsEnabled) || IsCharacterMissing() || IsBasicSetupNotDone();
 
         [DataInput(12)]
         [Label("ACTIVE_TRANSITION")]
@@ -623,12 +623,22 @@ namespace FlameStream
 
         public void RefreshSetupPorts() {
             try {
+                var isEnabledPort = GetDataInputPort(nameof(IsEnabled));
+                if (isEnabledPort?.Properties != null) {
+                    bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled;
+                    isEnabledPort.Properties.disabled = isPuppeteered;
+                    isEnabledPort.Properties.description = isPuppeteered
+                        ? string.Format("IK_DELEGATED_TO".Localized(), "ENABLE".Localized(), activeCoordinator.Name)
+                        : "KEYBOARD_ENABLE_DESC".Localized();
+                    BroadcastDataInputProperties(nameof(IsEnabled));
+                }
                 var handPort = GetDataInputPort(nameof(IsHandEnabled));
                 if (handPort?.Properties != null) {
-                    handPort.Properties.disabled = IsHandTrackingDisabled();
-                    handPort.Properties.description = IsBasicSetupNotDone()
-                        ? "BASIC_SETUP_REQUIRED_DESC".Localized()
-                        : "KEYBOARD_ENABLE_DESC".Localized();
+                    bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled;
+                    handPort.Properties.disabled = isPuppeteered || IsHandTrackingDisabled();
+                    handPort.Properties.description = isPuppeteered
+                        ? string.Format("IK_DELEGATED_TO".Localized(), "ENABLE".Localized(), activeCoordinator.Name)
+                        : (IsBasicSetupNotDone() ? "BASIC_SETUP_REQUIRED_DESC".Localized() : "KEYBOARD_ENABLE_DESC".Localized());
                     BroadcastDataInputProperties(nameof(IsHandEnabled));
                 }
                 var autoSetupPort = GetDataInputPort(nameof(AutoSetup));
@@ -651,9 +661,15 @@ namespace FlameStream
             try {
                 var handPort = GetDataInputPort(nameof(IsHandEnabled));
                 if (handPort?.Properties != null) {
-                    handPort.Properties.description = IsBasicSetupNotDone()
-                        ? "BASIC_SETUP_REQUIRED_DESC".Localized()
-                        : "KEYBOARD_ENABLE_DESC".Localized();
+                    bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled;
+                    if (isPuppeteered) {
+                        handPort.Properties.disabled = true;
+                        handPort.Properties.description = string.Format("IK_DELEGATED_TO".Localized(), "ENABLE".Localized(), activeCoordinator.Name);
+                    } else {
+                        handPort.Properties.description = IsBasicSetupNotDone()
+                            ? "BASIC_SETUP_REQUIRED_DESC".Localized()
+                            : "KEYBOARD_ENABLE_DESC".Localized();
+                    }
                     BroadcastDataInputProperties(nameof(IsHandEnabled));
                 }
 
@@ -818,7 +834,23 @@ namespace FlameStream
             });
         }
 
+        public void SetBaseHandPoseWeight(float weight) {
+            if (Character == null || Character.OverlappingAnimations == null) return;
+            var baseLayerId = $"{CHARACTER_ANIM_LAYER_ID_PREFIX} Base Hand Pose";
+            var baseLayerData = Array.Find(Character.OverlappingAnimations, a => a.CustomLayerID == baseLayerId);
+            if (baseLayerData != null) {
+                if (Mathf.Abs(baseLayerData.Weight - weight) > 0.001f) {
+                    baseLayerData.SetDataInput(nameof(baseLayerData.Weight), weight, false);
+                }
+                int animancerIdx = GetAnimancerLayerIndex(baseLayerData);
+                if (animancerIdx >= 0) {
+                    SetAnimancerLayerWeight(animancerIdx, weight);
+                }
+            }
+        }
+
         void ApplyHandIkWeight(float weight) {
+            SetBaseHandPoseWeight(weight);
             if (activeCoordinator != null) return;
             if (Character == null) return;
 
@@ -839,19 +871,6 @@ namespace FlameStream
                 rightIk.RotationWeight = weight;
                 rightIk.BendGoalWeight = weight;
                 rightIk.Broadcast();
-            }
-
-            // Drive base hand pose animation layer weight in sync with IK weight
-            if (Character.OverlappingAnimations != null) {
-                var baseLayerId = $"{CHARACTER_ANIM_LAYER_ID_PREFIX} Base Hand Pose";
-                var baseLayerData = Array.Find(Character.OverlappingAnimations, a => a.CustomLayerID == baseLayerId);
-                if (baseLayerData != null) {
-                    baseLayerData.Weight = weight;
-                    int animancerIdx = GetAnimancerLayerIndex(baseLayerData);
-                    if (animancerIdx >= 0) {
-                        SetAnimancerLayerWeight(animancerIdx, weight);
-                    }
-                }
             }
         }
 
@@ -1192,13 +1211,16 @@ namespace FlameStream
                 var baseLayer = pluginLayers.FirstOrDefault(d => d.CustomLayerID == baseLayerId);
                 var baseMask = new[] { AnimationMaskedBodyPart.LeftFingers, AnimationMaskedBodyPart.RightFingers };
                 float targetBaseWeight = (IsEnabled && IsHandEnabled) ? (handIkTween != null && handIkTween.IsActive() ? currentHandIkWeight : 1f) : 0f;
+                if (activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands) {
+                    targetBaseWeight = 1f;
+                }
 
                 if (baseLayer == null) {
                     baseLayer = StructuredData.Create<OverlappingAnimationData>();
                     baseLayer.CustomLayerID = baseLayerId;
                     baseLayer.Enabled = true;
                     baseLayer.Animation = baseAnimClip;
-                    baseLayer.Weight = targetBaseWeight;
+                    baseLayer.SetDataInput(nameof(baseLayer.Weight), targetBaseWeight, false);
                     baseLayer.Speed = 1f;
                     baseLayer.Additive = false; // Non-additive: sets stable baseline
                     baseLayer.Looping = false;
@@ -1207,6 +1229,7 @@ namespace FlameStream
                 } else {
                     baseLayer.Enabled = true;
                     baseLayer.Animation = baseAnimClip;
+                    baseLayer.SetDataInput(nameof(baseLayer.Weight), targetBaseWeight, false);
                     baseLayer.Additive = false;
                     baseLayer.Looping = false;
                     baseLayer.Speed = 1f;

@@ -125,8 +125,18 @@ namespace FlameStream {
             }
         }
 
+        protected virtual bool ShouldStartReceiver() {
+            return true;
+        }
+
         protected bool StartReceiver() {
             try {
+                if (!ShouldStartReceiver()) {
+                    SetActive(true);
+                    SetMessage("MSG_WAITING");
+                    return true;
+                }
+
                 Log($"Starting receiver on port {Port}");
 
                 // Enable SO_REUSEADDR so port can be rebound immediately across scene changes
@@ -254,7 +264,7 @@ namespace FlameStream {
             return null; // Valid new format
         }
 
-        protected void SetDataInputPropertyAndBroadcast(
+        public void SetDataInputPropertyAndBroadcast(
             string portName,
             bool? hidden = null,
             bool? alwaysHidden = null,
@@ -262,16 +272,19 @@ namespace FlameStream {
             bool? alwaysDisabled = null,
             string description = null
         ) {
+            var port = GetDataInputPort(portName);
+            if (port?.Properties == null) return;
+
             if (hidden != null)
-                GetDataInputPort(portName).Properties.hidden = hidden.Value;
+                port.Properties.hidden = hidden.Value;
             if (alwaysHidden != null)
-                GetDataInputPort(portName).Properties.alwaysHidden = alwaysHidden.Value;
+                port.Properties.alwaysHidden = alwaysHidden.Value;
             if (disabled != null)
-                GetDataInputPort(portName).Properties.disabled = disabled.Value;
+                port.Properties.disabled = disabled.Value;
             if (alwaysDisabled != null)
-                GetDataInputPort(portName).Properties.alwaysDisabled = alwaysDisabled.Value;
+                port.Properties.alwaysDisabled = alwaysDisabled.Value;
             if (description != null)
-                GetDataInputPort(portName).Properties.description = description;
+                port.Properties.description = description;
 
             BroadcastDataInputProperties(portName);
         }

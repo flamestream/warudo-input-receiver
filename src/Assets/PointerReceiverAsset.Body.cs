@@ -82,7 +82,8 @@ namespace FlameStream
         }
 
         void OnUpdateBody() {
-            if (!IsEnabled || !IsHandEnabled || !IsBodyEnabled) return;
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            if (((!isPuppeteered && (!IsEnabled || !IsHandEnabled)) || !IsBodyEnabled)) return;
             if (Character == null) return;
             if (cursorAnchorAsset == null) return;
 
@@ -383,10 +384,11 @@ namespace FlameStream
             a.Animation = p.Animation;
         }
         void HandleBodyAnimationChange(PoseState p) {
-            var userLayers = Character.OverlappingAnimations.Where(d => !d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
-            var pointerLayers = Character.OverlappingAnimations.Where(d => d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
+            if (Character == null || Character.OverlappingAnimations == null) return;
+            var userLayers = Character.OverlappingAnimations.Where(d => !d.CustomLayerID.StartsWith(LayerPrefix)).ToList() ?? new List<OverlappingAnimationData>();
+            var pointerLayers = Character.OverlappingAnimations.Where(d => d.CustomLayerID.StartsWith(LayerPrefix)).ToList() ?? new List<OverlappingAnimationData>();
 
-            var layerId = p.GetAnimationLayerId(LAYER_NAME_PREFIX);
+            var layerId = p.GetAnimationLayerId(LayerPrefix);
             var layer = pointerLayers.FirstOrDefault(d => d.CustomLayerID == layerId);
             if (layer == null) {
                 layer = StructuredData.Create<OverlappingAnimationData>();
@@ -413,9 +415,9 @@ namespace FlameStream
         }
 
         void HandleBodyAnimationWeightChange(PoseState p, float weight, bool resetAnimation = false) {
-            if (Character == null) return;
+            if (Character == null || Character.OverlappingAnimations == null) return;
 
-            var layerId = p.GetAnimationLayerId(LAYER_NAME_PREFIX);
+            var layerId = p.GetAnimationLayerId(LayerPrefix);
             if (layerId == null) return;
 
             var animationData = Array.Find(

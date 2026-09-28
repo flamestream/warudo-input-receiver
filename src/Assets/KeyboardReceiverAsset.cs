@@ -53,6 +53,7 @@ namespace FlameStream
             if (activeCoordinator == coordinator) return;
             activeCoordinator = coordinator;
             OnHandDelegationChanged();
+            OnCoordinatorStateChanged();
             RequestUiRefresh();
         }
 
@@ -60,6 +61,23 @@ namespace FlameStream
             if (activeCoordinator != coordinator) return;
             activeCoordinator = null;
             OnHandDelegationChanged();
+            OnCoordinatorStateChanged();
+            RequestUiRefresh();
+        }
+
+        public void OnCoordinatorStateChanged() {
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled;
+            SetDataInputPropertyAndBroadcast(
+                nameof(IsEnabled),
+                disabled: isPuppeteered,
+                description: isPuppeteered
+                    ? string.Format("IK_DELEGATED_TO".Localized(), "ENABLE".Localized(), activeCoordinator.Name)
+                    : "KEYBOARD_ENABLE_DESC".Localized()
+            );
+
+            UpdateFloatingKeysState();
+            OnHandDelegationChanged();
+            RefreshSetupPorts();
             RequestUiRefresh();
         }
 

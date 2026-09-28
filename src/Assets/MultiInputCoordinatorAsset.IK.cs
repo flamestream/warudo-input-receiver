@@ -4,6 +4,8 @@ using DG.Tweening;
 using UnityEngine;
 using Warudo.Core.Attributes;
 using Warudo.Core.Localization;
+using Warudo.Plugins.Core.Assets;
+using Warudo.Plugins.Core.Assets.Character;
 using Warudo.Plugins.Core.Assets.Utility;
 
 namespace FlameStream {
@@ -30,6 +32,7 @@ namespace FlameStream {
         float lastPenActivityTime = -1f;
         float lastKeyboardLeftTime = -1f;
         float lastKeyboardRightTime = -1f;
+        float lastKeyboardActivityTime = -1f;
 
         int lastMouseX;
         int lastMouseY;
@@ -44,47 +47,92 @@ namespace FlameStream {
         public bool hasInitializedMouse;
         public bool hasInitializedPen;
 
-        Tween leftPosTween;
-        Tween leftRotTween;
+        CharacterAsset lastBoundCharacter;
+
+        Tween leftProgressTween;
         Tween leftWeightTween;
         bool isLeftTransitioning;
-        float currentLeftWeight = 1f;
+        float leftTransitionProgress = 1f;
+        Vector3 leftTransitionStartPos;
+        Vector3 leftTransitionStartRot;
+        float currentLeftWeight = 0f;
 
-        Tween rightPosTween;
-        Tween rightRotTween;
+        Tween rightProgressTween;
         Tween rightWeightTween;
         bool isRightTransitioning;
-        float currentRightWeight = 1f;
-
-        Vector3 tweenLeftPos;
-        Vector3 tweenLeftRot;
-        Vector3 tweenRightPos;
-        Vector3 tweenRightRot;
+        float rightTransitionProgress = 1f;
+        Vector3 rightTransitionStartPos;
+        Vector3 rightTransitionStartRot;
+        float currentRightWeight = 0f;
 
         void OnCreateIK() {
-            proxyLeftAnchor = GetProxyLeftAnchor();
-            proxyRightAnchor = GetProxyRightAnchor();
+            float now = Time.time;
+            lastMouseActivityTime = now;
+            lastPenActivityTime = now;
+            lastKeyboardActivityTime = now;
+            lastKeyboardLeftTime = now;
+            lastKeyboardRightTime = now;
+
+            if (IsEnabled && EnableHands) {
+                proxyLeftAnchor = GetProxyLeftAnchor();
+                proxyRightAnchor = GetProxyRightAnchor();
+            }
         }
 
         void OnDestroyIK() {
-            KillAllTweens();
+            ReleaseCharacterIK(instant: true);
         }
 
         void KillAllTweens() {
-            leftPosTween?.Kill();
-            leftRotTween?.Kill();
+            leftProgressTween?.Kill();
             leftWeightTween?.Kill();
-            rightPosTween?.Kill();
-            rightRotTween?.Kill();
+            rightProgressTween?.Kill();
             rightWeightTween?.Kill();
         }
 
+        void CleanDestroy(GameObjectAsset g) {
+            if (g == null) return;
+            try {
+                Scene.RemoveAsset(g.Id);
+            } catch {}
+        }
+
+        public void DestroyProxyAnchors() {
+            var left = proxyLeftAnchor ?? (ProxyLeftHandAnchorAssetId != Guid.Empty ? Scene?.GetAssets<AnchorAsset>().FirstOrDefault(a => a.Id == ProxyLeftHandAnchorAssetId) : null);
+            if (left != null) {
+                CleanDestroy(left);
+            }
+            proxyLeftAnchor = null;
+            ProxyLeftHandAnchorAssetId = Guid.Empty;
+            SetDataInput(nameof(ProxyLeftHandAnchorAssetId), Guid.Empty, true);
+
+            var right = proxyRightAnchor ?? (ProxyRightHandAnchorAssetId != Guid.Empty ? Scene?.GetAssets<AnchorAsset>().FirstOrDefault(a => a.Id == ProxyRightHandAnchorAssetId) : null);
+            if (right != null) {
+                CleanDestroy(right);
+            }
+            proxyRightAnchor = null;
+            ProxyRightHandAnchorAssetId = Guid.Empty;
+            SetDataInput(nameof(ProxyRightHandAnchorAssetId), Guid.Empty, true);
+        }
+
         public AnchorAsset GetProxyLeftAnchor(bool skipAutoCreate = false) {
-            return GetAsset<AnchorAsset>(ref ProxyLeftHandAnchorAssetId, skipAutoCreate, newAssetName: "🔒⚓-🔥🎯 Left Proxy Hand IK");
+            if (proxyLeftAnchor != null && proxyLeftAnchor.GameObject != null) return proxyLeftAnchor;
+            proxyLeftAnchor = GetAsset<AnchorAsset>(ref ProxyLeftHandAnchorAssetId, skipAutoCreate, newAssetName: "🔒⚓-🔥🎯 Left Proxy Hand IK");
+            if (proxyLeftAnchor != null && ProxyLeftHandAnchorAssetId != proxyLeftAnchor.Id) {
+                ProxyLeftHandAnchorAssetId = proxyLeftAnchor.Id;
+                SetDataInput(nameof(ProxyLeftHandAnchorAssetId), proxyLeftAnchor.Id, true);
+            }
+            return proxyLeftAnchor;
         }
 
         public AnchorAsset GetProxyRightAnchor(bool skipAutoCreate = false) {
-            return GetAsset<AnchorAsset>(ref ProxyRightHandAnchorAssetId, skipAutoCreate, newAssetName: "🔒⚓-🔥🎯 Right Proxy Hand IK");
+            if (proxyRightAnchor != null && proxyRightAnchor.GameObject != null) return proxyRightAnchor;
+            proxyRightAnchor = GetAsset<AnchorAsset>(ref ProxyRightHandAnchorAssetId, skipAutoCreate, newAssetName: "🔒⚓-🔥🎯 Right Proxy Hand IK");
+            if (proxyRightAnchor != null && ProxyRightHandAnchorAssetId != proxyRightAnchor.Id) {
+                ProxyRightHandAnchorAssetId = proxyRightAnchor.Id;
+                SetDataInput(nameof(ProxyRightHandAnchorAssetId), proxyRightAnchor.Id, true);
+            }
+            return proxyRightAnchor;
         }
 
         T GetAsset<T>(ref Guid assetId, bool skipAutoCreate = false, string newAssetName = null) where T : Warudo.Core.Scenes.Asset {
@@ -96,7 +144,6 @@ namespace FlameStream {
                 var id = assetId;
                 var fetchResult = Scene.GetAssets<T>().FirstOrDefault(p => p.Id == id);
                 if (fetchResult != null) {
-                    Helper.AssignAssetToCategory(Scene, fetchResult, category);
                     return fetchResult;
                 }
             }
@@ -116,71 +163,331 @@ namespace FlameStream {
             if (KeyboardReceiver != null && KeyboardReceiver.ActiveCoordinator != this) {
                 KeyboardReceiver.RegisterCoordinator(this);
             }
-            if (MouseReceiver != null && MouseReceiver.ActiveCoordinator != this) {
-                MouseReceiver.RegisterCoordinator(this);
+            if (MouseReceiver != null) {
+                MouseReceiver.LayerPrefix = "🔥🖱️";
+                if (MouseReceiver.ActiveCoordinator != this) MouseReceiver.RegisterCoordinator(this);
             }
-            if (PenReceiver != null && PenReceiver.ActiveCoordinator != this) {
-                PenReceiver.RegisterCoordinator(this);
+            if (PenReceiver != null) {
+                PenReceiver.LayerPrefix = "🔥🖊️";
+                if (PenReceiver.ActiveCoordinator != this) PenReceiver.RegisterCoordinator(this);
             }
         }
 
         void RegisterAllReceivers() {
             KeyboardReceiver?.RegisterCoordinator(this);
-            MouseReceiver?.RegisterCoordinator(this);
-            PenReceiver?.RegisterCoordinator(this);
+            if (MouseReceiver != null) {
+                MouseReceiver.LayerPrefix = "🔥🖱️";
+                MouseReceiver.RegisterCoordinator(this);
+            }
+            if (PenReceiver != null) {
+                PenReceiver.LayerPrefix = "🔥🖊️";
+                PenReceiver.RegisterCoordinator(this);
+            }
         }
 
         void UnregisterAllReceivers() {
-            KeyboardReceiver?.UnregisterCoordinator(this);
-            MouseReceiver?.UnregisterCoordinator(this);
-            PenReceiver?.UnregisterCoordinator(this);
+            if (KeyboardReceiver != null) {
+                var kr = KeyboardReceiver;
+                kr.UnregisterCoordinator(this);
+                kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsEnabled), disabled: false, description: "KEYBOARD_ENABLE_DESC".Localized());
+                kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsHandEnabled), disabled: false, description: "KEYBOARD_ENABLE_DESC".Localized());
+            }
+            if (MouseReceiver != null) {
+                var mr = MouseReceiver;
+                mr.LayerPrefix = "🔥👆";
+                mr.UnregisterCoordinator(this);
+                mr.SetDataInputPropertyAndBroadcast(nameof(mr.IsEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
+                mr.SetDataInputPropertyAndBroadcast(nameof(mr.IsHandEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
+            }
+            if (PenReceiver != null) {
+                var pr = PenReceiver;
+                pr.LayerPrefix = "🔥👆";
+                pr.UnregisterCoordinator(this);
+                pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
+                pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsHandEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
+            }
         }
 
         void BindCharacterIK() {
             if (Character == null) return;
 
+            leftWeightTween?.Kill();
+            rightWeightTween?.Kill();
+
+            if (lastBoundCharacter != null && lastBoundCharacter != Character) {
+                if (lastBoundCharacter.LeftHandIK != null && lastBoundCharacter.LeftHandIK.IkTarget == proxyLeftAnchor) {
+                    lastBoundCharacter.LeftHandIK.PositionWeight = 0f;
+                    lastBoundCharacter.LeftHandIK.RotationWeight = 0f;
+                    lastBoundCharacter.LeftHandIK.Enabled = false;
+                    lastBoundCharacter.LeftHandIK.IkTarget = null;
+                    lastBoundCharacter.LeftHandIK.Broadcast();
+                }
+                if (lastBoundCharacter.RightHandIK != null && lastBoundCharacter.RightHandIK.IkTarget == proxyRightAnchor) {
+                    lastBoundCharacter.RightHandIK.PositionWeight = 0f;
+                    lastBoundCharacter.RightHandIK.RotationWeight = 0f;
+                    lastBoundCharacter.RightHandIK.Enabled = false;
+                    lastBoundCharacter.RightHandIK.IkTarget = null;
+                    lastBoundCharacter.RightHandIK.Broadcast();
+                }
+            }
+            lastBoundCharacter = Character;
+
+            float now = Time.time;
+            lastMouseActivityTime = now;
+            lastPenActivityTime = now;
+            lastKeyboardActivityTime = now;
+            lastKeyboardLeftTime = now;
+            lastKeyboardRightTime = now;
+
             proxyLeftAnchor = GetProxyLeftAnchor();
             proxyRightAnchor = GetProxyRightAnchor();
 
+            // 1. Detect device inputs and determine initial starting states
+            DetectDeviceInputs();
+
+            CoordinatorHandState initialLeft = GetInactivityReturnState(true);
+            CoordinatorHandState initialRight = GetInactivityReturnState(false);
+
+            bool isMouseRight = MouseReceiver != null && MouseReceiver.IsRightHanded;
+            bool isPenRight = PenReceiver != null && PenReceiver.IsRightHanded;
+            bool activeMouse = MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled && (now - lastMouseActivityTime < 0.15f);
+            bool activePen = PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled && (now - lastPenActivityTime < 0.15f);
+            bool keyPressLeft = (now - lastKeyboardLeftTime < 0.1f);
+            bool keyPressRight = (now - lastKeyboardRightTime < 0.1f);
+
+            if (keyPressLeft) initialLeft = CoordinatorHandState.Keyboard;
+            else if (activeMouse && !isMouseRight) initialLeft = CoordinatorHandState.Mouse;
+            else if (activePen && !isPenRight) initialLeft = CoordinatorHandState.Pen;
+
+            if (keyPressRight) initialRight = CoordinatorHandState.Keyboard;
+            else if (activeMouse && isMouseRight) initialRight = CoordinatorHandState.Mouse;
+            else if (activePen && isPenRight) initialRight = CoordinatorHandState.Pen;
+
+            currentLeftState = initialLeft;
+            targetLeftState = initialLeft;
+            currentRightState = initialRight;
+            targetRightState = initialRight;
+
+            // 2. Pre-position proxy anchors immediately before attaching IK
+            if (proxyLeftAnchor != null) {
+                GetTargetWorldPose(true, initialLeft, out Vector3 leftPos, out Vector3 leftRot, out _);
+                ApplyProxyWorldPose(proxyLeftAnchor, leftPos, leftRot);
+                leftTransitionStartPos = leftPos;
+                leftTransitionStartRot = leftRot;
+                leftTransitionProgress = 1f;
+            }
+            if (proxyRightAnchor != null) {
+                GetTargetWorldPose(false, initialRight, out Vector3 rightPos, out Vector3 rightRot, out _);
+                ApplyProxyWorldPose(proxyRightAnchor, rightPos, rightRot);
+                rightTransitionStartPos = rightPos;
+                rightTransitionStartRot = rightRot;
+                rightTransitionProgress = 1f;
+            }
+
+            // 3. Connect IK targets
             if (Character.LeftHandIK != null && proxyLeftAnchor != null) {
-                Character.LeftHandIK.Enabled = true;
-                Character.LeftHandIK.IkTarget = proxyLeftAnchor;
-                Character.LeftHandIK.PositionWeight = currentLeftWeight;
-                Character.LeftHandIK.RotationWeight = currentLeftWeight;
-                Character.LeftHandIK.Broadcast();
+                if (Character.LeftHandIK.IkTarget != proxyLeftAnchor || !Character.LeftHandIK.Enabled) {
+                    Character.LeftHandIK.PositionWeight = currentLeftWeight;
+                    Character.LeftHandIK.RotationWeight = currentLeftWeight;
+                    Character.LeftHandIK.Enabled = true;
+                    Character.LeftHandIK.IkTarget = proxyLeftAnchor;
+                    Character.LeftHandIK.Broadcast();
+                }
             }
 
             if (Character.RightHandIK != null && proxyRightAnchor != null) {
-                Character.RightHandIK.Enabled = true;
-                Character.RightHandIK.IkTarget = proxyRightAnchor;
-                Character.RightHandIK.PositionWeight = currentRightWeight;
-                Character.RightHandIK.RotationWeight = currentRightWeight;
-                Character.RightHandIK.Broadcast();
+                if (Character.RightHandIK.IkTarget != proxyRightAnchor || !Character.RightHandIK.Enabled) {
+                    Character.RightHandIK.PositionWeight = currentRightWeight;
+                    Character.RightHandIK.RotationWeight = currentRightWeight;
+                    Character.RightHandIK.Enabled = true;
+                    Character.RightHandIK.IkTarget = proxyRightAnchor;
+                    Character.RightHandIK.Broadcast();
+                }
+            }
+
+            // 4. Smooth fade-in weights using ActiveTransition
+            float duration = ActiveTransition != null ? ActiveTransition.Time : 0.5f;
+            Ease ease = ActiveTransition != null ? ActiveTransition.Ease : Ease.Linear;
+            float delay = ActiveTransition != null ? ActiveTransition.Delay : 0f;
+
+            float leftRemaining = 1.0f - Mathf.Clamp01(currentLeftWeight);
+            float actualLeftDuration = duration * leftRemaining;
+            if (actualLeftDuration <= 0.001f) {
+                currentLeftWeight = 1.0f;
+                if (Character.LeftHandIK != null) {
+                    Character.LeftHandIK.PositionWeight = 1.0f;
+                    Character.LeftHandIK.RotationWeight = 1.0f;
+                    Character.LeftHandIK.Broadcast();
+                }
+            } else {
+                leftWeightTween = DOTween.To(
+                    () => currentLeftWeight,
+                    v => {
+                        currentLeftWeight = v;
+                        if (Character?.LeftHandIK != null && Character.LeftHandIK.Enabled) {
+                            Character.LeftHandIK.PositionWeight = v;
+                            Character.LeftHandIK.RotationWeight = v;
+                            Character.LeftHandIK.Broadcast();
+                        }
+                    },
+                    1.0f,
+                    actualLeftDuration
+                ).SetEase(ease);
+                if (delay > 0f) leftWeightTween.SetDelay(delay);
+            }
+
+            float rightRemaining = 1.0f - Mathf.Clamp01(currentRightWeight);
+            float actualRightDuration = duration * rightRemaining;
+            if (actualRightDuration <= 0.001f) {
+                currentRightWeight = 1.0f;
+                if (Character.RightHandIK != null) {
+                    Character.RightHandIK.PositionWeight = 1.0f;
+                    Character.RightHandIK.RotationWeight = 1.0f;
+                    Character.RightHandIK.Broadcast();
+                }
+            } else {
+                rightWeightTween = DOTween.To(
+                    () => currentRightWeight,
+                    v => {
+                        currentRightWeight = v;
+                        if (Character?.RightHandIK != null && Character.RightHandIK.Enabled) {
+                            Character.RightHandIK.PositionWeight = v;
+                            Character.RightHandIK.RotationWeight = v;
+                            Character.RightHandIK.Broadcast();
+                        }
+                    },
+                    1.0f,
+                    actualRightDuration
+                ).SetEase(ease);
+                if (delay > 0f) rightWeightTween.SetDelay(delay);
             }
         }
 
-        void ReleaseCharacterIK() {
-            if (Character == null) return;
-            KillAllTweens();
+        void ReleaseCharacterIK(bool instant = false) {
+            leftWeightTween?.Kill();
+            rightWeightTween?.Kill();
 
-            if (Character.LeftHandIK != null && Character.LeftHandIK.IkTarget == proxyLeftAnchor) {
-                Character.LeftHandIK.Enabled = false;
-                Character.LeftHandIK.IkTarget = null;
-                Character.LeftHandIK.Broadcast();
+            if (instant || Character == null) {
+                KillAllTweens();
+                if (Character != null) {
+                    if (Character.LeftHandIK != null && (proxyLeftAnchor == null || Character.LeftHandIK.IkTarget == proxyLeftAnchor)) {
+                        Character.LeftHandIK.PositionWeight = 0f;
+                        Character.LeftHandIK.RotationWeight = 0f;
+                        Character.LeftHandIK.Enabled = false;
+                        Character.LeftHandIK.IkTarget = null;
+                        Character.LeftHandIK.Broadcast();
+                    }
+                    if (Character.RightHandIK != null && (proxyRightAnchor == null || Character.RightHandIK.IkTarget == proxyRightAnchor)) {
+                        Character.RightHandIK.PositionWeight = 0f;
+                        Character.RightHandIK.RotationWeight = 0f;
+                        Character.RightHandIK.Enabled = false;
+                        Character.RightHandIK.IkTarget = null;
+                        Character.RightHandIK.Broadcast();
+                    }
+                }
+                currentLeftWeight = 0f;
+                currentRightWeight = 0f;
+                DestroyProxyAnchors();
+                return;
             }
 
-            if (Character.RightHandIK != null && Character.RightHandIK.IkTarget == proxyRightAnchor) {
-                Character.RightHandIK.Enabled = false;
-                Character.RightHandIK.IkTarget = null;
-                Character.RightHandIK.Broadcast();
+            float duration = InactiveTransition != null ? InactiveTransition.Time : 0.5f;
+            Ease ease = InactiveTransition != null ? InactiveTransition.Ease : Ease.Linear;
+
+            float leftCurrent = Mathf.Clamp01(currentLeftWeight);
+            float leftDuration = duration * leftCurrent;
+            if (leftDuration <= 0.001f || Character.LeftHandIK == null) {
+                currentLeftWeight = 0f;
+                if (Character?.LeftHandIK != null && (proxyLeftAnchor == null || Character.LeftHandIK.IkTarget == proxyLeftAnchor)) {
+                    Character.LeftHandIK.PositionWeight = 0f;
+                    Character.LeftHandIK.RotationWeight = 0f;
+                    Character.LeftHandIK.Enabled = false;
+                    Character.LeftHandIK.IkTarget = null;
+                    Character.LeftHandIK.Broadcast();
+                }
+                CheckCleanupAnchorsAfterFadeOut();
+            } else {
+                leftWeightTween = DOTween.To(
+                    () => currentLeftWeight,
+                    v => {
+                        currentLeftWeight = v;
+                        if (Character?.LeftHandIK != null && Character.LeftHandIK.Enabled) {
+                            Character.LeftHandIK.PositionWeight = v;
+                            Character.LeftHandIK.RotationWeight = v;
+                            if (Character.LeftHandIK.BendGoalTarget != null) {
+                                Character.LeftHandIK.BendGoalWeight = v;
+                            }
+                            Character.LeftHandIK.Broadcast();
+                        }
+                    },
+                    0f,
+                    leftDuration
+                ).SetEase(ease).OnComplete(() => {
+                    currentLeftWeight = 0f;
+                    if (Character?.LeftHandIK != null && (proxyLeftAnchor == null || Character.LeftHandIK.IkTarget == proxyLeftAnchor)) {
+                        Character.LeftHandIK.PositionWeight = 0f;
+                        Character.LeftHandIK.RotationWeight = 0f;
+                        Character.LeftHandIK.Enabled = false;
+                        Character.LeftHandIK.IkTarget = null;
+                        Character.LeftHandIK.Broadcast();
+                    }
+                    CheckCleanupAnchorsAfterFadeOut();
+                });
+            }
+
+            float rightCurrent = Mathf.Clamp01(currentRightWeight);
+            float rightDuration = duration * rightCurrent;
+            if (rightDuration <= 0.001f || Character.RightHandIK == null) {
+                currentRightWeight = 0f;
+                if (Character?.RightHandIK != null && (proxyRightAnchor == null || Character.RightHandIK.IkTarget == proxyRightAnchor)) {
+                    Character.RightHandIK.PositionWeight = 0f;
+                    Character.RightHandIK.RotationWeight = 0f;
+                    Character.RightHandIK.Enabled = false;
+                    Character.RightHandIK.IkTarget = null;
+                    Character.RightHandIK.Broadcast();
+                }
+                CheckCleanupAnchorsAfterFadeOut();
+            } else {
+                rightWeightTween = DOTween.To(
+                    () => currentRightWeight,
+                    v => {
+                        currentRightWeight = v;
+                        if (Character?.RightHandIK != null && Character.RightHandIK.Enabled) {
+                            Character.RightHandIK.PositionWeight = v;
+                            Character.RightHandIK.RotationWeight = v;
+                            if (Character.RightHandIK.BendGoalTarget != null) {
+                                Character.RightHandIK.BendGoalWeight = v;
+                            }
+                            Character.RightHandIK.Broadcast();
+                        }
+                    },
+                    0f,
+                    rightDuration
+                ).SetEase(ease).OnComplete(() => {
+                    currentRightWeight = 0f;
+                    if (Character?.RightHandIK != null && (proxyRightAnchor == null || Character.RightHandIK.IkTarget == proxyRightAnchor)) {
+                        Character.RightHandIK.PositionWeight = 0f;
+                        Character.RightHandIK.RotationWeight = 0f;
+                        Character.RightHandIK.Enabled = false;
+                        Character.RightHandIK.IkTarget = null;
+                        Character.RightHandIK.Broadcast();
+                    }
+                    CheckCleanupAnchorsAfterFadeOut();
+                });
+            }
+        }
+
+        void CheckCleanupAnchorsAfterFadeOut() {
+            if ((!IsEnabled || !EnableHands) && currentLeftWeight <= 0.001f && currentRightWeight <= 0.001f) {
+                DestroyProxyAnchors();
             }
         }
 
         void OnUpdateIK() {
-            if (!IsEnabled || Character == null) return;
+            if (!IsEnabled || !EnableHands || Character == null) return;
 
-            proxyLeftAnchor = GetProxyLeftAnchor();
-            proxyRightAnchor = GetProxyRightAnchor();
+            if (proxyLeftAnchor == null || proxyLeftAnchor.GameObject == null) proxyLeftAnchor = GetProxyLeftAnchor();
+            if (proxyRightAnchor == null || proxyRightAnchor.GameObject == null) proxyRightAnchor = GetProxyRightAnchor();
 
             if (proxyLeftAnchor == null || proxyRightAnchor == null) return;
 
@@ -202,7 +509,7 @@ namespace FlameStream {
             float now = Time.time;
 
             // Check Mouse Input
-            if (MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled) {
+            if (MouseReceiver != null && (MouseReceiver.IsEnabled || (IsEnabled && EnableHands))) {
                 if (!hasInitializedMouse) {
                     lastMouseX = MouseReceiver.X;
                     lastMouseY = MouseReceiver.Y;
@@ -227,7 +534,7 @@ namespace FlameStream {
             }
 
             // Check Pen Input
-            if (PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled) {
+            if (PenReceiver != null && (PenReceiver.IsEnabled || (IsEnabled && EnableHands))) {
                 if (!hasInitializedPen) {
                     lastPenX = PenReceiver.X;
                     lastPenY = PenReceiver.Y;
@@ -262,6 +569,27 @@ namespace FlameStream {
 
                 if (leftKey) lastKeyboardLeftTime = now;
                 if (rightKey) lastKeyboardRightTime = now;
+                if (leftKey || rightKey || KeyboardReceiver.AnyDown) lastKeyboardActivityTime = now;
+            }
+        }
+
+        CoordinatorHandState GetInactivityReturnState(bool isLeft) {
+            switch (ReturnTarget) {
+                case InactivityReturnTarget.Mouse:
+                    if (MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled) {
+                        bool isMouseRight = MouseReceiver.IsRightHanded;
+                        if (isLeft == !isMouseRight) return CoordinatorHandState.Mouse;
+                    }
+                    return CoordinatorHandState.Keyboard;
+                case InactivityReturnTarget.Pen:
+                    if (PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled) {
+                        bool isPenRight = PenReceiver.IsRightHanded;
+                        if (isLeft == !isPenRight) return CoordinatorHandState.Pen;
+                    }
+                    return CoordinatorHandState.Keyboard;
+                case InactivityReturnTarget.Keyboard:
+                default:
+                    return CoordinatorHandState.Keyboard;
             }
         }
 
@@ -276,8 +604,9 @@ namespace FlameStream {
             bool activeMouse = MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled && (now - lastMouseActivityTime < 0.15f);
             bool activePen = PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled && (now - lastPenActivityTime < 0.15f);
 
-            bool mouseTimedOut = EnableInactivityReturn && MouseReturnTimeout > 0f && (now - lastMouseActivityTime >= MouseReturnTimeout);
-            bool penTimedOut = EnableInactivityReturn && PenReturnTimeout > 0f && (now - lastPenActivityTime >= PenReturnTimeout);
+            bool mouseTimedOut = EnableInactivityReturn && MouseIdleTimeout > 0f && (now - lastMouseActivityTime >= MouseIdleTimeout);
+            bool penTimedOut = EnableInactivityReturn && PenIdleTimeout > 0f && (now - lastPenActivityTime >= PenIdleTimeout);
+            bool keyboardTimedOut = EnableInactivityReturn && KeyboardIdleTimeout > 0f && (now - lastKeyboardActivityTime >= KeyboardIdleTimeout);
 
             bool isMouseRight = MouseReceiver != null && MouseReceiver.IsRightHanded;
             bool isPenRight = PenReceiver != null && PenReceiver.IsRightHanded;
@@ -289,7 +618,7 @@ namespace FlameStream {
                 // HYBRID MODE:
                 // Mouse/Pen moves active hand; other hand stays on keyboard shortcuts.
                 // Key press moves only the hand of that key.
-                // Idle timer returns both hands to keyboard.
+                // Idle timer returns hands to configured ReturnTarget.
 
                 bool mouseClaimsLeft = MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled && !isMouseRight;
                 bool penClaimsLeft = PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled && !isPenRight;
@@ -301,9 +630,11 @@ namespace FlameStream {
                 } else if (penClaimsLeft && activePen) {
                     nextLeft = CoordinatorHandState.Pen;
                 } else if ((mouseClaimsLeft && mouseTimedOut) || (penClaimsLeft && penTimedOut)) {
-                    nextLeft = CoordinatorHandState.Keyboard;
-                } else if (!mouseClaimsLeft && !penClaimsLeft) {
-                    nextLeft = CoordinatorHandState.Keyboard;
+                    nextLeft = GetInactivityReturnState(true);
+                } else if (targetLeftState == CoordinatorHandState.Keyboard && keyboardTimedOut && ReturnTarget != InactivityReturnTarget.Keyboard) {
+                    nextLeft = GetInactivityReturnState(true);
+                } else if (!mouseClaimsLeft && !penClaimsLeft && targetLeftState != GetInactivityReturnState(true) && keyboardTimedOut) {
+                    nextLeft = GetInactivityReturnState(true);
                 }
 
                 bool mouseClaimsRight = MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled && isMouseRight;
@@ -316,15 +647,17 @@ namespace FlameStream {
                 } else if (penClaimsRight && activePen) {
                     nextRight = CoordinatorHandState.Pen;
                 } else if ((mouseClaimsRight && mouseTimedOut) || (penClaimsRight && penTimedOut)) {
-                    nextRight = CoordinatorHandState.Keyboard;
-                } else if (!mouseClaimsRight && !penClaimsRight) {
-                    nextRight = CoordinatorHandState.Keyboard;
+                    nextRight = GetInactivityReturnState(false);
+                } else if (targetRightState == CoordinatorHandState.Keyboard && keyboardTimedOut && ReturnTarget != InactivityReturnTarget.Keyboard) {
+                    nextRight = GetInactivityReturnState(false);
+                } else if (!mouseClaimsRight && !penClaimsRight && targetRightState != GetInactivityReturnState(false) && keyboardTimedOut) {
+                    nextRight = GetInactivityReturnState(false);
                 }
             } else {
                 // NON-HYBRID MODE:
                 // Mouse/Pen moves active hand and rests other hand (PointerRest or Released).
                 // Key press on keyboard brings BOTH hands to keyboard.
-                // Idle timer returns BOTH hands to keyboard.
+                // Idle timer returns BOTH hands to configured ReturnTarget.
 
                 bool anyKey = keyPressLeft || keyPressRight || (KeyboardReceiver != null && KeyboardReceiver.IsEnabled && KeyboardReceiver.AnyDown);
 
@@ -344,10 +677,11 @@ namespace FlameStream {
                 } else if (EnableInactivityReturn) {
                     bool currentOnMouse = (targetLeftState == CoordinatorHandState.Mouse || targetRightState == CoordinatorHandState.Mouse);
                     bool currentOnPen = (targetLeftState == CoordinatorHandState.Pen || targetRightState == CoordinatorHandState.Pen);
+                    bool currentOnKeyboard = (targetLeftState == CoordinatorHandState.Keyboard || targetRightState == CoordinatorHandState.Keyboard);
 
-                    if ((currentOnMouse && mouseTimedOut) || (currentOnPen && penTimedOut)) {
-                        nextLeft = CoordinatorHandState.Keyboard;
-                        nextRight = CoordinatorHandState.Keyboard;
+                    if ((currentOnMouse && mouseTimedOut) || (currentOnPen && penTimedOut) || (currentOnKeyboard && keyboardTimedOut && ReturnTarget != InactivityReturnTarget.Keyboard)) {
+                        nextLeft = GetInactivityReturnState(true);
+                        nextRight = GetInactivityReturnState(false);
                     }
                 }
 
@@ -356,20 +690,20 @@ namespace FlameStream {
                     if (isMouseRight) {
                         nextLeft = CoordinatorHandState.PointerRest;
                         if (targetLeftState != CoordinatorHandState.PointerRest) {
-                            leftPosTween?.Kill();
-                            leftRotTween?.Kill();
+                            leftProgressTween?.Kill();
                             leftWeightTween?.Kill();
                             isLeftTransitioning = false;
+                            leftTransitionProgress = 1f;
                             currentLeftState = CoordinatorHandState.PointerRest;
                             currentLeftWeight = 1.0f;
                         }
                     } else {
                         nextRight = CoordinatorHandState.PointerRest;
                         if (targetRightState != CoordinatorHandState.PointerRest) {
-                            rightPosTween?.Kill();
-                            rightRotTween?.Kill();
+                            rightProgressTween?.Kill();
                             rightWeightTween?.Kill();
                             isRightTransitioning = false;
+                            rightTransitionProgress = 1f;
                             currentRightState = CoordinatorHandState.PointerRest;
                             currentRightWeight = 1.0f;
                         }
@@ -378,20 +712,20 @@ namespace FlameStream {
                     if (isPenRight) {
                         nextLeft = CoordinatorHandState.PointerRest;
                         if (targetLeftState != CoordinatorHandState.PointerRest) {
-                            leftPosTween?.Kill();
-                            leftRotTween?.Kill();
+                            leftProgressTween?.Kill();
                             leftWeightTween?.Kill();
                             isLeftTransitioning = false;
+                            leftTransitionProgress = 1f;
                             currentLeftState = CoordinatorHandState.PointerRest;
                             currentLeftWeight = 1.0f;
                         }
                     } else {
                         nextRight = CoordinatorHandState.PointerRest;
                         if (targetRightState != CoordinatorHandState.PointerRest) {
-                            rightPosTween?.Kill();
-                            rightRotTween?.Kill();
+                            rightProgressTween?.Kill();
                             rightWeightTween?.Kill();
                             isRightTransitioning = false;
+                            rightTransitionProgress = 1f;
                             currentRightState = CoordinatorHandState.PointerRest;
                             currentRightWeight = 1.0f;
                         }
@@ -399,23 +733,37 @@ namespace FlameStream {
                 }
             }
 
-            // Trigger left transition if changed
-            if (nextLeft != targetLeftState) {
-                targetLeftState = nextLeft;
+            // Commit both target states before starting either transition so rest resolution is never stale
+            bool leftChanged = (nextLeft != targetLeftState);
+            bool rightChanged = (nextRight != targetRightState);
+
+            targetLeftState = nextLeft;
+            targetRightState = nextRight;
+
+            if (leftChanged) {
                 StartHandTransition(true, nextLeft);
             }
-
-            // Trigger right transition if changed
-            if (nextRight != targetRightState) {
-                targetRightState = nextRight;
+            if (rightChanged) {
                 StartHandTransition(false, nextRight);
             }
         }
 
         void StartHandTransition(bool isLeft, CoordinatorHandState targetState) {
-            var trans = Transition ?? new ActiveTransition();
-            float duration = trans.Time;
-            var ease = trans.Ease;
+            CoordinatorHandState currentState = isLeft ? currentLeftState : currentRightState;
+            Transition chosenTransition;
+            float delay = 0f;
+
+            if (targetState == CoordinatorHandState.Released) {
+                chosenTransition = InactiveTransition ?? new InactiveTransition();
+            } else if (currentState == CoordinatorHandState.Released) {
+                chosenTransition = ActiveTransition ?? new ActiveTransition();
+                delay = (ActiveTransition != null) ? ActiveTransition.Delay : 0.1f;
+            } else {
+                chosenTransition = SwitchTransition ?? new Transition { Time = 0.2f, Ease = Ease.OutQuad };
+            }
+
+            float duration = chosenTransition.Time;
+            var ease = chosenTransition.Ease;
 
             var proxy = isLeft ? proxyLeftAnchor : proxyRightAnchor;
             if (proxy == null) return;
@@ -435,71 +783,98 @@ namespace FlameStream {
                 }
             }
 
-            GetTargetWorldPose(isLeft, targetState, out Vector3 destPos, out Vector3 destRot, out float destWeight);
-
-            if (destWeight <= 0f) {
-                destPos = startPos;
-                destRot = startRot;
-            }
+            GetTargetWorldPose(isLeft, targetState, out _, out _, out float destWeight);
 
             if (isLeft) {
-                leftPosTween?.Kill();
-                leftRotTween?.Kill();
+                leftProgressTween?.Kill();
                 leftWeightTween?.Kill();
 
-                if (duration <= 0f) {
+                leftTransitionStartPos = startPos;
+                leftTransitionStartRot = startRot;
+
+                if (duration <= 0f && delay <= 0f) {
                     isLeftTransitioning = false;
+                    leftTransitionProgress = 1f;
                     currentLeftState = targetState;
                     currentLeftWeight = destWeight;
-                    tweenLeftPos = destPos;
-                    tweenLeftRot = destRot;
+                    GetTargetWorldPose(true, targetState, out Vector3 destPos, out Vector3 destRot, out _);
                     ApplyProxyWorldPose(proxy, destPos, destRot);
                     OnTransitionCompleted(true, targetState);
                     return;
                 }
 
                 isLeftTransitioning = true;
-                tweenLeftPos = startPos;
-                tweenLeftRot = startRot;
+                leftTransitionProgress = 0f;
 
-                leftPosTween = DOTween.To(() => tweenLeftPos, v => tweenLeftPos = v, destPos, duration).SetEase(ease);
-                leftRotTween = DOTween.To(() => tweenLeftRot, v => tweenLeftRot = v, destRot, duration).SetEase(ease);
-                leftWeightTween = DOTween.To(() => currentLeftWeight, v => currentLeftWeight = v, destWeight, duration)
+                float actualDuration = duration > 0f ? duration : 0.001f;
+                leftProgressTween = DOTween.To(() => leftTransitionProgress, v => leftTransitionProgress = v, 1.0f, actualDuration)
                     .SetEase(ease)
+                    .SetDelay(delay)
                     .OnComplete(() => {
                         isLeftTransitioning = false;
+                        leftTransitionProgress = 1.0f;
                         currentLeftState = targetState;
                         OnTransitionCompleted(true, targetState);
                     });
+
+                leftWeightTween = DOTween.To(() => currentLeftWeight, v => {
+                    currentLeftWeight = v;
+                    if (Character?.LeftHandIK != null && Character.LeftHandIK.Enabled) {
+                        Character.LeftHandIK.PositionWeight = v;
+                        Character.LeftHandIK.RotationWeight = v;
+                        if (Character.LeftHandIK.BendGoalTarget != null) {
+                            Character.LeftHandIK.BendGoalWeight = v;
+                        }
+                        Character.LeftHandIK.Broadcast();
+                    }
+                }, destWeight, actualDuration)
+                .SetEase(ease)
+                .SetDelay(delay);
             } else {
-                rightPosTween?.Kill();
-                rightRotTween?.Kill();
+                rightProgressTween?.Kill();
                 rightWeightTween?.Kill();
 
-                if (duration <= 0f) {
+                rightTransitionStartPos = startPos;
+                rightTransitionStartRot = startRot;
+
+                if (duration <= 0f && delay <= 0f) {
                     isRightTransitioning = false;
+                    rightTransitionProgress = 1f;
                     currentRightState = targetState;
                     currentRightWeight = destWeight;
-                    tweenRightPos = destPos;
-                    tweenRightRot = destRot;
+                    GetTargetWorldPose(false, targetState, out Vector3 destPos, out Vector3 destRot, out _);
                     ApplyProxyWorldPose(proxy, destPos, destRot);
                     OnTransitionCompleted(false, targetState);
                     return;
                 }
 
                 isRightTransitioning = true;
-                tweenRightPos = startPos;
-                tweenRightRot = startRot;
+                rightTransitionProgress = 0f;
 
-                rightPosTween = DOTween.To(() => tweenRightPos, v => tweenRightPos = v, destPos, duration).SetEase(ease);
-                rightRotTween = DOTween.To(() => tweenRightRot, v => tweenRightRot = v, destRot, duration).SetEase(ease);
-                rightWeightTween = DOTween.To(() => currentRightWeight, v => currentRightWeight = v, destWeight, duration)
+                float actualDuration = duration > 0f ? duration : 0.001f;
+                rightProgressTween = DOTween.To(() => rightTransitionProgress, v => rightTransitionProgress = v, 1.0f, actualDuration)
                     .SetEase(ease)
+                    .SetDelay(delay)
                     .OnComplete(() => {
                         isRightTransitioning = false;
+                        rightTransitionProgress = 1.0f;
                         currentRightState = targetState;
                         OnTransitionCompleted(false, targetState);
                     });
+
+                rightWeightTween = DOTween.To(() => currentRightWeight, v => {
+                    currentRightWeight = v;
+                    if (Character?.RightHandIK != null && Character.RightHandIK.Enabled) {
+                        Character.RightHandIK.PositionWeight = v;
+                        Character.RightHandIK.RotationWeight = v;
+                        if (Character.RightHandIK.BendGoalTarget != null) {
+                            Character.RightHandIK.BendGoalWeight = v;
+                        }
+                        Character.RightHandIK.Broadcast();
+                    }
+                }, destWeight, actualDuration)
+                .SetEase(ease)
+                .SetDelay(delay);
             }
         }
 
@@ -509,6 +884,7 @@ namespace FlameStream {
 
             bool isTransitioning = isLeft ? isLeftTransitioning : isRightTransitioning;
             var activeState = isLeft ? currentLeftState : currentRightState;
+            var targetState = isLeft ? targetLeftState : targetRightState;
 
             if (activeState == CoordinatorHandState.PointerRest) {
                 var activePointer = GetActiveRestPointer(isLeft);
@@ -517,13 +893,30 @@ namespace FlameStream {
                 }
             }
 
+            GetTargetWorldPose(isLeft, isTransitioning ? targetState : activeState, out Vector3 liveDestPos, out Vector3 liveDestRot, out float weight);
+
             if (isTransitioning) {
-                // During tween transition, follow interpolated world position and rotation
-                ApplyProxyWorldPose(proxy, isLeft ? tweenLeftPos : tweenRightPos, isLeft ? tweenLeftRot : tweenRightRot);
+                float progress = Mathf.Clamp01(isLeft ? leftTransitionProgress : rightTransitionProgress);
+                Vector3 startPos = isLeft ? leftTransitionStartPos : rightTransitionStartPos;
+                Vector3 startRot = isLeft ? leftTransitionStartRot : rightTransitionStartRot;
+
+                if (weight <= 0f) {
+                    // When transitioning to Released, target has no physical anchor; hold starting pose while weight fades out
+                    ApplyProxyWorldPose(proxy, startPos, startRot);
+                } else {
+                    // Dynamically interpolate toward the LIVE destination pose
+                    Vector3 unwrappedLiveRot = new Vector3(
+                        startRot.x + Mathf.DeltaAngle(startRot.x, liveDestRot.x),
+                        startRot.y + Mathf.DeltaAngle(startRot.y, liveDestRot.y),
+                        startRot.z + Mathf.DeltaAngle(startRot.z, liveDestRot.z)
+                    );
+                    Vector3 currentPos = Vector3.Lerp(startPos, liveDestPos, progress);
+                    Vector3 currentRot = Vector3.Lerp(startRot, unwrappedLiveRot, progress);
+                    ApplyProxyWorldPose(proxy, currentPos, currentRot);
+                }
             } else {
-                // Settled in state: lock 1:1 to target world position and rotation in real time
-                GetTargetWorldPose(isLeft, activeState, out Vector3 worldPos, out Vector3 worldRot, out float weight);
-                ApplyProxyWorldPose(proxy, worldPos, worldRot);
+                // Settled in state: lock 1:1 to live target world position and rotation in real time
+                ApplyProxyWorldPose(proxy, liveDestPos, liveDestRot);
                 if (isLeft) currentLeftWeight = weight;
                 else currentRightWeight = weight;
             }
@@ -586,14 +979,25 @@ namespace FlameStream {
         }
 
         PointerReceiverAsset GetActiveRestPointer(bool isLeft) {
-            bool dominantIsRight = isLeft;
-            if (MouseReceiver != null && MouseReceiver.IsRightHanded == dominantIsRight && (targetRightState == CoordinatorHandState.Mouse || targetLeftState == CoordinatorHandState.Mouse || MouseReceiver.IsInRestHandVisualSetup)) {
-                return MouseReceiver;
-            }
-            if (PenReceiver != null && PenReceiver.IsRightHanded == dominantIsRight && (targetRightState == CoordinatorHandState.Pen || targetLeftState == CoordinatorHandState.Pen || PenReceiver.IsInRestHandVisualSetup)) {
+            // If isLeft is true, the rest hand is the Left hand -> dominant hand is Right hand
+            // If isLeft is false, the rest hand is the Right hand -> dominant hand is Left hand
+            CoordinatorHandState dominantState = isLeft ? targetRightState : targetLeftState;
+
+            if (dominantState == CoordinatorHandState.Pen && PenReceiver != null) {
                 return PenReceiver;
             }
-            return MouseReceiver ?? PenReceiver;
+            if (dominantState == CoordinatorHandState.Mouse && MouseReceiver != null) {
+                return MouseReceiver;
+            }
+
+            if (PenReceiver != null && (PenReceiver.IsInRestHandVisualSetup || PenReceiver.IsRestHandActive)) {
+                return PenReceiver;
+            }
+            if (MouseReceiver != null && (MouseReceiver.IsInRestHandVisualSetup || MouseReceiver.IsRestHandActive)) {
+                return MouseReceiver;
+            }
+
+            return PenReceiver ?? MouseReceiver;
         }
 
         void ApplyProxyWorldPose(AnchorAsset proxy, Vector3 worldPos, Vector3 worldRot) {
@@ -603,6 +1007,10 @@ namespace FlameStream {
             proxy.Transform.Position = worldPos;
             proxy.Transform.Rotation = worldRot;
             proxy.Transform.Broadcast();
+            if (proxy.GameObject != null) {
+                proxy.GameObject.transform.position = worldPos;
+                proxy.GameObject.transform.rotation = Quaternion.Euler(worldRot);
+            }
         }
 
         void UpdateCharacterLimbWeights() {

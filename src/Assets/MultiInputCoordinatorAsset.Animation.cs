@@ -1,8 +1,8 @@
 using System;
 using System.Linq;
+using System.Text;
 using UnityEngine;
-using Warudo.Core.Data;
-using Warudo.Plugins.Core.Assets.Character;
+using Warudo.Core.Localization;
 
 namespace FlameStream {
     public partial class MultiInputCoordinatorAsset {
@@ -14,86 +14,106 @@ namespace FlameStream {
         }
 
         void OnUpdateAnimation() {
-            if (!IsEnabled || Character == null) return;
-
-            // Synchronize prop visibility
-            UpdatePropVisibility();
+            if (KeyboardReceiver != null) {
+                bool shouldKeyboardBaseBeActive = IsEnabled && EnableHands && Character != null;
+                KeyboardReceiver.SetBaseHandPoseWeight(shouldKeyboardBaseBeActive ? 1f : 0f);
+            }
         }
 
         void OnTransitionCompleted(bool isLeft, CoordinatorHandState targetState) {
-            UpdateFingerAnimationLayers();
-            UpdatePropVisibility();
         }
 
-        void UpdatePropVisibility() {
-            bool isPenActive = (currentLeftState == CoordinatorHandState.Pen && PenReceiver != null && !PenReceiver.IsRightHanded)
-                            || (currentRightState == CoordinatorHandState.Pen && PenReceiver != null && PenReceiver.IsRightHanded);
-
-            if (PenReceiver != null && PenReceiver.Prop != null) {
-                var prop = PenReceiver.Prop;
-                bool shouldEnable = isPenActive && PenReceiver.IsPropEnabled && PenReceiver.IsEnabled;
-                if (prop.Enabled != shouldEnable) {
-                    prop.SetDataInput(nameof(prop.Enabled), shouldEnable, true);
-                    prop.Broadcast();
-                }
+        string GetAnimationLayersOverviewMessage() {
+            if (Character == null) {
+                return $"**{"ANIMATION_LAYERS_OVERVIEW".Localized()}:**\n- {"ANIMATION_LAYERS_NO_CHAR".Localized()}";
+            }
+            if (Character.OverlappingAnimations == null || Character.OverlappingAnimations.Length == 0) {
+                return $"**{"ANIMATION_LAYERS_OVERVIEW".Localized()}:**\n- {"ANIMATION_LAYERS_NONE".Localized()}";
             }
 
-            bool isMouseActive = (currentLeftState == CoordinatorHandState.Mouse && MouseReceiver != null && !MouseReceiver.IsRightHanded)
-                              || (currentRightState == CoordinatorHandState.Mouse && MouseReceiver != null && MouseReceiver.IsRightHanded);
+            var sb = new StringBuilder();
+            sb.AppendLine($"**{"ANIMATION_LAYERS_OVERVIEW".Localized()}:**\n");
+            sb.AppendLine("| Device        | Layer            | Hand           | Weight       | Status |");
+            sb.AppendLine("| :---          | :---             | :---           | :---         | :---:  |");
 
-            if (MouseReceiver != null && MouseReceiver.Prop != null) {
-                var prop = MouseReceiver.Prop;
-                bool shouldEnable = isMouseActive && MouseReceiver.IsPropEnabled && MouseReceiver.IsEnabled;
-                if (prop.Enabled != shouldEnable) {
-                    prop.SetDataInput(nameof(prop.Enabled), shouldEnable, true);
-                    prop.Broadcast();
-                }
-            }
-        }
+            var activeLayers = Character.OverlappingAnimations.Where(a => a != null && a.Enabled && a.GetAnimationClip() != null).ToList();
 
-        void UpdateFingerAnimationLayers() {
-            if (Character == null || Character.OverlappingAnimations == null) return;
-
-            bool isLeftKeyboard = currentLeftState == CoordinatorHandState.Keyboard;
-            bool isRightKeyboard = currentRightState == CoordinatorHandState.Keyboard;
-
-            bool isLeftMouse = currentLeftState == CoordinatorHandState.Mouse;
-            bool isRightMouse = currentRightState == CoordinatorHandState.Mouse;
-
-            bool isLeftPen = currentLeftState == CoordinatorHandState.Pen;
-            bool isRightPen = currentRightState == CoordinatorHandState.Pen;
-
-            // Adjust weights of overlapping animation layers on Character
+            bool foundAny = false;
             foreach (var layer in Character.OverlappingAnimations) {
-                if (string.IsNullOrEmpty(layer.CustomLayerID)) continue;
+                if (layer == null) continue;
+                string layerId = layer.CustomLayerID ?? "";
+                if (!layerId.StartsWith("🔥")) continue;
 
-                // 1. Keyboard Layers (Prefix: 🔥⌨️)
-                if (layer.CustomLayerID.StartsWith("🔥⌨️")) {
-                    bool isRightFingerLayer = layer.CustomLayerID.Contains("Right");
-                    bool isLeftFingerLayer = layer.CustomLayerID.Contains("Left");
+                foundAny = true;
+                string device = "🎮 Other";
+                if (layerId.StartsWith("🔥⌨️")) {
+                    device = "⌨️ Keyboard";
+                } else if (MouseReceiver != null && layerId.StartsWith(MouseReceiver.LayerPrefix)) {
+                    device = "🖱️ Mouse";
+                } else if (PenReceiver != null && layerId.StartsWith(PenReceiver.LayerPrefix)) {
+                    device = "🖊️ Pen";
+                } else if (layerId.StartsWith("🔥🖱️")) {
+                    device = "🖱️ Mouse";
+                } else if (layerId.StartsWith("🔥🖊️")) {
+                    device = "🖊️ Pen";
+                }
 
-                    if (isRightFingerLayer) {
-                        layer.Weight = isRightKeyboard ? 1f : 0f;
-                    } else if (isLeftFingerLayer) {
-                        layer.Weight = isLeftKeyboard ? 1f : 0f;
-                    } else if (layer.CustomLayerID.Contains("Base Hand Pose")) {
-                        // Base hand pose layer: keep active if either hand is on keyboard
-                        layer.Weight = (isLeftKeyboard || isRightKeyboard) ? 1f : 0f;
+                string layerName = layerId;
+                if (layerName.StartsWith("🔥⌨️") || layerName.StartsWith("🔥🖱️") || layerName.StartsWith("🔥🖊️") || layerName.StartsWith("🔥🎮")) {
+                    layerName = layerName.Substring(4).Trim();
+                } else if (layerName.StartsWith("🔥")) {
+                    layerName = layerName.Substring(2).Trim();
+                }
+                if (layerName.StartsWith("-")) {
+                    layerName = layerName.Substring(1).Trim();
+                }
+
+                if (layerName.Length > 15) {
+                    layerName = layerName.Substring(0, 14) + "…";
+                }
+
+                string hand = "Full Body";
+                if (layer.Masked && layer.MaskedBodyParts != null && layer.MaskedBodyParts.Length > 0) {
+                    bool hasLeft = layer.MaskedBodyParts.Any(p => p.ToString().IndexOf("Left", StringComparison.OrdinalIgnoreCase) >= 0);
+                    bool hasRight = layer.MaskedBodyParts.Any(p => p.ToString().IndexOf("Right", StringComparison.OrdinalIgnoreCase) >= 0);
+                    if (hasLeft && hasRight) hand = "Left & Right";
+                    else if (hasRight) hand = "Right";
+                    else if (hasLeft) hand = "Left";
+                    else hand = "Masked";
+                }
+
+                float targetWt = layer.Weight;
+                float liveWt = targetWt;
+                int animancerIdx = activeLayers.IndexOf(layer);
+                if (animancerIdx >= 0 && Character.Animancer != null && Character.Animancer.Layers != null) {
+                    int realIdx = 1 + animancerIdx;
+                    if (realIdx >= 0 && realIdx < Character.Animancer.Layers.Count) {
+                        var l = Character.Animancer.Layers[realIdx];
+                        if (l != null) {
+                            liveWt = l.Weight;
+                        }
                     }
                 }
 
-                // 2. Mouse Layers (Prefix: 🔥🖱️)
-                if (MouseReceiver != null && layer.CustomLayerID.StartsWith("🔥🖱️") && layer.CustomLayerID.Contains("Mouse")) {
-                    bool mouseHand = MouseReceiver.IsRightHanded ? isRightMouse : isLeftMouse;
-                    layer.Weight = mouseHand ? 1f : 0f;
+                string weightStr;
+                if (string.IsNullOrEmpty(layer.Animation)) {
+                    weightStr = "-";
+                } else if (Mathf.Abs(liveWt - targetWt) > 0.02f) {
+                    weightStr = $"{liveWt:F2} ➔ {targetWt:F2}";
+                } else {
+                    weightStr = $"{liveWt:F2}";
                 }
 
-                // 3. Pen Layers (Prefix: 🔥🖱️)
-                if (PenReceiver != null && layer.CustomLayerID.StartsWith("🔥🖱️") && layer.CustomLayerID.Contains("Pen")) {
-                    bool penHand = PenReceiver.IsRightHanded ? isRightPen : isLeftPen;
-                    layer.Weight = penHand ? 1f : 0f;
-                }
+                string status = (!string.IsNullOrEmpty(layer.Animation) && liveWt > 0.01f) ? "🟢" : "⚪";
+
+                sb.AppendLine($"| {device.PadRight(13)} | {layerName.PadRight(16)} | {hand.PadRight(14)} | {weightStr.PadRight(12)} |   {status}   |");
             }
+
+            if (!foundAny) {
+                return $"**{"ANIMATION_LAYERS_OVERVIEW".Localized()}:**\n- {"ANIMATION_LAYERS_NONE".Localized()}";
+            }
+
+            return sb.ToString().TrimEnd();
         }
     }
 }

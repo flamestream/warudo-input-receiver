@@ -23,34 +23,40 @@ namespace FlameStream {
         Released = 4
     }
 
+    public enum InactivityReturnTarget {
+        Keyboard = 0,
+        Mouse = 1,
+        Pen = 2
+    }
+
     [AssetType(
         Id = "FlameStream.Asset.MultiInputCoordinator",
         Title = "FS_ASSET_TITLE_MULTI_INPUT_COORDINATOR",
         Category = "FS_ASSET_CATEGORY_INPUT"
     )]
-    public partial class MultiInputCoordinatorAsset : Asset {
+    public partial class MultiInputCoordinatorAsset : ReceiverAsset {
 
-        protected long uiVersion = 0;
+        protected override ushort PROTOCOL_VERSION => 1;
+        protected override string PROTOCOL_ID => "FSMC";
+        protected override int DEFAULT_PORT => 40610;
+        protected override string CHARACTER_ANIM_LAYER_ID_PREFIX => "🔥🎮";
 
-        public override long GetVersion() {
-            return base.GetVersion() + uiVersion;
+        protected override void Log(string msg) {
+            Debug.Log($"[FlameStream.Asset.MultiInputCoordinator] {msg}");
         }
 
-        public async void RequestUiRefresh() {
-            await Cysharp.Threading.Tasks.UniTask.Yield();
-            uiVersion++;
-            Broadcast();
-        }
+        private int lockedPort = 0;
 
         [Section("BASIC_SETUP")]
 
         [DataInput]
         [Label("ENABLE")]
-        public bool IsEnabled = true;
+        [Description("ENABLE_HANDS_DESC")]
+        public bool EnableHands = true;
 
         [DataInput]
         [Label("CHARACTER")]
-        [Description("CHARACTER_DESC")]
+        [Description("COORDINATOR_CHARACTER_AUTO_DESC")]
         public CharacterAsset Character;
 
         [DataInput]
@@ -75,22 +81,54 @@ namespace FlameStream {
         [Label("COORDINATION_MODE")]
         public HandCoordinationMode CoordinationMode = HandCoordinationMode.Hybrid;
 
-
         [DataInput]
         [Label("ACTIVE_TRANSITION")]
-        public ActiveTransition Transition;
+        public ActiveTransition ActiveTransition;
+
+        [DataInput]
+        [Label("INACTIVE_TRANSITION")]
+        public InactiveTransition InactiveTransition;
+
+        [DataInput]
+        [Label("SWITCH_TRANSITION")]
+        public Transition SwitchTransition;
 
         [DataInput]
         [Label("ENABLE_INACTIVITY_RETURN")]
         public bool EnableInactivityReturn = true;
 
         [DataInput]
-        [Label("MOUSE_RETURN_TIMEOUT")]
+        [Label("RETURN_TARGET")]
+        [HiddenIf(nameof(IsReturnDisabled))]
+        public InactivityReturnTarget ReturnTarget = InactivityReturnTarget.Keyboard;
+
+        [DataInput]
+        [Label("KEYBOARD_IDLE_TIMEOUT")]
+        [FloatSlider(0.1f, 10f, 0.1f)]
+        [HiddenIf(nameof(IsReturnDisabled))]
+        public float KeyboardIdleTimeout = 2.0f;
+
+        [DataInput]
+        [Label("MOUSE_IDLE_TIMEOUT")]
+        [FloatSlider(0.1f, 10f, 0.1f)]
+        [HiddenIf(nameof(IsReturnDisabled))]
+        public float MouseIdleTimeout = 2.0f;
+
+        [DataInput]
+        [Label("PEN_IDLE_TIMEOUT")]
+        [FloatSlider(0.1f, 10f, 0.1f)]
+        [HiddenIf(nameof(IsReturnDisabled))]
+        public float PenIdleTimeout = 3.0f;
+
+        [DataInput]
+        [Hidden]
         public float MouseReturnTimeout = 2.0f;
 
         [DataInput]
-        [Label("PEN_RETURN_TIMEOUT")]
+        [Hidden]
         public float PenReturnTimeout = 3.0f;
+
+        public bool IsReturnDisabled() => !EnableInactivityReturn;
 
 
         [Section("STATUS_DASHBOARD")]
@@ -104,32 +142,82 @@ namespace FlameStream {
         [Markdown]
         public string RightHandStatus = "";
 
+        [Markdown]
+        public string AnimationLayersOverview = "";
+
 
         protected override void OnCreate() {
             base.OnCreate();
             OnCreateIK();
             OnCreateAnimation();
 
+            if (ActiveTransition == null) {
+                ActiveTransition = StructuredData.Create<ActiveTransition>();
+                SetDataInput(nameof(ActiveTransition), ActiveTransition, true);
+            }
+            if (ActiveTransition != null) {
+                var delayPort = ActiveTransition.GetDataInputPort(nameof(ActiveTransition.Delay));
+                if (delayPort?.Properties != null) {
+                    delayPort.Properties.hidden = false;
+                }
+            }
+            Watch(nameof(ActiveTransition), delegate {
+                if (ActiveTransition != null) {
+                    var delayPort = ActiveTransition.GetDataInputPort(nameof(ActiveTransition.Delay));
+                    if (delayPort?.Properties != null) {
+                        delayPort.Properties.hidden = false;
+                    }
+                }
+            });
+
+            if (InactiveTransition == null) {
+                InactiveTransition = StructuredData.Create<InactiveTransition>();
+                SetDataInput(nameof(InactiveTransition), InactiveTransition, true);
+            }
+
+            if (SwitchTransition == null) {
+                SwitchTransition = StructuredData.Create<Transition>();
+                SwitchTransition.Time = 0.2f;
+                SwitchTransition.Ease = DG.Tweening.Ease.OutQuad;
+                SetDataInput(nameof(SwitchTransition), SwitchTransition, true);
+            }
+
             Watch(nameof(IsEnabled), delegate { OnCoordinatorSettingChange(); });
+            Watch(nameof(EnableHands), delegate { OnEnableHandsChange(); });
             Watch(nameof(Character), delegate { OnCoordinatorSettingChange(); });
             Watch(nameof(KeyboardReceiver), delegate { OnReceiverLinksChanged(); });
             Watch(nameof(MouseReceiver), delegate { OnReceiverLinksChanged(); });
             Watch(nameof(PenReceiver), delegate { OnReceiverLinksChanged(); });
             Watch(nameof(CoordinationMode), delegate { RequestUiRefresh(); });
             Watch(nameof(EnableInactivityReturn), delegate { RequestUiRefresh(); });
+            Watch(nameof(ReturnTarget), delegate { RequestUiRefresh(); });
 
+            if (MouseIdleTimeout == 2.0f && MouseReturnTimeout != 2.0f) MouseIdleTimeout = MouseReturnTimeout;
+            if (PenIdleTimeout == 3.0f && PenReturnTimeout != 3.0f) PenIdleTimeout = PenReturnTimeout;
+
+            if (Active && IsEnabled) {
+                lockedPort = Port;
+            }
+            ValidateConfiguration();
             OnCoordinatorSettingChange();
         }
 
         protected override void OnDestroy() {
-            base.OnDestroy();
             UnregisterAllReceivers();
             OnDestroyIK();
             OnDestroyAnimation();
+            base.OnDestroy();
         }
 
         public override void OnUpdate() {
             base.OnUpdate();
+            ValidateConfiguration();
+
+            if (IsEnabled && lastState != null) {
+                MouseReceiver?.InjectRawState(lastState);
+                PenReceiver?.InjectRawState(lastState);
+            }
+
             EnsureReceiversRegistered();
             OnUpdateIK();
             OnUpdateAnimation();
@@ -138,23 +226,287 @@ namespace FlameStream {
 
         void OnCoordinatorSettingChange() {
             if (!IsEnabled) {
+                lockedPort = 0;
+                PuppetRegisteredReceivers();
                 UnregisterAllReceivers();
                 ReleaseCharacterIK();
+                KeyboardReceiver?.SetBaseHandPoseWeight(0f);
             } else {
+                lockedPort = Port;
                 RegisterAllReceivers();
-                BindCharacterIK();
+                PuppetRegisteredReceivers();
+                if (EnableHands) {
+                    BindCharacterIK();
+                    KeyboardReceiver?.SetBaseHandPoseWeight(1f);
+                } else {
+                    ReleaseCharacterIK();
+                    KeyboardReceiver?.SetBaseHandPoseWeight(0f);
+                }
             }
             RequestUiRefresh();
         }
 
-        void OnReceiverLinksChanged() {
-            hasInitializedMouse = false;
-            hasInitializedPen = false;
-            EnsureReceiversRegistered();
+        void OnEnableHandsChange() {
+            PuppetRegisteredReceivers();
+            if (IsEnabled && EnableHands) {
+                BindCharacterIK();
+                KeyboardReceiver?.SetBaseHandPoseWeight(1f);
+            } else {
+                ReleaseCharacterIK();
+                KeyboardReceiver?.SetBaseHandPoseWeight(0f);
+            }
             RequestUiRefresh();
         }
 
+        public void PuppetRegisteredReceivers() {
+            var receivers = new ReceiverAsset[] { KeyboardReceiver, MouseReceiver, PenReceiver };
+            string desc = string.Format("IK_DELEGATED_TO".Localized(), "ENABLE".Localized(), Name);
+
+            foreach (var r in receivers) {
+                if (r == null) continue;
+
+                if (IsEnabled) {
+                    if (!r.IsEnabled) {
+                        r.SetDataInput(nameof(r.IsEnabled), true, true);
+                    }
+                    r.SetDataInputPropertyAndBroadcast(nameof(r.IsEnabled), disabled: true, description: desc);
+                } else {
+                    r.SetDataInputPropertyAndBroadcast(nameof(r.IsEnabled), disabled: false, description: (r is KeyboardReceiverAsset) ? "KEYBOARD_ENABLE_DESC".Localized() : "POINTER_ENABLE_DESC".Localized());
+                    if (r.IsEnabled) {
+                        r.SetDataInput(nameof(r.IsEnabled), false, true);
+                    }
+                }
+
+                if (r is PointerReceiverAsset pr) {
+                    if (IsEnabled && EnableHands) {
+                        if (!pr.IsHandEnabled) {
+                            pr.SetDataInput(nameof(pr.IsHandEnabled), true, true);
+                        }
+                        pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsHandEnabled), disabled: true, description: desc);
+                    } else {
+                        pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsHandEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
+                        if (pr.IsHandEnabled) {
+                            pr.SetDataInput(nameof(pr.IsHandEnabled), false, true);
+                        }
+                    }
+                    pr.OnCoordinatorStateChanged();
+                } else if (r is KeyboardReceiverAsset kr) {
+                    if (IsEnabled && EnableHands) {
+                        if (!kr.IsHandEnabled) {
+                            kr.SetDataInput(nameof(kr.IsHandEnabled), true, true);
+                        }
+                        kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsHandEnabled), disabled: true, description: desc);
+                    } else {
+                        kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsHandEnabled), disabled: false, description: "ENABLE_HANDS_DESC".Localized());
+                        if (kr.IsHandEnabled) {
+                            kr.SetDataInput(nameof(kr.IsHandEnabled), false, true);
+                        }
+                    }
+                    kr.OnCoordinatorStateChanged();
+                }
+            }
+        }
+
+        public void NotifyRegisteredReceiversStateChanged() {
+            PuppetRegisteredReceivers();
+        }
+
+        void OnReceiverLinksChanged() {
+            if (Scene != null) {
+                var krs = Scene.GetAssets<KeyboardReceiverAsset>();
+                if (krs != null) {
+                    foreach (var kr in krs) {
+                        if (kr.ActiveCoordinator == this && kr != KeyboardReceiver) {
+                            kr.UnregisterCoordinator(this);
+                        }
+                    }
+                }
+                var prs = Scene.GetAssets<PointerReceiverAsset>();
+                if (prs != null) {
+                    foreach (var pr in prs) {
+                        if (pr.ActiveCoordinator == this && pr != MouseReceiver && pr != PenReceiver) {
+                            pr.UnregisterCoordinator(this);
+                        }
+                    }
+                }
+            }
+
+            hasInitializedMouse = false;
+            hasInitializedPen = false;
+            EnsureReceiversRegistered();
+            ValidateConfiguration();
+            PuppetRegisteredReceivers();
+            RequestUiRefresh();
+        }
+
+        void ValidateConfiguration() {
+            // Port and Character inspector lock
+            SetDataInputPropertyAndBroadcast(
+                nameof(Port),
+                disabled: true,
+                description: "COORDINATOR_PORT_DESC".Localized()
+            );
+            SetDataInputPropertyAndBroadcast(
+                nameof(Character),
+                disabled: true,
+                description: "COORDINATOR_CHARACTER_AUTO_DESC".Localized()
+            );
+
+            // Auto-derive Character when coordinator is disabled
+            if (!IsEnabled) {
+                var chars = new[] { KeyboardReceiver?.Character, MouseReceiver?.Character, PenReceiver?.Character }
+                    .Where(c => c != null)
+                    .Distinct()
+                    .ToList();
+
+                CharacterAsset sharedChar = null;
+                bool hasMismatch = false;
+
+                if (chars.Count == 1) {
+                    sharedChar = chars[0];
+                } else if (chars.Count > 1) {
+                    hasMismatch = true;
+                }
+
+                if (hasMismatch) {
+                    if (Character != null) {
+                        Character = null;
+                        SetDataInput(nameof(Character), null, true);
+                        BroadcastDataInput(nameof(Character));
+                    }
+                } else if (Character != sharedChar) {
+                    Character = sharedChar;
+                    SetDataInput(nameof(Character), sharedChar, true);
+                    BroadcastDataInput(nameof(Character));
+                }
+            }
+
+            // 1. Port Validation & Locking
+            if (!IsEnabled) {
+                if (MouseReceiver != null && PenReceiver != null) {
+                    if (MouseReceiver.Port != PenReceiver.Port) {
+                        SetDataInputPropertyAndBroadcast(
+                            nameof(IsEnabled),
+                            disabled: true,
+                            description: $"Pointer receivers have conflicting UDP ports (Mouse: {MouseReceiver.Port}, Pen: {PenReceiver.Port}). Both must be set to the same port."
+                        );
+                    } else {
+                        if (Port != MouseReceiver.Port) {
+                            Port = MouseReceiver.Port;
+                            BroadcastDataInput(nameof(Port));
+                        }
+                        SetDataInputPropertyAndBroadcast(
+                            nameof(IsEnabled),
+                            disabled: false,
+                            description: "COORDINATOR_ENABLE_DESC".Localized()
+                        );
+                    }
+                } else if (MouseReceiver != null) {
+                    if (Port != MouseReceiver.Port) {
+                        Port = MouseReceiver.Port;
+                        BroadcastDataInput(nameof(Port));
+                    }
+                    SetDataInputPropertyAndBroadcast(
+                        nameof(IsEnabled),
+                        disabled: false,
+                        description: "COORDINATOR_ENABLE_DESC".Localized()
+                    );
+                } else if (PenReceiver != null) {
+                    if (Port != PenReceiver.Port) {
+                        Port = PenReceiver.Port;
+                        BroadcastDataInput(nameof(Port));
+                    }
+                    SetDataInputPropertyAndBroadcast(
+                        nameof(IsEnabled),
+                        disabled: false,
+                        description: "COORDINATOR_ENABLE_DESC".Localized()
+                    );
+                } else {
+                    SetDataInputPropertyAndBroadcast(
+                        nameof(IsEnabled),
+                        disabled: false,
+                        description: "COORDINATOR_ENABLE_DESC".Localized()
+                    );
+                }
+            }
+
+            // 2. EnableHands Preconditions
+            // A. Same Character Check
+            if (Character == null) {
+                if (EnableHands) {
+                    EnableHands = false;
+                    SetDataInput(nameof(EnableHands), false, true);
+                    BroadcastDataInput(nameof(EnableHands));
+                }
+                SetDataInputPropertyAndBroadcast(
+                    nameof(EnableHands),
+                    disabled: true,
+                    description: "COORDINATOR_CHAR_REQUIRED_DESC".Localized()
+                );
+                return;
+            }
+
+            bool kbMismatch = KeyboardReceiver != null && KeyboardReceiver.Character != Character;
+            bool mouseMismatch = MouseReceiver != null && MouseReceiver.Character != Character;
+            bool penMismatch = PenReceiver != null && PenReceiver.Character != Character;
+            if (kbMismatch || mouseMismatch || penMismatch) {
+                string mismatchedName = kbMismatch ? KeyboardReceiver.Name : (mouseMismatch ? MouseReceiver.Name : PenReceiver.Name);
+                if (EnableHands) {
+                    EnableHands = false;
+                    SetDataInput(nameof(EnableHands), false, true);
+                    BroadcastDataInput(nameof(EnableHands));
+                }
+                SetDataInputPropertyAndBroadcast(
+                    nameof(EnableHands),
+                    disabled: true,
+                    description: $"All registered receivers must be bound to {Character.Name}. '{mismatchedName}' is currently bound to another character or no character."
+                );
+                return;
+            }
+
+            // All checks passed
+            SetDataInputPropertyAndBroadcast(
+                nameof(EnableHands),
+                disabled: false,
+                description: "ENABLE_HANDS_DESC".Localized()
+            );
+        }
+
+        public bool IsPointerDeviceActive(PointerReceiverAsset ptr) {
+            if (ptr == null || !IsEnabled || !EnableHands) return false;
+
+            bool isMouse = (ptr == MouseReceiver);
+            bool isPen = (ptr == PenReceiver);
+            if (!isMouse && !isPen) return false;
+
+            bool isRight = ptr.IsRightHanded;
+            var state = isRight ? targetRightState : targetLeftState;
+
+            if (isMouse && state == CoordinatorHandState.Mouse) return true;
+            if (isPen && state == CoordinatorHandState.Pen) return true;
+            return false;
+        }
+
+        public bool IsPointerInPenState(PointerReceiverAsset ptr) {
+            if (!IsPointerDeviceActive(ptr)) return false;
+            bool isRight = ptr.IsRightHanded;
+            var state = isRight ? targetRightState : targetLeftState;
+            return state == CoordinatorHandState.Pen;
+        }
+
+        public bool IsPointerInMouseState(PointerReceiverAsset ptr) {
+            if (!IsPointerDeviceActive(ptr)) return false;
+            bool isRight = ptr.IsRightHanded;
+            var state = isRight ? targetRightState : targetLeftState;
+            return state == CoordinatorHandState.Mouse;
+        }
+
+        private float lastDashboardUpdateTime;
+
         void UpdateDashboardStatus() {
+            if (Time.time - lastDashboardUpdateTime < 0.1f) return;
+            lastDashboardUpdateTime = Time.time;
+
             var overview = GetConnectionOverviewMessage();
             if (ConnectionOverview != overview) {
                 ConnectionOverview = overview;
@@ -171,6 +523,12 @@ namespace FlameStream {
             if (RightHandStatus != right) {
                 RightHandStatus = right;
                 BroadcastDataInput(nameof(RightHandStatus));
+            }
+
+            var animLayers = GetAnimationLayersOverviewMessage();
+            if (AnimationLayersOverview != animLayers) {
+                AnimationLayersOverview = animLayers;
+                BroadcastDataInput(nameof(AnimationLayersOverview));
             }
         }
 

@@ -168,7 +168,7 @@ namespace FlameStream
 
             RefreshVirtualKeysParent();
 
-            if (EnableFloatingKeys && IsEnabled) {
+            if (IsKeysVisualActive) {
                 UpdateFloatingKeysState();
             }
         }
@@ -521,7 +521,7 @@ namespace FlameStream
         }
 
         public void UpdateIdentifyVisuals() {
-            if (IdentifiedVirtualKey == null || IdentifiedVirtualKey.KeyGameObject == null || !EnableFloatingKeys || !IsEnabled) {
+            if (IdentifiedVirtualKey == null || IdentifiedVirtualKey.KeyGameObject == null || !IsKeysVisualActive) {
                 if (identifyPulseGo != null) {
                     identifyPulseGo.SetActive(false);
                 }
@@ -624,7 +624,7 @@ namespace FlameStream
         }
 
         void UpdateGroupTransforms() {
-            if (!EnableFloatingKeys || !IsEnabled) return;
+            if (!IsKeysVisualActive) return;
 
             // 1. Left Group
             if (leftKeysGroupGo != null) {
@@ -696,8 +696,10 @@ namespace FlameStream
             }
         }
 
-        void UpdateFloatingKeysState() {
-            if (EnableFloatingKeys && IsEnabled && Character != null) {
+        public bool IsKeysVisualActive => EnableFloatingKeys && (IsEnabled || (activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands));
+
+        public void UpdateFloatingKeysState() {
+            if (IsKeysVisualActive && Character != null) {
                 EnsureAnchors();
                 UpdateGroupTransforms();
                 RebuildAllVirtualKeyMeshes();
@@ -707,7 +709,7 @@ namespace FlameStream
         }
 
         void OnUpdateVirtualKeys() {
-            if (!EnableFloatingKeys || !IsEnabled) return;
+            if (!IsKeysVisualActive) return;
 
             // Auto-restore meshes if hot-reloaded and visuals haven't been built yet
             if (VirtualKeys != null && VirtualKeys.Length > 0 && VirtualKeys[0] != null && VirtualKeys[0].KeyGameObject == null) {
@@ -1015,7 +1017,7 @@ namespace FlameStream
         }
 
         public void RebuildVirtualKeyMesh(VirtualKeyDefinition keyDef) {
-            if (keyDef == null || !EnableFloatingKeys || !IsEnabled) return;
+            if (keyDef == null || !IsKeysVisualActive) return;
 
             keyDef.DestroyVisuals();
 
@@ -1120,7 +1122,7 @@ namespace FlameStream
         }
 
         public void RebuildAllVirtualKeyMeshes() {
-            if (!EnableFloatingKeys || !IsEnabled || VirtualKeys == null) return;
+            if (!IsKeysVisualActive || VirtualKeys == null) return;
             for (int i = 0; i < VirtualKeys.Length; i++) {
                 if (VirtualKeys[i] != null) {
                     RebuildVirtualKeyMesh(VirtualKeys[i]);
@@ -1721,7 +1723,7 @@ namespace FlameStream
             BindingGenerator?.UpdateStatus();
             UpdateInputEnableDescriptions();
 
-            if (EnableFloatingKeys && IsEnabled) {
+            if (IsKeysVisualActive) {
                 UpdateFloatingKeysState();
             }
 

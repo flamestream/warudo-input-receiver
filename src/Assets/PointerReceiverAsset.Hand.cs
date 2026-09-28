@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
 using Warudo.Core;
@@ -67,8 +68,8 @@ namespace FlameStream
             if (!shouldExist && !skipAutoCreate) {
                 return null;
             }
-            var anchor = GetAsset<AnchorAsset>(ref ActiveHandPoleAnchorAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"⚓-{LAYER_NAME_PREFIX} Active Hand Pole IK", category: "FS_ASSET_CATEGORY_INPUT".Localized());
-            if (anchor != null && anchor.Name.StartsWith($"🔒⚓-{LAYER_NAME_PREFIX}")) {
+            var anchor = GetAsset<AnchorAsset>(ref ActiveHandPoleAnchorAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"⚓-{LayerPrefix} Active Hand Pole IK", category: "FS_ASSET_CATEGORY_INPUT".Localized());
+            if (anchor != null && anchor.Name.StartsWith($"🔒⚓-{LayerPrefix}")) {
                 anchor.Name = anchor.Name.Replace("🔒⚓-", "⚓-");
                 Scene?.UpdateNewAssetName(anchor);
                 anchor.Broadcast();
@@ -125,11 +126,15 @@ namespace FlameStream
                 OnInputAffectingHandSetupChange();
                 bool isHandActive = IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound && Character != null;
                 TransitionActivePole(isHandActive);
+                if (!IsEnabled) CleanupCharacterAnimationLayers();
+                else if (IsHandEnabled) SynchronizeHandAnimationLayers();
             });
             Watch(nameof(IsHandEnabled), delegate {
                 OnInputAffectingHandSetupChange();
                 bool isHandActive = IsEnabled && IsHandEnabled && !isHandDisabledByOutOfBound && Character != null;
                 TransitionActivePole(isHandActive);
+                if (!IsHandEnabled) CleanupCharacterAnimationLayers();
+                else if (IsEnabled) SynchronizeHandAnimationLayers();
             });
             Watch(nameof(IsRightHanded), delegate {
                 if (ActiveHand != null && ActiveHand.IsRightHanded != IsRightHanded) {
@@ -251,11 +256,13 @@ namespace FlameStream
             HandPenMode.OnEnterVisualSetup = (p) => { HandleHandEnterVisualSetup((PoseState)p); };
             HandPenMode.OnExitVisualSetup = (p, ia) => { HandleHandExitVisualSetup((PoseState)p, ia); };
 
+            SynchronizeHandAnimationLayers();
             OnInputAffectingHandSetupChange(instant: true);
         }
 
         void OnUpdateHand() {
-            if (!IsEnabled || !IsHandEnabled) return;
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            if (!isPuppeteered && (!IsEnabled || !IsHandEnabled)) return;
             if (handAnchor == null) handAnchor = GetHandIK();
             if (handAnchor == null) return;
 
@@ -353,7 +360,7 @@ namespace FlameStream
             var ease = st?.EnterTransition.Ease ?? HandMouseMode.EnterTransition.Ease;
             SetHandOffsetTransforms(tr.position, r, time, ease);
 
-            HandMouseMode.StartAnimationTransition(st != null);
+            HandMouseMode.StartAnimationTransition(st == HandMouseMode || st == HandMouseMode.ActiveState);
             HandMouseMode.ActiveState.StartAnimationTransition(st == HandMouseMode.ActiveState);
             HandPenMode.StartAnimationTransition(st == HandPenMode || st == HandPenMode.ActiveState);
             HandPenMode.ActiveState.StartAnimationTransition(st == HandPenMode.ActiveState);
@@ -419,7 +426,7 @@ namespace FlameStream
             }
 
             var dominantLimb = Character != null ? (IsRightHanded ? Character.RightHandIK : Character.LeftHandIK) : null;
-            if (Character != null) {
+            if (Character != null && activeCoordinator == null) {
                 if (IsRightHanded) {
                     EnableLimb(isHandActive, dominantLimb, handAnchor, ref tweenRightIK, instant);
                 } else {
@@ -434,7 +441,7 @@ namespace FlameStream
                     nonDominantLimb.BendGoalWeight = 0f;
                     nonDominantLimb.Broadcast();
                 }
-            } else if (!isHandActive) {
+            } else if (!isHandActive && activeCoordinator == null) {
                 DestroyHandIK();
                 DestroyCursorAnchor();
             }
@@ -481,10 +488,10 @@ namespace FlameStream
             }
 
             var matchingLayerNames = new List<string> {
-                HandMouseMode.GetAnimationLayerId(LAYER_NAME_PREFIX),
-                HandMouseMode.ActiveState.GetAnimationLayerId(LAYER_NAME_PREFIX),
-                HandPenMode.GetAnimationLayerId(LAYER_NAME_PREFIX),
-                HandPenMode.ActiveState.GetAnimationLayerId(LAYER_NAME_PREFIX),
+                HandMouseMode.GetAnimationLayerId(LayerPrefix),
+                HandMouseMode.ActiveState.GetAnimationLayerId(LayerPrefix),
+                HandPenMode.GetAnimationLayerId(LayerPrefix),
+                HandPenMode.ActiveState.GetAnimationLayerId(LayerPrefix),
             };
 
             var layers = Character.OverlappingAnimations.ToList().ToArray();
@@ -543,16 +550,31 @@ namespace FlameStream
         }
 
         PoseState GetHandState(int source, bool button1) {
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            if (!isPuppeteered && (!IsEnabled || !IsHandEnabled)) return null;
+            if (isPuppeteered && !activeCoordinator.IsPointerDeviceActive(this)) return null;
 
-            if (!IsEnabled || !IsHandEnabled) return null;
+            bool forcePen = isPuppeteered && activeCoordinator.IsPointerInPenState(this);
+            bool forceMouse = isPuppeteered && activeCoordinator.IsPointerInMouseState(this);
 
-            var st = HandPenMode.Enabled && source == 2
-                    ? (BasePoseState)HandPenMode
-                    : HandMouseMode;
+            BasePoseState st = null;
+            if (forcePen || (!forceMouse && source == 2)) {
+                if (HandPenMode != null && HandPenMode.Enabled) {
+                    st = HandPenMode;
+                } else if (HandMouseMode != null && HandMouseMode.Enabled) {
+                    st = HandMouseMode;
+                }
+            } else {
+                if (HandMouseMode != null && HandMouseMode.Enabled) {
+                    st = HandMouseMode;
+                } else if (HandPenMode != null && HandPenMode.Enabled) {
+                    st = HandPenMode;
+                }
+            }
 
-            if (!st.Enabled) return null;
+            if (st == null || !st.Enabled) return null;
 
-            var o = st.ActiveState.Enabled && button1
+            var o = st.ActiveState != null && st.ActiveState.Enabled && button1
                 ? (PoseState)st.ActiveState
                 : st;
 
@@ -560,7 +582,7 @@ namespace FlameStream
         }
 
         AnchorAsset GetHandIK(bool skipAutoCreate = false) {
-            return GetAsset<AnchorAsset>(ref HandAnchorAssetId, skipAutoCreate, newAssetName: $"🔒⚓-{LAYER_NAME_PREFIX} Hand IK", category: "FS_ASSET_CATEGORY_INTERNAL".Localized());
+            return GetAsset<AnchorAsset>(ref HandAnchorAssetId, skipAutoCreate, newAssetName: $"🔒⚓-{LayerPrefix} Hand IK", category: "FS_ASSET_CATEGORY_INTERNAL".Localized());
         }
 
         public void DestroyHandIK() {
@@ -1198,45 +1220,87 @@ namespace FlameStream
 
         void OnDestroyHand() {
             DestroyCursorIndicator();
+            CleanupCharacterAnimationLayers();
+        }
+
+        public void CleanupCharacterAnimationLayers() {
+            if (Character == null || Character.OverlappingAnimations == null) return;
+            if (activeCoordinator != null && activeCoordinator.IsEnabled) return;
+            var remainingLayers = Character.OverlappingAnimations
+                .Where(d => !(d.CustomLayerID?.StartsWith(LayerPrefix) ?? false))
+                .ToArray();
+            if (remainingLayers.Length != Character.OverlappingAnimations.Length) {
+                Helper.SetCharacterOverlappingAnimations(Character, remainingLayers).Forget();
+            }
+        }
+
+        public void SynchronizeHandAnimationLayers() {
+            if (Character == null) return;
+
+            var userLayers = Character.OverlappingAnimations?.Where(d => !(d.CustomLayerID?.StartsWith(LayerPrefix) ?? false)).ToList() ?? new List<OverlappingAnimationData>();
+            var pointerLayers = Character.OverlappingAnimations?.Where(d => d.CustomLayerID?.StartsWith(LayerPrefix) ?? false).ToList() ?? new List<OverlappingAnimationData>();
+
+            var states = new List<PoseState>();
+            if (HandMouseMode != null) {
+                states.Add(HandMouseMode);
+                if (HandMouseMode.ActiveState != null) states.Add(HandMouseMode.ActiveState);
+            }
+            if (HandPenMode != null) {
+                states.Add(HandPenMode);
+                if (HandPenMode.ActiveState != null) states.Add(HandPenMode.ActiveState);
+            }
+
+            foreach (var p in states) {
+                if (p == null || string.IsNullOrEmpty(p.Animation)) continue;
+                var layerId = p.GetAnimationLayerId(LayerPrefix);
+                if (string.IsNullOrEmpty(layerId)) continue;
+
+                var layer = pointerLayers.FirstOrDefault(d => d.CustomLayerID == layerId);
+                var maskedParts = IsRightHanded
+                    ? new[] { AnimationMaskedBodyPart.RightFingers }
+                    : new[] { AnimationMaskedBodyPart.LeftFingers };
+
+                float targetWeight = setupModeHandState == p ? 1f : 0f;
+
+                if (layer == null) {
+                    layer = StructuredData.Create<OverlappingAnimationData>();
+                    layer.CustomLayerID = layerId;
+                    layer.Enabled = true;
+                    layer.Animation = p.Animation;
+                    layer.Weight = targetWeight;
+                    layer.Speed = 1f;
+                    layer.Masked = true;
+                    layer.MaskedBodyParts = maskedParts;
+                    layer.Additive = false;
+                    layer.Looping = false;
+                    pointerLayers.Add(layer);
+                } else {
+                    layer.Enabled = true;
+                    layer.Animation = p.Animation;
+                    layer.Speed = 1f;
+                    layer.Masked = true;
+                    layer.MaskedBodyParts = maskedParts;
+                    layer.Additive = false;
+                    layer.Looping = false;
+                }
+            }
+
+            // Remove invalid animations
+            pointerLayers = pointerLayers.Where(d => !string.IsNullOrEmpty(d.Animation)).ToList();
+            pointerLayers.Sort((x, y) => string.Compare(x.CustomLayerID, y.CustomLayerID, StringComparison.Ordinal));
+            userLayers.AddRange(pointerLayers);
+
+            Helper.SetCharacterOverlappingAnimations(Character, userLayers.ToArray()).Forget();
         }
 
         void HandleHandAnimationChange(PoseState p) {
-            var userLayers = Character.OverlappingAnimations.Where(d => !d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
-            var pointerLayers = Character.OverlappingAnimations.Where(d => d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
-
-            var layerId = p.GetAnimationLayerId(LAYER_NAME_PREFIX);
-            var layer = pointerLayers.FirstOrDefault(d => d.CustomLayerID == layerId);
-            if (layer == null) {
-                layer = StructuredData.Create<OverlappingAnimationData>();
-                layer.Weight = setupModeHandState == p ? 1f : 0f;
-                layer.Speed = 1f;
-                layer.Masked = true;
-                layer.Additive = false;
-                layer.Looping = false;
-                layer.CustomLayerID = layerId;
-
-                pointerLayers.Add(layer);
-            }
-            // Update values
-            layer.MaskedBodyParts = IsRightHanded
-                ? new AnimationMaskedBodyPart[] { AnimationMaskedBodyPart.RightFingers }
-                : new AnimationMaskedBodyPart[] { AnimationMaskedBodyPart.LeftFingers };
-            layer.Animation = p.Animation;
-
-            // Remove invalid animations
-            pointerLayers = pointerLayers.Where(d => d.Animation != null).ToList();
-
-            // Reorder layers
-            pointerLayers.Sort((x, y) => x.CustomLayerID.CompareTo(y.CustomLayerID));
-            userLayers.AddRange(pointerLayers);
-
-            Character.SetDataInput($"{nameof(Character.OverlappingAnimations)}", userLayers.ToArray(), true);
+            SynchronizeHandAnimationLayers();
         }
 
         void HandleHandAnimationWeightChange(PoseState p, float weight, bool resetAnimation = false) {
-            if (Character == null) return;
+            if (Character == null || Character.OverlappingAnimations == null) return;
 
-            var layerId = p.GetAnimationLayerId(LAYER_NAME_PREFIX);
+            var layerId = p.GetAnimationLayerId(LayerPrefix);
             if (layerId == null) return;
 
             var animationData = Array.Find(

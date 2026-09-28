@@ -63,7 +63,8 @@ namespace FlameStream
         }
 
         void OnUpdateProp() {
-            if (!IsEnabled || !IsHandEnabled || !IsPropEnabled) return;
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            if (((!isPuppeteered && (!IsEnabled || !IsHandEnabled)) || !IsPropEnabled)) return;
             if (prop == null) return;
 
             if (inSetupMode) {
@@ -113,7 +114,8 @@ namespace FlameStream
 
         void OnInputAffectingPropChange() {
             if (!isReady) return;
-            bool shouldPropBeActive = IsEnabled && IsHandEnabled && IsPropEnabled && !string.IsNullOrEmpty(PropSource) && Character != null;
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            bool shouldPropBeActive = (isPuppeteered || (IsEnabled && IsHandEnabled)) && IsPropEnabled && !string.IsNullOrEmpty(PropSource) && Character != null;
             if (!shouldPropBeActive) {
                 DestroyProp();
                 return;
@@ -156,6 +158,8 @@ namespace FlameStream
                 tr.Rotate(st.Transform.Rotation);
                 r += st.Transform.Rotation;
                 s = Vector3.Scale(s, st.Transform.Scale);
+            } else {
+                s = Vector3.zero;
             }
 
             var time = inSetupMode ? 0 : st?.EnterTransition.Time ?? PropMouseMode.EnterTransition.Time;
@@ -204,16 +208,31 @@ namespace FlameStream
         }
 
         GameObjectState GetPropState(int source, bool button1) {
-
             if (!IsPropEnabled) return null;
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            if (isPuppeteered && !activeCoordinator.IsPointerDeviceActive(this)) return null;
 
-            var st = PropPenMode.Enabled && source == 2
-                    ? (BaseState)PropPenMode
-                    : PropMouseMode;
+            bool forcePen = isPuppeteered && activeCoordinator.IsPointerInPenState(this);
+            bool forceMouse = isPuppeteered && activeCoordinator.IsPointerInMouseState(this);
 
-            if (!st.Enabled) return null;
+            BaseState st = null;
+            if (forcePen || (!forceMouse && source == 2)) {
+                if (PropPenMode != null && PropPenMode.Enabled) {
+                    st = PropPenMode;
+                } else if (PropMouseMode != null && PropMouseMode.Enabled) {
+                    st = PropMouseMode;
+                }
+            } else {
+                if (PropMouseMode != null && PropMouseMode.Enabled) {
+                    st = PropMouseMode;
+                } else if (PropPenMode != null && PropPenMode.Enabled) {
+                    st = PropPenMode;
+                }
+            }
 
-            var o = st.ActiveState.Enabled && button1
+            if (st == null || !st.Enabled) return null;
+
+            var o = st.ActiveState != null && st.ActiveState.Enabled && button1
                 ? (GameObjectState)st.ActiveState
                 : st;
 
@@ -285,7 +304,7 @@ namespace FlameStream
         }
 
         PropAsset GetProp(bool skipAutoCreate = false) {
-            return GetAsset<PropAsset>(ref PenPropAssetId, skipAutoCreate, newAssetName: $"📦-{LAYER_NAME_PREFIX} Hand Prop", category: "FS_ASSET_CATEGORY_INPUT".Localized());
+            return GetAsset<PropAsset>(ref PenPropAssetId, skipAutoCreate, newAssetName: $"📦-{LayerPrefix} Hand Prop", category: "FS_ASSET_CATEGORY_INPUT".Localized());
         }
 
         async UniTask<AutoCompleteList> GetPropSources() {

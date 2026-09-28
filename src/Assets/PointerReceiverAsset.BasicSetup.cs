@@ -246,50 +246,10 @@ namespace FlameStream
             OnBasicSettingChange();
 
             Watch(nameof(DebugSphereScaleFactor), delegate { ApplyDisplayPointerSphereScale(); });
-            Watch(nameof(DataSourceReceiver), delegate { UpdateSocketLifecycle(); RequestUiRefresh(); });
             Watch(nameof(RestHand), delegate { OnRestHandSettingChange(); });
         }
 
-        private bool isDataSourceFallbackActive = false;
-        public bool IsDataSourceFallbackActive => isDataSourceFallbackActive;
-
-        public void UpdateSocketLifecycle() {
-            if (!IsEnabled) {
-                if (IsSocketListening) StopReceiver();
-                isDataSourceFallbackActive = false;
-                return;
-            }
-
-            bool hasValidDataSource = DataSourceReceiver != null && DataSourceReceiver != this;
-            if (hasValidDataSource) {
-                if (DataSourceReceiver.IsEnabled && DataSourceReceiver.Active) {
-                    // Sharing stream cleanly from data source; no direct socket needed
-                    if (IsSocketListening) StopReceiver();
-                    if (isDataSourceFallbackActive) {
-                        isDataSourceFallbackActive = false;
-                        RequestUiRefresh();
-                    }
-                } else {
-                    // DataSource is disabled or inactive! Fall back to listening directly
-                    if (!IsSocketListening) {
-                        StartReceiver();
-                        if (!isDataSourceFallbackActive) {
-                            isDataSourceFallbackActive = true;
-                            RequestUiRefresh();
-                        }
-                    }
-                }
-            } else {
-                if (isDataSourceFallbackActive) {
-                    isDataSourceFallbackActive = false;
-                    RequestUiRefresh();
-                }
-                if (!IsSocketListening) StartReceiver();
-            }
-        }
-
         void OnUpdateBasicSetup() {
-            UpdateSocketLifecycle();
             UpdateUiStatus();
 
             if (ScreenSetup?.Transform != null && ScreenSetup.Transform.InVisualSetupMode && ScreenSetup.Transform.setupAnchor != null) {
@@ -307,7 +267,8 @@ namespace FlameStream
                 }
             }
 
-            if (!IsEnabled || !IsHandEnabled) return;
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            if (!isPuppeteered && (!IsEnabled || !IsHandEnabled)) return;
             if (screenAsset == null) screenAsset = GetSurfaceScreen();
             if (monitor == null && !string.IsNullOrEmpty(DisplayName)) {
                 monitor = Manager.monitors.FirstOrDefault((Monitor it) => it.name == DisplayName);
@@ -573,7 +534,8 @@ namespace FlameStream
                 enableDesc = "POINTER_ENABLE_DESC".Localized();
             }
 
-            if (isReady && isMissingRequirements && IsHandEnabled) {
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled;
+            if (isReady && isMissingRequirements && IsHandEnabled && !isPuppeteered) {
                 IsHandEnabled = false;
                 SetDataInput(nameof(IsHandEnabled), false, true);
                 BroadcastDataInput(nameof(IsHandEnabled));
@@ -581,8 +543,8 @@ namespace FlameStream
 
             SetDataInputPropertyAndBroadcast(
                 nameof(IsHandEnabled),
-                disabled: isMissingRequirements,
-                description: enableDesc
+                disabled: isMissingRequirements || isPuppeteered,
+                description: isPuppeteered ? string.Format("IK_DELEGATED_TO".Localized(), "ENABLE".Localized(), activeCoordinator.Name) : enableDesc
             );
 
             // Basic Setup ports are NEVER hidden based on IsHandEnabled
@@ -624,7 +586,8 @@ namespace FlameStream
             // Scene check
             if (Scene == null) return;
 
-            bool isRemoveWanted = !IsEnabled && (ScreenSetup?.RemoveOnDisable ?? false);
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            bool isRemoveWanted = (!IsEnabled && !isPuppeteered) && (ScreenSetup?.RemoveOnDisable ?? false);
             if (isRemoveWanted) {
                 var dominantLimb = Character != null ? (IsRightHanded ? Character.RightHandIK : Character.LeftHandIK) : null;
                 bool isLimbActive = dominantLimb != null && (dominantLimb.PositionWeight > 0.001f || dominantLimb.Enabled);
@@ -644,7 +607,7 @@ namespace FlameStream
             screenAsset.DataInputPortCollection.SetValueAtPath("Enabled", true, true);
             screenAsset.DataInputPortCollection.SetValueAtPath("DisplayName", DisplayName, true);
 
-            bool isDisplayMustBeVisible = IsEnabled && IsHandEnabled;
+            bool isDisplayMustBeVisible = (IsEnabled && IsHandEnabled) || isPuppeteered;
             if (isDisplayMustBeVisible) {
                 // Bind cursor anchor to screen
                 cursorAnchorAsset = GetCursorAnchor();
@@ -928,7 +891,7 @@ namespace FlameStream
         }
 
         DrawingScreenAsset GetSurfaceScreen(bool skipAutoCreate = false) {
-            var screen = GetAsset<DrawingScreenAsset>(ref SurfaceScreenAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"📦-{LAYER_NAME_PREFIX} Screen", category: "FS_ASSET_CATEGORY_INPUT".Localized());
+            var screen = GetAsset<DrawingScreenAsset>(ref SurfaceScreenAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"📦-{LayerPrefix} Screen", category: "FS_ASSET_CATEGORY_INPUT".Localized());
             if (screen != null) {
                 if (isNewlyCreated && ScreenSetup?.Transform != null) {
                     screen.Transform.Position = ScreenSetup.Transform.Position;
@@ -941,11 +904,30 @@ namespace FlameStream
         }
 
         AnchorAsset GetCursorAnchor(bool skipAutoCreate = false) {
-            return GetAsset<AnchorAsset>(ref CursorAnchorAssetId, skipAutoCreate, newAssetName: $"🔒⚓-{LAYER_NAME_PREFIX}🎯", category: "FS_ASSET_CATEGORY_INTERNAL".Localized());
+            return GetAsset<AnchorAsset>(ref CursorAnchorAssetId, skipAutoCreate, newAssetName: $"🔒⚓-{LayerPrefix}🎯", category: "FS_ASSET_CATEGORY_INTERNAL".Localized());
         }
 
         public void AssignAssetToCategory(Asset asset, string category) {
             Helper.AssignAssetToCategory(Scene, asset, category);
+        }
+
+        bool IsAssetClaimedByOtherReceiver(Guid id) {
+            if (id == Guid.Empty || Scene == null) return false;
+            var others = Scene.GetAssets<PointerReceiverAsset>();
+            if (others == null) return false;
+            foreach (var r in others) {
+                if (r == this) continue;
+                if (r.SurfaceScreenAssetId == id ||
+                    r.CursorAnchorAssetId == id ||
+                    r.HandAnchorAssetId == id ||
+                    r.ActiveHandPoleAnchorAssetId == id ||
+                    r.RestHandAnchorAssetId == id ||
+                    r.RestHandPoleAnchorAssetId == id ||
+                    r.PenPropAssetId == id) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         T GetAsset<T>(ref Guid assetId, out bool isNewlyCreated, bool skipAutoCreate = false, string newAssetName = null, string category = null) where T : Asset  {
@@ -970,9 +952,11 @@ namespace FlameStream
                 }
             }
 
-            // Check if an existing asset matching the intended name is in the scene (avoid duplicate " 2" suffixes)
+            // Check if an existing asset matching the intended name is in the scene and not already claimed by another receiver
             if (!string.IsNullOrEmpty(newAssetName)) {
-                var existing = Scene.GetAssets<T>().FirstOrDefault(p => p.Name == newAssetName || (p.Name != null && p.Name.Contains(newAssetName)));
+                var existing = Scene.GetAssets<T>().FirstOrDefault(p => 
+                    (p.Name == newAssetName || (p.Name != null && p.Name.Contains(newAssetName))) &&
+                    !IsAssetClaimedByOtherReceiver(p.Id));
                 if (existing != null) {
                     assetId = existing.Id;
                     AssignAssetToCategory(existing, category);
@@ -983,7 +967,7 @@ namespace FlameStream
             if (skipAutoCreate) return null;
 
             var newAsset = Scene.AddAssetToGroup<T>(category);
-            newAsset.Name = newAssetName ?? $"📦-{LAYER_NAME_PREFIX} {nameof(T)}";
+            newAsset.Name = newAssetName ?? $"📦-{LayerPrefix} {nameof(T)}";
             Scene.UpdateNewAssetName(newAsset);
             AssignAssetToCategory(newAsset, category);
             newAsset.Broadcast();

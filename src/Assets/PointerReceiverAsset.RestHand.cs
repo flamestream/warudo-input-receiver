@@ -56,8 +56,8 @@ namespace FlameStream {
             if (!shouldExist && !skipAutoCreate) {
                 return null;
             }
-            var anchor = GetAsset<AnchorAsset>(ref RestHandAnchorAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"⚓-{LAYER_NAME_PREFIX} Rest Hand IK", category: "FS_ASSET_CATEGORY_INPUT".Localized());
-            if (anchor != null && anchor.Name.StartsWith($"🔒⚓-{LAYER_NAME_PREFIX}")) {
+            var anchor = GetAsset<AnchorAsset>(ref RestHandAnchorAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"⚓-{LayerPrefix} Rest Hand IK", category: "FS_ASSET_CATEGORY_INPUT".Localized());
+            if (anchor != null && anchor.Name.StartsWith($"🔒⚓-{LayerPrefix}")) {
                 anchor.Name = anchor.Name.Replace("🔒⚓-", "⚓-");
                 Scene?.UpdateNewAssetName(anchor);
                 anchor.Broadcast();
@@ -78,8 +78,8 @@ namespace FlameStream {
             if (!shouldExist && !skipAutoCreate) {
                 return null;
             }
-            var anchor = GetAsset<AnchorAsset>(ref RestHandPoleAnchorAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"⚓-{LAYER_NAME_PREFIX} Rest Hand Pole IK", category: "FS_ASSET_CATEGORY_INPUT".Localized());
-            if (anchor != null && anchor.Name.StartsWith($"🔒⚓-{LAYER_NAME_PREFIX}")) {
+            var anchor = GetAsset<AnchorAsset>(ref RestHandPoleAnchorAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"⚓-{LayerPrefix} Rest Hand Pole IK", category: "FS_ASSET_CATEGORY_INPUT".Localized());
+            if (anchor != null && anchor.Name.StartsWith($"🔒⚓-{LayerPrefix}")) {
                 anchor.Name = anchor.Name.Replace("🔒⚓-", "⚓-");
                 Scene?.UpdateNewAssetName(anchor);
                 anchor.Broadcast();

@@ -126,10 +126,22 @@ namespace FlameStream {
             }
         }
 
+        public static int GetOverlappingAnimationSortPriority(CharacterAsset.OverlappingAnimationData layer) {
+            if (layer == null || string.IsNullOrEmpty(layer.CustomLayerID)) return 0;
+            if (!layer.CustomLayerID.StartsWith("🔥")) return 0; // Non-plugin user layers first
+            if (layer.CustomLayerID.StartsWith("🔥⌨️")) return 1; // Keyboard layers (base pose + finger presses)
+            if (layer.CustomLayerID.StartsWith("🔥🖱️") || layer.CustomLayerID.StartsWith("🔥🖊️")) return 2; // Pointer layers on top
+            return 1;
+        }
+
         public static Cysharp.Threading.Tasks.UniTask SetCharacterOverlappingAnimations(CharacterAsset character, CharacterAsset.OverlappingAnimationData[] layers) {
             if (character == null) return Cysharp.Threading.Tasks.UniTask.CompletedTask;
 
             try {
+                if (layers != null) {
+                    layers = layers.OrderBy(GetOverlappingAnimationSortPriority).ToArray();
+                }
+
                 if (IsPlaygroundMode) {
                     Warudo.Core.Context.Service?.Toast(
                         Warudo.Core.Server.ToastSeverity.Warning,
