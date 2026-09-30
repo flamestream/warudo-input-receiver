@@ -583,6 +583,7 @@ namespace FlameStream
             OnBodyEnabledChanged();
             OnDebugSettingChange();
             ScreenSetup?.UpdateAutoSetupStatus();
+            UpdateDrawingScreenAppearance();
         }
 
         void OnSurfaceSettingChange() {
@@ -606,9 +607,13 @@ namespace FlameStream
             screenAsset = GetSurfaceScreen(skipAutoCreate: isRemoveWanted);
             if (screenAsset == null) return;
 
-            // Ensure screen stays enabled even if pointer asset is disabled
-            screenAsset.DataInputPortCollection.SetValueAtPath("Enabled", true, true);
+            // Screen visibility depends on ShowOnEnable or if visual setup mode is active
+            bool isVisualSetup = ScreenSetup?.Transform != null && ScreenSetup.Transform.InVisualSetupMode;
+            bool showScreen = isVisualSetup || (ScreenSetup?.ShowOnEnable ?? true);
+            screenAsset.DataInputPortCollection.SetValueAtPath("Enabled", showScreen, true);
             screenAsset.DataInputPortCollection.SetValueAtPath("DisplayName", DisplayName, true);
+
+            UpdateDrawingScreenAppearance();
 
             bool isDisplayMustBeVisible = (IsEnabled && IsHandEnabled) || isPuppeteered;
             if (isDisplayMustBeVisible) {
@@ -622,6 +627,15 @@ namespace FlameStream
             // Monitor data check
             monitor = Manager.monitors.FirstOrDefault((Monitor it) => it.name == DisplayName);
             if (monitor == null) return;
+        }
+
+        public void UpdateDrawingScreenAppearance() {
+            if (screenAsset == null) {
+                screenAsset = GetSurfaceScreen(skipAutoCreate: true);
+            }
+            if (screenAsset != null && ScreenSetup?.Appearance != null) {
+                screenAsset.UpdateAppearance(ScreenSetup.Appearance);
+            }
         }
 
         public void OnDrawingScreenSettingChange() {
@@ -740,6 +754,8 @@ namespace FlameStream
                     screenAsset = GetSurfaceScreen();
                 }
                 if (screenAsset != null) {
+                    screenAsset.DataInputPortCollection.SetValueAtPath("Enabled", true, true);
+                    UpdateDrawingScreenAppearance();
                     t.Position = screenAsset.Transform.Position;
                     t.Rotation = screenAsset.Transform.Rotation;
                     t.Scale = screenAsset.Transform.Scale;
@@ -799,6 +815,10 @@ namespace FlameStream
                         screenAsset.GameObject.transform.rotation = Quaternion.Euler(tr.Rotation);
                         screenAsset.GameObject.transform.localScale = tr.Scale;
                     }
+                }
+                if (screenAsset != null) {
+                    bool showScreen = ScreenSetup?.ShowOnEnable ?? true;
+                    screenAsset.DataInputPortCollection.SetValueAtPath("Enabled", showScreen, true);
                 }
                 Context.Service.NavigateToAsset(Id);
                 Context.Service.BroadcastOpenedScene();
