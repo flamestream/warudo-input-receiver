@@ -277,61 +277,64 @@ namespace FlameStream
             if (cursorAnchorAsset != null && screenAsset != null && cursorAnchorAsset.Attachable.Parent != screenAsset) {
                 cursorAnchorAsset.Attachable.Parent = screenAsset;
             }
-            if (monitor == null) return;
             if (cursorAnchorAsset == null) return;
+            bool isInVisualSetup = inSetupMode || IsInRestHandVisualSetup || IsInActiveHandPoleVisualSetup || IsInScreenVisualSetup;
+            if (monitor == null && !isInVisualSetup) return;
 
-            if (CursorMode.Mode == CursorModeValue.FixedDelta) {
-                adjustedX = 0;
-                adjustedY = 0;
-                if (X != lastX) {
-                    var midX = (monitor.left + monitor.right) / 2;
-                    if (X != midX) {
-                        adjustedX = (int)((X - midX) * CursorMode.DisplacementFactor);
+            if (!isInVisualSetup) {
+                if (CursorMode.Mode == CursorModeValue.FixedDelta) {
+                    adjustedX = 0;
+                    adjustedY = 0;
+                    if (X != lastX) {
+                        var midX = (monitor.left + monitor.right) / 2;
+                        if (X != midX) {
+                            adjustedX = (int)((X - midX) * CursorMode.DisplacementFactor);
+                        }
                     }
-                }
-                if (Y != lastY) {
-                    var midY = (monitor.top + monitor.bottom) / 2;
-                    if (Y != midY) {
-                        adjustedY = (int)((Y - midY) * CursorMode.DisplacementFactor);
+                    if (Y != lastY) {
+                        var midY = (monitor.top + monitor.bottom) / 2;
+                        if (Y != midY) {
+                            adjustedY = (int)((Y - midY) * CursorMode.DisplacementFactor);
+                        }
                     }
+                    adjustedX += lastAdjustedX;
+                    adjustedY += lastAdjustedY;
+                } else {
+                    adjustedX = X;
+                    adjustedY = Y;
                 }
-                adjustedX += lastAdjustedX;
-                adjustedY += lastAdjustedY;
-            } else {
-                adjustedX = X;
-                adjustedY = Y;
-            }
 
-            var inX = Mathf.Clamp(adjustedX, monitor.left - (int)CursorMode.BoundOffsets.x, monitor.right + (int)CursorMode.BoundOffsets.z);
-            var inY = Mathf.Clamp(adjustedY, monitor.top - (int)CursorMode.BoundOffsets.y, monitor.bottom + (int)CursorMode.BoundOffsets.w);
-            isOutOfBound = inX != X || inY != Y;
+                var inX = Mathf.Clamp(adjustedX, monitor.left - (int)CursorMode.BoundOffsets.x, monitor.right + (int)CursorMode.BoundOffsets.z);
+                var inY = Mathf.Clamp(adjustedY, monitor.top - (int)CursorMode.BoundOffsets.y, monitor.bottom + (int)CursorMode.BoundOffsets.w);
+                isOutOfBound = inX != X || inY != Y;
 
 
-            if (CursorMode.Mode == CursorModeValue.FixedDelta) {
-                switch (CursorMode.OutOfBoundFixedDeltaHandling) {
-                    case OutOfBoundFixedDeltaHandlingValue.BackToCenter:
-                        if (adjustedX != inX) adjustedX = (monitor.left + monitor.right) / 2;
-                        if (adjustedY != inY) adjustedY = (monitor.top + monitor.bottom) / 2;
-                        break;
-                    case OutOfBoundFixedDeltaHandlingValue.Clamped:
-                    default:
+                if (CursorMode.Mode == CursorModeValue.FixedDelta) {
+                    switch (CursorMode.OutOfBoundFixedDeltaHandling) {
+                        case OutOfBoundFixedDeltaHandlingValue.BackToCenter:
+                            if (adjustedX != inX) adjustedX = (monitor.left + monitor.right) / 2;
+                            if (adjustedY != inY) adjustedY = (monitor.top + monitor.bottom) / 2;
+                            break;
+                        case OutOfBoundFixedDeltaHandlingValue.Clamped:
+                        default:
+                            adjustedX = inX;
+                            adjustedY = inY;
+                            break;
+                    }
+                } else {
+                    if (CursorMode.OutOfBoundRawTrackingHandling != OutOfBoundRawTrackingHandlingValue.Overflow) {
                         adjustedX = inX;
                         adjustedY = inY;
-                        break;
-                }
-            } else {
-                if (CursorMode.OutOfBoundRawTrackingHandling != OutOfBoundRawTrackingHandlingValue.Overflow) {
-                    adjustedX = inX;
-                    adjustedY = inY;
-                    if (CursorMode.OutOfBoundRawTrackingHandling == OutOfBoundRawTrackingHandlingValue.DisableHand) {
-                        if (isOutOfBound != lastIsOutOfBound) {
-                            isHandDisabledByOutOfBound = isOutOfBound;
-                            OnInputAffectingHandSetupChange();
-                        }
-                    } else if (CursorMode.OutOfBoundRawTrackingHandling == OutOfBoundRawTrackingHandlingValue.Freeze) {
-                        if (isOutOfBound) {
-                            adjustedX = lastAdjustedX;
-                            adjustedY = lastAdjustedY;
+                        if (CursorMode.OutOfBoundRawTrackingHandling == OutOfBoundRawTrackingHandlingValue.DisableHand) {
+                            if (isOutOfBound != lastIsOutOfBound) {
+                                isHandDisabledByOutOfBound = isOutOfBound;
+                                OnInputAffectingHandSetupChange();
+                            }
+                        } else if (CursorMode.OutOfBoundRawTrackingHandling == OutOfBoundRawTrackingHandlingValue.Freeze) {
+                            if (isOutOfBound) {
+                                adjustedX = lastAdjustedX;
+                                adjustedY = lastAdjustedY;
+                            }
                         }
                     }
                 }
@@ -342,7 +345,7 @@ namespace FlameStream
                 ? IK_BASIS_RIGHT_HANDED
                 : IK_BASIS_LEFT_HANDED;
 
-            if (inSetupMode || IsInRestHandVisualSetup || IsInActiveHandPoleVisualSetup || IsInScreenVisualSetup) {
+            if (isInVisualSetup) {
                 anchorTransform.Position = NeutralHandPosition.setupAnchor?.Transform.Position ?? NeutralHandPosition.Position;
                 cursorScreenPosition = anchorTransform.Position;
 

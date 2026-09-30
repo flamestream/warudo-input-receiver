@@ -313,7 +313,8 @@ namespace FlameStream
             }
 
             if (IsInRestHandVisualSetup || IsInActiveHandPoleVisualSetup) {
-                handState = null;
+                handState = GetHandState(Source == 2 || LayerPrefix == "🔥🖊️" ? 2 : 0, false);
+                CalculateRestSetupHandOffsets(handState);
             } else if (inSetupMode) {
                 handState = setupModeHandState;
                 CalculateSetupHandOffsets();
@@ -330,6 +331,28 @@ namespace FlameStream
             ikt.Broadcast();
 
             lastHandState = handState;
+        }
+
+        void CalculateRestSetupHandOffsets(PoseState st) {
+            if (st == null) return;
+            var tr = GetGlobalCalculatorTransform();
+            var r = Vector3.zero;
+            if (st != HandMouseMode) {
+                tr.Translate(HandMouseMode.Transform.Position);
+                tr.Rotate(HandMouseMode.Transform.Rotation);
+                r += HandMouseMode.Transform.Rotation;
+            }
+            if (st == HandPenMode.ActiveState) {
+                tr.Translate(HandPenMode.Transform.Position);
+                tr.Rotate(HandPenMode.Transform.Rotation);
+                r += HandPenMode.Transform.Rotation;
+            }
+            tr.Translate(st.Transform.Position);
+            tr.Rotate(st.Transform.Rotation);
+            r += st.Transform.Rotation;
+
+            handPositionOffset = tr.position;
+            handRotationOffset = r;
         }
 
         void OnHandStateChange() {
@@ -356,7 +379,7 @@ namespace FlameStream
                 r += st.Transform.Rotation;
             }
 
-            var time = (inSetupMode || !isReady) ? 0 : st?.EnterTransition.Time ?? HandMouseMode.EnterTransition.Time;
+            var time = (inSetupMode || IsInRestHandVisualSetup || IsInActiveHandPoleVisualSetup || !isReady) ? 0 : st?.EnterTransition.Time ?? HandMouseMode.EnterTransition.Time;
             var ease = st?.EnterTransition.Ease ?? HandMouseMode.EnterTransition.Ease;
             SetHandOffsetTransforms(tr.position, r, time, ease);
 

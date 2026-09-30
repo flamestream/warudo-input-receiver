@@ -523,8 +523,8 @@ namespace FlameStream {
                 // In PointerReceiver packets, Source == 2 is Pen, whereas Mouse is Source != 2 (0 or 1)
                 bool isMouseSource = MouseReceiver.Source != 2;
 
-                bool isMouseRestSetup = MouseReceiver.IsInRestHandVisualSetup;
-                if (!isMouseRestSetup && isMouseSource && (hasMouseMoved || hasMouseClicks)) {
+                bool isAnyRestSetup = (MouseReceiver != null && MouseReceiver.IsInRestHandVisualSetup) || (PenReceiver != null && PenReceiver.IsInRestHandVisualSetup);
+                if (!isAnyRestSetup && isMouseSource && (hasMouseMoved || hasMouseClicks)) {
                     lastMouseActivityTime = now;
                 }
                 lastMouseX = MouseReceiver.X;
@@ -547,8 +547,8 @@ namespace FlameStream {
                 bool hasPenClicks = PenReceiver.Button1 || PenReceiver.Button2;
                 bool isPenSource = PenReceiver.Source == 2;
 
-                bool isPenRestSetup = PenReceiver.IsInRestHandVisualSetup;
-                if (!isPenRestSetup && isPenSource && (hasPenMoved || hasPenClicks)) {
+                bool isAnyRestSetup = (MouseReceiver != null && MouseReceiver.IsInRestHandVisualSetup) || (PenReceiver != null && PenReceiver.IsInRestHandVisualSetup);
+                if (!isAnyRestSetup && isPenSource && (hasPenMoved || hasPenClicks)) {
                     lastPenActivityTime = now;
                 }
                 lastPenX = PenReceiver.X;
@@ -567,9 +567,10 @@ namespace FlameStream {
                     rightKey = true;
                 }
 
-                if (leftKey) lastKeyboardLeftTime = now;
-                if (rightKey) lastKeyboardRightTime = now;
-                if (leftKey || rightKey || KeyboardReceiver.AnyDown) lastKeyboardActivityTime = now;
+                bool isAnyRestSetup = (MouseReceiver != null && MouseReceiver.IsInRestHandVisualSetup) || (PenReceiver != null && PenReceiver.IsInRestHandVisualSetup);
+                if (!isAnyRestSetup && leftKey) lastKeyboardLeftTime = now;
+                if (!isAnyRestSetup && rightKey) lastKeyboardRightTime = now;
+                if (!isAnyRestSetup && (leftKey || rightKey || KeyboardReceiver.AnyDown)) lastKeyboardActivityTime = now;
             }
         }
 
@@ -577,16 +578,24 @@ namespace FlameStream {
             switch (ReturnTarget) {
                 case InactivityReturnTarget.Mouse:
                     if (MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled) {
-                        bool isMouseRight = MouseReceiver.IsRightHanded;
-                        if (isLeft == !isMouseRight) return CoordinatorHandState.Mouse;
+                        bool isDominant = (isLeft == !MouseReceiver.IsRightHanded);
+                        if (isDominant || MouseReceiver.IsRestHandActive || MouseReceiver.IsInRestHandVisualSetup) {
+                            return CoordinatorHandState.Mouse;
+                        }
+                        if (CoordinationMode == HandCoordinationMode.NonHybrid) return CoordinatorHandState.Released;
                     }
                     return CoordinatorHandState.Keyboard;
+
                 case InactivityReturnTarget.Pen:
                     if (PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled) {
-                        bool isPenRight = PenReceiver.IsRightHanded;
-                        if (isLeft == !isPenRight) return CoordinatorHandState.Pen;
+                        bool isDominant = (isLeft == !PenReceiver.IsRightHanded);
+                        if (isDominant || PenReceiver.IsRestHandActive || PenReceiver.IsInRestHandVisualSetup) {
+                            return CoordinatorHandState.Pen;
+                        }
+                        if (CoordinationMode == HandCoordinationMode.NonHybrid) return CoordinatorHandState.Released;
                     }
                     return CoordinatorHandState.Keyboard;
+
                 case InactivityReturnTarget.Keyboard:
                 default:
                     return CoordinatorHandState.Keyboard;
@@ -615,30 +624,25 @@ namespace FlameStream {
             var nextRight = targetRightState;
 
             if (CoordinationMode == HandCoordinationMode.Hybrid) {
-                // HYBRID MODE:
-                // Mouse/Pen moves active hand; other hand stays on keyboard shortcuts.
-                // Key press moves only the hand of that key.
-                // Idle timer returns hands to configured ReturnTarget.
+                // HYBRID MODE (PER-HAND ARBITRATION):
+                // 1. Hand that needs to move will move.
+                // 2. Hand that does not need to move stays where it was previously (targetLeftState / targetRightState).
+                // 3. When coordinator as a whole idles (all active devices finish their countdown), both hands return to ReturnTarget.
 
                 bool mouseClaimsLeft = MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled && !isMouseRight;
                 bool penClaimsLeft = PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled && !isPenRight;
 
+                bool mouseClaimsRight = MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled && isMouseRight;
+                bool penClaimsRight = PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled && isPenRight;
+
+                // Per-hand active input triggers:
                 if (keyPressLeft) {
                     nextLeft = CoordinatorHandState.Keyboard;
                 } else if (mouseClaimsLeft && activeMouse) {
                     nextLeft = CoordinatorHandState.Mouse;
                 } else if (penClaimsLeft && activePen) {
                     nextLeft = CoordinatorHandState.Pen;
-                } else if ((mouseClaimsLeft && mouseTimedOut) || (penClaimsLeft && penTimedOut)) {
-                    nextLeft = GetInactivityReturnState(true);
-                } else if (targetLeftState == CoordinatorHandState.Keyboard && keyboardTimedOut && ReturnTarget != InactivityReturnTarget.Keyboard) {
-                    nextLeft = GetInactivityReturnState(true);
-                } else if (!mouseClaimsLeft && !penClaimsLeft && targetLeftState != GetInactivityReturnState(true) && keyboardTimedOut) {
-                    nextLeft = GetInactivityReturnState(true);
                 }
-
-                bool mouseClaimsRight = MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled && isMouseRight;
-                bool penClaimsRight = PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled && isPenRight;
 
                 if (keyPressRight) {
                     nextRight = CoordinatorHandState.Keyboard;
@@ -646,16 +650,36 @@ namespace FlameStream {
                     nextRight = CoordinatorHandState.Mouse;
                 } else if (penClaimsRight && activePen) {
                     nextRight = CoordinatorHandState.Pen;
-                } else if ((mouseClaimsRight && mouseTimedOut) || (penClaimsRight && penTimedOut)) {
-                    nextRight = GetInactivityReturnState(false);
-                } else if (targetRightState == CoordinatorHandState.Keyboard && keyboardTimedOut && ReturnTarget != InactivityReturnTarget.Keyboard) {
-                    nextRight = GetInactivityReturnState(false);
-                } else if (!mouseClaimsRight && !penClaimsRight && targetRightState != GetInactivityReturnState(false) && keyboardTimedOut) {
-                    nextRight = GetInactivityReturnState(false);
+                }
+
+                // Coordinator-wide Inactivity Return:
+                if (EnableInactivityReturn) {
+                    bool mouseConfigured = MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled;
+                    bool penConfigured = PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled;
+                    bool keyboardConfigured = KeyboardReceiver != null && KeyboardReceiver.IsEnabled;
+
+                    bool mouseActiveNow = activeMouse;
+                    bool penActiveNow = activePen;
+                    bool keyboardAnyDown = keyboardConfigured && KeyboardReceiver.AnyDown;
+                    bool keyboardActiveNow = keyboardConfigured && (keyboardAnyDown || (now - lastKeyboardActivityTime < 0.15f));
+
+                    bool anyInputActive = mouseActiveNow || penActiveNow || keyboardActiveNow;
+
+                    // Each device counts down independently:
+                    bool mouseIdle = !mouseConfigured || MouseIdleTimeout <= 0f || (now - lastMouseActivityTime >= MouseIdleTimeout);
+                    bool penIdle = !penConfigured || PenIdleTimeout <= 0f || (now - lastPenActivityTime >= PenIdleTimeout);
+                    bool keyboardIdle = !keyboardConfigured || (!keyboardAnyDown && (KeyboardIdleTimeout <= 0f || (now - lastKeyboardActivityTime >= KeyboardIdleTimeout)));
+
+                    bool isCoordinatorIdle = !anyInputActive && mouseIdle && penIdle && keyboardIdle;
+
+                    if (isCoordinatorIdle) {
+                        nextLeft = GetInactivityReturnState(true);
+                        nextRight = GetInactivityReturnState(false);
+                    }
                 }
             } else {
                 // NON-HYBRID MODE:
-                // Mouse/Pen moves active hand and rests other hand (PointerRest or Released).
+                // Mouse/Pen moves active hand and rests other hand (Mouse/Pen or Released).
                 // Key press on keyboard brings BOTH hands to keyboard.
                 // Idle timer returns BOTH hands to configured ReturnTarget.
 
@@ -666,12 +690,12 @@ namespace FlameStream {
                     nextRight = CoordinatorHandState.Keyboard;
                 } else if (activePen) {
                     var restActive = PenReceiver != null && (PenReceiver.IsRestHandActive || PenReceiver.IsInRestHandVisualSetup);
-                    var restState = restActive ? CoordinatorHandState.PointerRest : CoordinatorHandState.Released;
+                    var restState = restActive ? CoordinatorHandState.Pen : CoordinatorHandState.Released;
                     nextLeft = !isPenRight ? CoordinatorHandState.Pen : restState;
                     nextRight = isPenRight ? CoordinatorHandState.Pen : restState;
                 } else if (activeMouse) {
                     var restActive = MouseReceiver != null && (MouseReceiver.IsRestHandActive || MouseReceiver.IsInRestHandVisualSetup);
-                    var restState = restActive ? CoordinatorHandState.PointerRest : CoordinatorHandState.Released;
+                    var restState = restActive ? CoordinatorHandState.Mouse : CoordinatorHandState.Released;
                     nextLeft = !isMouseRight ? CoordinatorHandState.Mouse : restState;
                     nextRight = isMouseRight ? CoordinatorHandState.Mouse : restState;
                 } else if (EnableInactivityReturn) {
@@ -684,52 +708,46 @@ namespace FlameStream {
                         nextRight = GetInactivityReturnState(false);
                     }
                 }
+            }
 
-                // If currently in visual setup mode on pointer rest hand, force rest hand into PointerRest immediately
-                if (MouseReceiver != null && MouseReceiver.IsInRestHandVisualSetup) {
-                    if (isMouseRight) {
-                        nextLeft = CoordinatorHandState.PointerRest;
-                        if (targetLeftState != CoordinatorHandState.PointerRest) {
-                            leftProgressTween?.Kill();
-                            leftWeightTween?.Kill();
-                            isLeftTransitioning = false;
-                            leftTransitionProgress = 1f;
-                            currentLeftState = CoordinatorHandState.PointerRest;
-                            currentLeftWeight = 1.0f;
-                        }
-                    } else {
-                        nextRight = CoordinatorHandState.PointerRest;
-                        if (targetRightState != CoordinatorHandState.PointerRest) {
-                            rightProgressTween?.Kill();
-                            rightWeightTween?.Kill();
-                            isRightTransitioning = false;
-                            rightTransitionProgress = 1f;
-                            currentRightState = CoordinatorHandState.PointerRest;
-                            currentRightWeight = 1.0f;
-                        }
-                    }
-                } else if (PenReceiver != null && PenReceiver.IsInRestHandVisualSetup) {
-                    if (isPenRight) {
-                        nextLeft = CoordinatorHandState.PointerRest;
-                        if (targetLeftState != CoordinatorHandState.PointerRest) {
-                            leftProgressTween?.Kill();
-                            leftWeightTween?.Kill();
-                            isLeftTransitioning = false;
-                            leftTransitionProgress = 1f;
-                            currentLeftState = CoordinatorHandState.PointerRest;
-                            currentLeftWeight = 1.0f;
-                        }
-                    } else {
-                        nextRight = CoordinatorHandState.PointerRest;
-                        if (targetRightState != CoordinatorHandState.PointerRest) {
-                            rightProgressTween?.Kill();
-                            rightWeightTween?.Kill();
-                            isRightTransitioning = false;
-                            rightTransitionProgress = 1f;
-                            currentRightState = CoordinatorHandState.PointerRest;
-                            currentRightWeight = 1.0f;
-                        }
-                    }
+            // If currently in visual setup mode on pointer rest hand, lock both hands immediately
+            if (MouseReceiver != null && MouseReceiver.IsInRestHandVisualSetup) {
+                nextLeft = CoordinatorHandState.Mouse;
+                nextRight = CoordinatorHandState.Mouse;
+                if (targetLeftState != CoordinatorHandState.Mouse) {
+                    leftProgressTween?.Kill();
+                    leftWeightTween?.Kill();
+                    isLeftTransitioning = false;
+                    leftTransitionProgress = 1f;
+                    currentLeftState = CoordinatorHandState.Mouse;
+                    currentLeftWeight = 1.0f;
+                }
+                if (targetRightState != CoordinatorHandState.Mouse) {
+                    rightProgressTween?.Kill();
+                    rightWeightTween?.Kill();
+                    isRightTransitioning = false;
+                    rightTransitionProgress = 1f;
+                    currentRightState = CoordinatorHandState.Mouse;
+                    currentRightWeight = 1.0f;
+                }
+            } else if (PenReceiver != null && PenReceiver.IsInRestHandVisualSetup) {
+                nextLeft = CoordinatorHandState.Pen;
+                nextRight = CoordinatorHandState.Pen;
+                if (targetLeftState != CoordinatorHandState.Pen) {
+                    leftProgressTween?.Kill();
+                    leftWeightTween?.Kill();
+                    isLeftTransitioning = false;
+                    leftTransitionProgress = 1f;
+                    currentLeftState = CoordinatorHandState.Pen;
+                    currentLeftWeight = 1.0f;
+                }
+                if (targetRightState != CoordinatorHandState.Pen) {
+                    rightProgressTween?.Kill();
+                    rightWeightTween?.Kill();
+                    isRightTransitioning = false;
+                    rightTransitionProgress = 1f;
+                    currentRightState = CoordinatorHandState.Pen;
+                    currentRightWeight = 1.0f;
                 }
             }
 
@@ -886,11 +904,10 @@ namespace FlameStream {
             var activeState = isLeft ? currentLeftState : currentRightState;
             var targetState = isLeft ? targetLeftState : targetRightState;
 
-            if (activeState == CoordinatorHandState.PointerRest) {
-                var activePointer = GetActiveRestPointer(isLeft);
-                if (activePointer != null && activePointer.IsInRestHandVisualSetup) {
-                    isTransitioning = false;
-                }
+            if (activeState == CoordinatorHandState.Mouse && MouseReceiver != null && MouseReceiver.IsInRestHandVisualSetup) {
+                isTransitioning = false;
+            } else if (activeState == CoordinatorHandState.Pen && PenReceiver != null && PenReceiver.IsInRestHandVisualSetup) {
+                isTransitioning = false;
             }
 
             GetTargetWorldPose(isLeft, isTransitioning ? targetState : activeState, out Vector3 liveDestPos, out Vector3 liveDestRot, out float weight);
@@ -941,32 +958,50 @@ namespace FlameStream {
                     break;
 
                 case CoordinatorHandState.Mouse:
-                    if (MouseReceiver != null && MouseReceiver.HandAnchor != null && MouseReceiver.HandAnchor.GameObject != null) {
-                        worldPos = MouseReceiver.HandAnchor.GameObject.transform.position;
-                        worldRot = MouseReceiver.HandAnchor.GameObject.transform.eulerAngles;
-                        return;
+                    if (MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled) {
+                        bool isDominant = (isLeft == !MouseReceiver.IsRightHanded);
+                        if (isDominant) {
+                            if (MouseReceiver.HandAnchor != null && MouseReceiver.HandAnchor.GameObject != null) {
+                                worldPos = MouseReceiver.HandAnchor.GameObject.transform.position;
+                                worldRot = MouseReceiver.HandAnchor.GameObject.transform.eulerAngles;
+                                weight = 1f;
+                                return;
+                            }
+                        } else {
+                            if (MouseReceiver.IsRestHandActive || MouseReceiver.IsInRestHandVisualSetup) {
+                                var restAnchor = MouseReceiver.RestHandAnchor;
+                                if (restAnchor != null && restAnchor.GameObject != null) {
+                                    worldPos = restAnchor.GameObject.transform.position;
+                                    worldRot = restAnchor.GameObject.transform.eulerAngles;
+                                    weight = 1f;
+                                    return;
+                                }
+                            }
+                        }
                     }
                     weight = 0f;
                     break;
 
                 case CoordinatorHandState.Pen:
-                    if (PenReceiver != null && PenReceiver.HandAnchor != null && PenReceiver.HandAnchor.GameObject != null) {
-                        worldPos = PenReceiver.HandAnchor.GameObject.transform.position;
-                        worldRot = PenReceiver.HandAnchor.GameObject.transform.eulerAngles;
-                        return;
-                    }
-                    weight = 0f;
-                    break;
-
-                case CoordinatorHandState.PointerRest:
-                    var activePointer = GetActiveRestPointer(isLeft);
-                    if (activePointer != null && (activePointer.IsRestHandActive || activePointer.IsInRestHandVisualSetup)) {
-                        var restAnchor = activePointer.RestHandAnchor;
-                        if (restAnchor != null && restAnchor.GameObject != null) {
-                            worldPos = restAnchor.GameObject.transform.position;
-                            worldRot = restAnchor.GameObject.transform.eulerAngles;
-                            weight = 1f;
-                            return;
+                    if (PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled) {
+                        bool isDominant = (isLeft == !PenReceiver.IsRightHanded);
+                        if (isDominant) {
+                            if (PenReceiver.HandAnchor != null && PenReceiver.HandAnchor.GameObject != null) {
+                                worldPos = PenReceiver.HandAnchor.GameObject.transform.position;
+                                worldRot = PenReceiver.HandAnchor.GameObject.transform.eulerAngles;
+                                weight = 1f;
+                                return;
+                            }
+                        } else {
+                            if (PenReceiver.IsRestHandActive || PenReceiver.IsInRestHandVisualSetup) {
+                                var restAnchor = PenReceiver.RestHandAnchor;
+                                if (restAnchor != null && restAnchor.GameObject != null) {
+                                    worldPos = restAnchor.GameObject.transform.position;
+                                    worldRot = restAnchor.GameObject.transform.eulerAngles;
+                                    weight = 1f;
+                                    return;
+                                }
+                            }
                         }
                     }
                     weight = 0f;
@@ -978,26 +1013,19 @@ namespace FlameStream {
             }
         }
 
-        PointerReceiverAsset GetActiveRestPointer(bool isLeft) {
-            // If isLeft is true, the rest hand is the Left hand -> dominant hand is Right hand
-            // If isLeft is false, the rest hand is the Right hand -> dominant hand is Left hand
-            CoordinatorHandState dominantState = isLeft ? targetRightState : targetLeftState;
-
-            if (dominantState == CoordinatorHandState.Pen && PenReceiver != null) {
-                return PenReceiver;
+        PointerReceiverAsset GetPointerRestDevice(bool isLeft, CoordinatorHandState state) {
+            if (state == CoordinatorHandState.Mouse && MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled) {
+                bool isNonDominant = (isLeft == MouseReceiver.IsRightHanded);
+                if (isNonDominant && (MouseReceiver.IsRestHandActive || MouseReceiver.IsInRestHandVisualSetup)) {
+                    return MouseReceiver;
+                }
+            } else if (state == CoordinatorHandState.Pen && PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled) {
+                bool isNonDominant = (isLeft == PenReceiver.IsRightHanded);
+                if (isNonDominant && (PenReceiver.IsRestHandActive || PenReceiver.IsInRestHandVisualSetup)) {
+                    return PenReceiver;
+                }
             }
-            if (dominantState == CoordinatorHandState.Mouse && MouseReceiver != null) {
-                return MouseReceiver;
-            }
-
-            if (PenReceiver != null && (PenReceiver.IsInRestHandVisualSetup || PenReceiver.IsRestHandActive)) {
-                return PenReceiver;
-            }
-            if (MouseReceiver != null && (MouseReceiver.IsInRestHandVisualSetup || MouseReceiver.IsRestHandActive)) {
-                return MouseReceiver;
-            }
-
-            return PenReceiver ?? MouseReceiver;
+            return null;
         }
 
         void ApplyProxyWorldPose(AnchorAsset proxy, Vector3 worldPos, Vector3 worldRot) {
@@ -1019,15 +1047,10 @@ namespace FlameStream {
             if (Character.LeftHandIK != null && Character.LeftHandIK.Enabled) {
                 Character.LeftHandIK.PositionWeight = currentLeftWeight;
                 Character.LeftHandIK.RotationWeight = currentLeftWeight;
-                if (currentLeftState == CoordinatorHandState.PointerRest) {
-                    var activePointer = GetActiveRestPointer(true);
-                    if (activePointer != null && activePointer.RestHandPoleAnchor != null && activePointer.RestPoleWeight > 0.001f) {
-                        Character.LeftHandIK.BendGoalTarget = activePointer.RestHandPoleAnchor;
-                        Character.LeftHandIK.BendGoalWeight = currentLeftWeight * activePointer.RestPoleWeight;
-                    } else if (Character.LeftHandIK.BendGoalTarget != null) {
-                        Character.LeftHandIK.BendGoalWeight = 0f;
-                        Character.LeftHandIK.BendGoalTarget = null;
-                    }
+                var restPointer = GetPointerRestDevice(true, currentLeftState);
+                if (restPointer != null && restPointer.RestHandPoleAnchor != null && restPointer.RestPoleWeight > 0.001f) {
+                    Character.LeftHandIK.BendGoalTarget = restPointer.RestHandPoleAnchor;
+                    Character.LeftHandIK.BendGoalWeight = currentLeftWeight * restPointer.RestPoleWeight;
                 } else if (Character.LeftHandIK.BendGoalTarget != null) {
                     Character.LeftHandIK.BendGoalWeight = 0f;
                     Character.LeftHandIK.BendGoalTarget = null;
@@ -1038,15 +1061,10 @@ namespace FlameStream {
             if (Character.RightHandIK != null && Character.RightHandIK.Enabled) {
                 Character.RightHandIK.PositionWeight = currentRightWeight;
                 Character.RightHandIK.RotationWeight = currentRightWeight;
-                if (currentRightState == CoordinatorHandState.PointerRest) {
-                    var activePointer = GetActiveRestPointer(false);
-                    if (activePointer != null && activePointer.RestHandPoleAnchor != null && activePointer.RestPoleWeight > 0.001f) {
-                        Character.RightHandIK.BendGoalTarget = activePointer.RestHandPoleAnchor;
-                        Character.RightHandIK.BendGoalWeight = currentRightWeight * activePointer.RestPoleWeight;
-                    } else if (Character.RightHandIK.BendGoalTarget != null) {
-                        Character.RightHandIK.BendGoalWeight = 0f;
-                        Character.RightHandIK.BendGoalTarget = null;
-                    }
+                var restPointer = GetPointerRestDevice(false, currentRightState);
+                if (restPointer != null && restPointer.RestHandPoleAnchor != null && restPointer.RestPoleWeight > 0.001f) {
+                    Character.RightHandIK.BendGoalTarget = restPointer.RestHandPoleAnchor;
+                    Character.RightHandIK.BendGoalWeight = currentRightWeight * restPointer.RestPoleWeight;
                 } else if (Character.RightHandIK.BendGoalTarget != null) {
                     Character.RightHandIK.BendGoalWeight = 0f;
                     Character.RightHandIK.BendGoalTarget = null;

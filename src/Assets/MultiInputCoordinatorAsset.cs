@@ -11,16 +11,15 @@ using Warudo.Plugins.Core.Assets.Utility;
 namespace FlameStream {
 
     public enum HandCoordinationMode {
-        Hybrid = 0,     // Mouse/Pen with dominant hand while off-hand stays on keyboard shortcuts
+        Hybrid = 0,     // Per-hand independent tracking: active input moves only its hand; idle timer returns both to ReturnTarget
         NonHybrid = 1   // Dedicated single-device: mouse/pen uses desk rest, typing brings both hands to keyboard
     }
 
     public enum CoordinatorHandState {
-        Keyboard = 0,
-        Mouse = 1,
-        Pen = 2,
-        PointerRest = 3,
-        Released = 4
+        Released = 0,
+        Keyboard = 1,
+        Mouse = 2,
+        Pen = 3
     }
 
     public enum InactivityReturnTarget {
@@ -557,11 +556,10 @@ namespace FlameStream {
 
         string FormatHandState(CoordinatorHandState state) {
             switch (state) {
+                case CoordinatorHandState.Released: return "STATE_RELEASED".Localized();
                 case CoordinatorHandState.Keyboard: return "STATE_KEYBOARD".Localized();
                 case CoordinatorHandState.Mouse: return "STATE_MOUSE".Localized();
                 case CoordinatorHandState.Pen: return "STATE_PEN".Localized();
-                case CoordinatorHandState.PointerRest: return "STATE_POINTER_REST".Localized();
-                case CoordinatorHandState.Released: return "STATE_RELEASED".Localized();
                 default: return state.ToString();
             }
         }
