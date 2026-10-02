@@ -65,6 +65,7 @@ namespace FlameStream {
         Vector3 rightTransitionStartRot;
         float currentRightWeight = 0f;
         int bindSettleCountdown = 0;
+        bool isIkBound = false;
 
         void OnCreateIK() {
             float now = Time.time;
@@ -237,6 +238,7 @@ namespace FlameStream {
         void BindCharacterIK() {
             if (Character == null) return;
 
+            isIkBound = true;
             leftWeightTween?.Kill();
             rightWeightTween?.Kill();
             currentLeftWeight = 0f;
@@ -411,6 +413,7 @@ namespace FlameStream {
         }
 
         void ReleaseCharacterIK(bool instant = false) {
+            isIkBound = false;
             bindSettleCountdown = 0;
             leftWeightTween?.Kill();
             rightWeightTween?.Kill();
@@ -532,7 +535,15 @@ namespace FlameStream {
         }
 
         void OnUpdateIK() {
-            if (!IsEnabled || !EnableHands || Character == null) return;
+            if (!IsEnabled || !EnableHands || Character == null || HasCharacterMismatch()) {
+                if (isIkBound) ReleaseCharacterIK();
+                return;
+            }
+
+            if (!isIkBound) {
+                BindCharacterIK();
+                return;
+            }
 
             if (bindSettleCountdown > 0) {
                 --bindSettleCountdown;

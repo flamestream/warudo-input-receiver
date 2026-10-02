@@ -45,6 +45,8 @@ namespace FlameStream {
         }
 
         private int lockedPort = 0;
+        private int onReadyCountdown = 3;
+        private bool isReady = false;
 
         [Section("BASIC_SETUP")]
 
@@ -197,8 +199,7 @@ namespace FlameStream {
             if (Active && IsEnabled) {
                 lockedPort = Port;
             }
-            ValidateConfiguration();
-            OnCoordinatorSettingChange();
+            // Defer ValidateConfiguration() and OnCoordinatorSettingChange() to OnUpdate after the 3-frame settle period
         }
 
         protected override void OnDestroy() {
@@ -210,6 +211,22 @@ namespace FlameStream {
 
         public override void OnUpdate() {
             base.OnUpdate();
+
+            if (onReadyCountdown > 0) {
+                --onReadyCountdown;
+                if (onReadyCountdown == 0) {
+                    isReady = true;
+                    EnsureReceiversRegistered();
+                    ValidateConfiguration();
+                    PuppetRegisteredReceivers();
+                    if (IsEnabled && EnableHands && Character != null && !HasCharacterMismatch()) {
+                        BindCharacterIK();
+                        KeyboardReceiver?.SetBaseHandPoseWeight(1f);
+                    }
+                }
+                return;
+            }
+
             ValidateConfiguration();
 
             if (IsEnabled && lastState != null) {
@@ -224,6 +241,7 @@ namespace FlameStream {
         }
 
         void OnCoordinatorSettingChange() {
+            if (!isReady) return;
             if (!IsEnabled) {
                 lockedPort = 0;
                 PuppetRegisteredReceivers();
@@ -234,7 +252,7 @@ namespace FlameStream {
                 lockedPort = Port;
                 RegisterAllReceivers();
                 PuppetRegisteredReceivers();
-                if (EnableHands) {
+                if (EnableHands && Character != null && !HasCharacterMismatch()) {
                     BindCharacterIK();
                     KeyboardReceiver?.SetBaseHandPoseWeight(1f);
                 } else {
@@ -246,8 +264,9 @@ namespace FlameStream {
         }
 
         void OnEnableHandsChange() {
+            if (!isReady) return;
             PuppetRegisteredReceivers();
-            if (IsEnabled && EnableHands) {
+            if (IsEnabled && EnableHands && Character != null && !HasCharacterMismatch()) {
                 BindCharacterIK();
                 KeyboardReceiver?.SetBaseHandPoseWeight(1f);
             } else {
@@ -311,6 +330,7 @@ namespace FlameStream {
         }
 
         void OnReceiverLinksChanged() {
+            if (!isReady) return;
             if (Scene != null) {
                 var krs = Scene.GetAssets<KeyboardReceiverAsset>();
                 if (krs != null) {
@@ -432,11 +452,6 @@ namespace FlameStream {
             // 2. EnableHands Preconditions
             // A. Same Character Check
             if (Character == null) {
-                if (EnableHands) {
-                    EnableHands = false;
-                    SetDataInput(nameof(EnableHands), false, true);
-                    BroadcastDataInput(nameof(EnableHands));
-                }
                 SetDataInputPropertyAndBroadcast(
                     nameof(EnableHands),
                     disabled: true,
@@ -450,11 +465,6 @@ namespace FlameStream {
             bool penMismatch = PenReceiver != null && PenReceiver.Character != Character;
             if (kbMismatch || mouseMismatch || penMismatch) {
                 string mismatchedName = kbMismatch ? KeyboardReceiver.Name : (mouseMismatch ? MouseReceiver.Name : PenReceiver.Name);
-                if (EnableHands) {
-                    EnableHands = false;
-                    SetDataInput(nameof(EnableHands), false, true);
-                    BroadcastDataInput(nameof(EnableHands));
-                }
                 SetDataInputPropertyAndBroadcast(
                     nameof(EnableHands),
                     disabled: true,
@@ -469,6 +479,14 @@ namespace FlameStream {
                 disabled: false,
                 description: "ENABLE_HANDS_DESC".Localized()
             );
+        }
+
+        public bool HasCharacterMismatch() {
+            if (Character == null) return false;
+            bool kbMismatch = KeyboardReceiver != null && KeyboardReceiver.Character != Character;
+            bool mouseMismatch = MouseReceiver != null && MouseReceiver.Character != Character;
+            bool penMismatch = PenReceiver != null && PenReceiver.Character != Character;
+            return kbMismatch || mouseMismatch || penMismatch;
         }
 
         public bool IsPointerDeviceActive(PointerReceiverAsset ptr) {

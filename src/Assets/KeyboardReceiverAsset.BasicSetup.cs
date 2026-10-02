@@ -607,7 +607,8 @@ namespace FlameStream
                 AutoSetup?.UpdateButtonState();
             });
             Watch(nameof(Character), delegate { 
-                if (Character == null) {
+                bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled;
+                if (Character == null && !isPuppeteered) {
                     if (IsHandEnabled) {
                         SetDataInput(nameof(IsHandEnabled), false, true);
                         BroadcastDataInput(nameof(IsHandEnabled));
