@@ -343,6 +343,10 @@ namespace FlameStream
             rootAnchor.Transform.Rotation = KeyboardRootRotation;
             rootAnchor.Transform.Broadcast();
             rootAnchor.Broadcast();
+            if (rootAnchor.GameObject != null) {
+                rootAnchor.GameObject.transform.localPosition = KeyboardRootPosition;
+                rootAnchor.GameObject.transform.localRotation = Quaternion.Euler(KeyboardRootRotation);
+            }
             return rootAnchor;
         }
 
@@ -942,6 +946,10 @@ namespace FlameStream
             // 1. Root Anchor
             AnchorAsset rootAnchor = GetRootAnchor(false);
             if (rootAnchor == null) return;
+            if (rootAnchor.GameObject != null) {
+                rootAnchor.GameObject.transform.localPosition = KeyboardRootPosition;
+                rootAnchor.GameObject.transform.localRotation = Quaternion.Euler(KeyboardRootRotation);
+            }
 
             // 2. Left Hand IK Anchor
             AnchorAsset leftHandAnchor = LeftHandAnchor;
@@ -964,6 +972,10 @@ namespace FlameStream
             leftHandAnchor.Transform.Rotation = leftIkRot;
             leftHandAnchor.Transform.Broadcast();
             leftHandAnchor.Broadcast();
+            if (leftHandAnchor.GameObject != null) {
+                leftHandAnchor.GameObject.transform.localPosition = LeftHandRestPosition;
+                leftHandAnchor.GameObject.transform.localRotation = Quaternion.Euler(leftIkRot);
+            }
 
             // 3. Right Hand IK Anchor
             AnchorAsset rightHandAnchor = RightHandAnchor;
@@ -986,6 +998,10 @@ namespace FlameStream
             rightHandAnchor.Transform.Rotation = rightIkRot;
             rightHandAnchor.Transform.Broadcast();
             rightHandAnchor.Broadcast();
+            if (rightHandAnchor.GameObject != null) {
+                rightHandAnchor.GameObject.transform.localPosition = RightHandRestPosition;
+                rightHandAnchor.GameObject.transform.localRotation = Quaternion.Euler(rightIkRot);
+            }
 
             rootAnchor.Broadcast();
         }

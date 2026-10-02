@@ -414,6 +414,7 @@ namespace FlameStream {
                 Transform.SetDataInput(nameof(Transform.Position), defaultPos, true);
                 Transform.SetDataInput(nameof(Transform.Rotation), defaultRot, true);
                 Transform.SetDataInput(nameof(Transform.Scale), defaultScl, true);
+                SetDataInput(nameof(Transform), Transform, true);
             }
             Transform.LocalizationKey = "SCREEN_TRANSFORM";
             Transform.CollapsedSelf = true;

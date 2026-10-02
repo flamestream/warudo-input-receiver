@@ -443,8 +443,13 @@ namespace FlameStream
                 }
 
                 leftAnchor.Transform.Position = currentLeftHandPos;
-                leftAnchor.Transform.Rotation = ApplyHandIKIntermediateRotation(true, currentLeftHandRot);
+                var leftRotNorm = ApplyHandIKIntermediateRotation(true, currentLeftHandRot);
+                leftAnchor.Transform.Rotation = leftRotNorm;
                 leftAnchor.Transform.Broadcast();
+                if (leftAnchor.GameObject != null) {
+                    leftAnchor.GameObject.transform.localPosition = currentLeftHandPos;
+                    leftAnchor.GameObject.transform.localRotation = Quaternion.Euler(leftRotNorm);
+                }
             }
 
             // 5. Drive Right Hand Anchor
@@ -483,8 +488,13 @@ namespace FlameStream
                 }
 
                 rightAnchor.Transform.Position = currentRightHandPos;
-                rightAnchor.Transform.Rotation = ApplyHandIKIntermediateRotation(false, currentRightHandRot);
+                var rightRotNorm = ApplyHandIKIntermediateRotation(false, currentRightHandRot);
+                rightAnchor.Transform.Rotation = rightRotNorm;
                 rightAnchor.Transform.Broadcast();
+                if (rightAnchor.GameObject != null) {
+                    rightAnchor.GameObject.transform.localPosition = currentRightHandPos;
+                    rightAnchor.GameObject.transform.localRotation = Quaternion.Euler(rightRotNorm);
+                }
             }
 
 

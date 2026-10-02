@@ -121,6 +121,7 @@ namespace FlameStream
         }
 
         void OnReadyBasicSetup() {
+            SetupDrawingScreenTransform();
             OnSurfaceSettingChange();
             if (screenAsset == null) {
                 screenAsset = GetSurfaceScreen();
@@ -136,8 +137,6 @@ namespace FlameStream
         void OnCreateBasicSetup() {
             calculator = new GameObject();
 
-            SetupDrawingScreenTransform();
-
             if (ScreenSetup == null) {
                 ScreenSetup = StructuredData.Create<PointerDrawingScreenSetup>();
                 SetDataInput(nameof(ScreenSetup), ScreenSetup, true);
@@ -147,6 +146,8 @@ namespace FlameStream
                 ScreenSetup.AutoSetup.Parent = this;
                 ScreenSetup.AutoSetup.UpdateDescription();
             }
+
+            SetupDrawingScreenTransform();
 
             // Compatibility: migrate older saved single-port screen transforms if present
             if (HasSavedScreenTransform && !HasConfiguredScreenTransform && ScreenSetup?.Transform != null) {
@@ -229,6 +230,19 @@ namespace FlameStream
                     OnReadyBody();
                     OnReadyProp();
                     OnReadyRestHand();
+                }
+                if (Character != null && !HasConfiguredScreenTransform && ScreenSetup?.Transform != null) {
+                    var preset = ScreenSetup.AutoSetup?.Preset ?? DrawingScreenAutoSetupPreset.StandingTilted;
+                    if (CalculateScreenPresetTransform(preset, out Vector3 pos, out Vector3 rot, out Vector3 scl)) {
+                        ScreenSetup.Transform.Position = pos;
+                        ScreenSetup.Transform.Rotation = rot;
+                        ScreenSetup.Transform.Scale = scl;
+                        ScreenSetup.Transform.SetDataInput(nameof(ScreenSetup.Transform.Position), pos, true);
+                        ScreenSetup.Transform.SetDataInput(nameof(ScreenSetup.Transform.Rotation), rot, true);
+                        ScreenSetup.Transform.SetDataInput(nameof(ScreenSetup.Transform.Scale), scl, true);
+                        ScreenSetup.Transform.Broadcast();
+                        SyncDrawingScreenTransform(screenAsset, force: true);
+                    }
                 }
                 ScreenSetup?.UpdateAutoSetupStatus();
                 BroadcastDataInput(nameof(ScreenSetup));
@@ -607,6 +621,8 @@ namespace FlameStream
             screenAsset = GetSurfaceScreen(skipAutoCreate: isRemoveWanted);
             if (screenAsset == null) return;
 
+            SyncDrawingScreenTransform(screenAsset);
+
             // Screen visibility depends on ShowOnEnable or if visual setup mode is active
             bool isVisualSetup = ScreenSetup?.Transform != null && ScreenSetup.Transform.InVisualSetupMode;
             bool showScreen = isVisualSetup || (ScreenSetup?.ShowOnEnable ?? true);
@@ -619,8 +635,25 @@ namespace FlameStream
             if (isDisplayMustBeVisible) {
                 // Bind cursor anchor to screen
                 cursorAnchorAsset = GetCursorAnchor();
-                if (cursorAnchorAsset != null) {
+                if (cursorAnchorAsset != null && cursorAnchorAsset.Attachable.Parent != screenAsset) {
                     cursorAnchorAsset.Attachable.Parent = screenAsset;
+                    cursorAnchorAsset.DataInputPortCollection?.SetValueAtPath("Attachable.Parent", screenAsset, true);
+                    cursorAnchorAsset.Broadcast();
+                }
+            }
+
+            if (screenAsset != null) {
+                if (RestHand != null && RestHand.ParentType == AnchorParentType.Screen) {
+                    var targetAnchor = GetRestHandAnchor(true);
+                    if (targetAnchor != null && targetAnchor.Attachable.Parent != screenAsset) {
+                        AttachAnchorToParent(targetAnchor, AnchorParentType.Screen, !IsRightHanded);
+                    }
+                }
+                if (RestHand?.ElbowPole != null && RestHand.ElbowPole.ParentType == AnchorParentType.Screen) {
+                    var poleAnchor = GetRestHandPoleAnchor(true);
+                    if (poleAnchor != null && poleAnchor.Attachable.Parent != screenAsset) {
+                        AttachAnchorToParent(poleAnchor, AnchorParentType.Screen, !IsRightHanded);
+                    }
                 }
             }
 
@@ -709,10 +742,7 @@ namespace FlameStream
 
                 var screen = screenAsset ?? (SurfaceScreenAssetId != Guid.Empty ? Scene?.GetAssets<DrawingScreenAsset>().FirstOrDefault(s => s.Id == SurfaceScreenAssetId) : null);
                 if (screen != null) {
-                    screen.Transform.Position = pos;
-                    screen.Transform.Rotation = rot;
-                    screen.Transform.Scale = scl;
-                    screen.Transform.Broadcast();
+                    SyncDrawingScreenTransform(screen, force: true);
                 }
 
                 string presetName = preset == DrawingScreenAutoSetupPreset.StandingTilted
@@ -829,6 +859,29 @@ namespace FlameStream
             tr.Watch(nameof(tr.Scale), delegate { OnDrawingScreenTransformDirectEdit(); });
         }
 
+        public void SyncDrawingScreenTransform(DrawingScreenAsset screen = null, bool force = false) {
+            var targetScreen = screen ?? screenAsset ?? (SurfaceScreenAssetId != Guid.Empty ? Scene?.GetAssets<DrawingScreenAsset>().FirstOrDefault(s => s.Id == SurfaceScreenAssetId) : null);
+            if (targetScreen == null || ScreenSetup?.Transform == null) return;
+
+            bool isUninitialized = (targetScreen.Transform.Scale == Vector3.one && targetScreen.Transform.Position == Vector3.zero);
+            if (force || isUninitialized || !HasConfiguredScreenTransform) {
+                var tr = ScreenSetup.Transform;
+                targetScreen.Transform.Position = tr.Position;
+                targetScreen.Transform.Rotation = tr.Rotation;
+                targetScreen.Transform.Scale = tr.Scale;
+                targetScreen.Transform.SetDataInput(nameof(targetScreen.Transform.Position), tr.Position, true);
+                targetScreen.Transform.SetDataInput(nameof(targetScreen.Transform.Rotation), tr.Rotation, true);
+                targetScreen.Transform.SetDataInput(nameof(targetScreen.Transform.Scale), tr.Scale, true);
+                targetScreen.Transform.Broadcast();
+
+                if (targetScreen.GameObject != null) {
+                    targetScreen.GameObject.transform.position = tr.Position;
+                    targetScreen.GameObject.transform.rotation = Quaternion.Euler(tr.Rotation);
+                    targetScreen.GameObject.transform.localScale = tr.Scale;
+                }
+            }
+        }
+
         public void OnDrawingScreenTransformDirectEdit() {
             if (screenAsset != null && ScreenSetup?.Transform != null && !ScreenSetup.Transform.InVisualSetupMode) {
                 HasConfiguredScreenTransform = true;
@@ -836,7 +889,15 @@ namespace FlameStream
                 screenAsset.Transform.Position = ScreenSetup.Transform.Position;
                 screenAsset.Transform.Rotation = ScreenSetup.Transform.Rotation;
                 screenAsset.Transform.Scale = ScreenSetup.Transform.Scale;
+                screenAsset.Transform.SetDataInput(nameof(screenAsset.Transform.Position), ScreenSetup.Transform.Position, true);
+                screenAsset.Transform.SetDataInput(nameof(screenAsset.Transform.Rotation), ScreenSetup.Transform.Rotation, true);
+                screenAsset.Transform.SetDataInput(nameof(screenAsset.Transform.Scale), ScreenSetup.Transform.Scale, true);
                 screenAsset.Transform.Broadcast();
+                if (screenAsset.GameObject != null) {
+                    screenAsset.GameObject.transform.position = ScreenSetup.Transform.Position;
+                    screenAsset.GameObject.transform.rotation = Quaternion.Euler(ScreenSetup.Transform.Rotation);
+                    screenAsset.GameObject.transform.localScale = ScreenSetup.Transform.Scale;
+                }
             }
         }
 
@@ -916,12 +977,7 @@ namespace FlameStream
         DrawingScreenAsset GetSurfaceScreen(bool skipAutoCreate = false) {
             var screen = GetAsset<DrawingScreenAsset>(ref SurfaceScreenAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"📦-{LayerPrefix} Screen", category: "FS_ASSET_CATEGORY_INPUT".Localized());
             if (screen != null) {
-                if (isNewlyCreated && ScreenSetup?.Transform != null) {
-                    screen.Transform.Position = ScreenSetup.Transform.Position;
-                    screen.Transform.Rotation = ScreenSetup.Transform.Rotation;
-                    screen.Transform.Scale = ScreenSetup.Transform.Scale;
-                    screen.Transform.Broadcast();
-                }
+                SyncDrawingScreenTransform(screen, force: isNewlyCreated);
             }
             return screen;
         }

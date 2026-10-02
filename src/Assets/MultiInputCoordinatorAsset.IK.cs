@@ -64,6 +64,7 @@ namespace FlameStream {
         Vector3 rightTransitionStartPos;
         Vector3 rightTransitionStartRot;
         float currentRightWeight = 0f;
+        int bindSettleCountdown = 0;
 
         void OnCreateIK() {
             float now = Time.time;
@@ -80,10 +81,12 @@ namespace FlameStream {
         }
 
         void OnDestroyIK() {
+            bindSettleCountdown = 0;
             ReleaseCharacterIK(instant: true);
         }
 
         void KillAllTweens() {
+            bindSettleCountdown = 0;
             leftProgressTween?.Kill();
             leftWeightTween?.Kill();
             rightProgressTween?.Kill();
@@ -117,22 +120,45 @@ namespace FlameStream {
 
         public AnchorAsset GetProxyLeftAnchor(bool skipAutoCreate = false) {
             if (proxyLeftAnchor != null && proxyLeftAnchor.GameObject != null) return proxyLeftAnchor;
+            bool isNew = (ProxyLeftHandAnchorAssetId == Guid.Empty || Scene?.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == ProxyLeftHandAnchorAssetId) == null);
             proxyLeftAnchor = GetAsset<AnchorAsset>(ref ProxyLeftHandAnchorAssetId, skipAutoCreate, newAssetName: "🔒⚓-🔥🎯 Left Proxy Hand IK");
-            if (proxyLeftAnchor != null && ProxyLeftHandAnchorAssetId != proxyLeftAnchor.Id) {
-                ProxyLeftHandAnchorAssetId = proxyLeftAnchor.Id;
-                SetDataInput(nameof(ProxyLeftHandAnchorAssetId), proxyLeftAnchor.Id, true);
+            if (proxyLeftAnchor != null) {
+                if (ProxyLeftHandAnchorAssetId != proxyLeftAnchor.Id) {
+                    ProxyLeftHandAnchorAssetId = proxyLeftAnchor.Id;
+                    SetDataInput(nameof(ProxyLeftHandAnchorAssetId), proxyLeftAnchor.Id, true);
+                }
+                if (isNew) {
+                    InitializeProxyAnchorPose(proxyLeftAnchor, true);
+                }
             }
             return proxyLeftAnchor;
         }
 
         public AnchorAsset GetProxyRightAnchor(bool skipAutoCreate = false) {
             if (proxyRightAnchor != null && proxyRightAnchor.GameObject != null) return proxyRightAnchor;
+            bool isNew = (ProxyRightHandAnchorAssetId == Guid.Empty || Scene?.GetAssets<AnchorAsset>().FirstOrDefault(p => p.Id == ProxyRightHandAnchorAssetId) == null);
             proxyRightAnchor = GetAsset<AnchorAsset>(ref ProxyRightHandAnchorAssetId, skipAutoCreate, newAssetName: "🔒⚓-🔥🎯 Right Proxy Hand IK");
-            if (proxyRightAnchor != null && ProxyRightHandAnchorAssetId != proxyRightAnchor.Id) {
-                ProxyRightHandAnchorAssetId = proxyRightAnchor.Id;
-                SetDataInput(nameof(ProxyRightHandAnchorAssetId), proxyRightAnchor.Id, true);
+            if (proxyRightAnchor != null) {
+                if (ProxyRightHandAnchorAssetId != proxyRightAnchor.Id) {
+                    ProxyRightHandAnchorAssetId = proxyRightAnchor.Id;
+                    SetDataInput(nameof(ProxyRightHandAnchorAssetId), proxyRightAnchor.Id, true);
+                }
+                if (isNew) {
+                    InitializeProxyAnchorPose(proxyRightAnchor, false);
+                }
             }
             return proxyRightAnchor;
+        }
+
+        void InitializeProxyAnchorPose(AnchorAsset proxy, bool isLeft) {
+            if (proxy == null) return;
+            Transform bone = null;
+            if (Character != null && Character.Animator != null) {
+                bone = Character.Animator.GetBoneTransform(isLeft ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand);
+            }
+            Vector3 initPos = bone != null ? bone.position : (Character != null && Character.GameObject != null ? Character.GameObject.transform.position + (isLeft ? new Vector3(-0.2f, 1f, 0.2f) : new Vector3(0.2f, 1f, 0.2f)) : Vector3.zero);
+            Vector3 initRot = bone != null ? bone.eulerAngles : (isLeft ? new Vector3(0, 90f, 0) : new Vector3(0, -90f, 0));
+            ApplyProxyWorldPose(proxy, initPos, initRot);
         }
 
         T GetAsset<T>(ref Guid assetId, bool skipAutoCreate = false, string newAssetName = null) where T : Warudo.Core.Scenes.Asset {
@@ -213,6 +239,8 @@ namespace FlameStream {
 
             leftWeightTween?.Kill();
             rightWeightTween?.Kill();
+            currentLeftWeight = 0f;
+            currentRightWeight = 0f;
 
             if (lastBoundCharacter != null && lastBoundCharacter != Character) {
                 if (lastBoundCharacter.LeftHandIK != null && lastBoundCharacter.LeftHandIK.IkTarget == proxyLeftAnchor) {
@@ -231,6 +259,27 @@ namespace FlameStream {
                 }
             }
             lastBoundCharacter = Character;
+
+            if (Character.LeftHandIK != null) {
+                Character.LeftHandIK.PositionWeight = 0f;
+                Character.LeftHandIK.RotationWeight = 0f;
+                Character.LeftHandIK.BendGoalWeight = 0f;
+            }
+            if (Character.RightHandIK != null) {
+                Character.RightHandIK.PositionWeight = 0f;
+                Character.RightHandIK.RotationWeight = 0f;
+                Character.RightHandIK.BendGoalWeight = 0f;
+            }
+
+            proxyLeftAnchor = GetProxyLeftAnchor();
+            proxyRightAnchor = GetProxyRightAnchor();
+
+            // Give downstream receivers and Warudo Attachable hierarchies 3 frames to settle before binding
+            bindSettleCountdown = 3;
+        }
+
+        void FinalizeBindCharacterIK() {
+            if (!IsEnabled || !EnableHands || Character == null) return;
 
             float now = Time.time;
             lastMouseActivityTime = now;
@@ -286,23 +335,21 @@ namespace FlameStream {
 
             // 3. Connect IK targets
             if (Character.LeftHandIK != null && proxyLeftAnchor != null) {
-                if (Character.LeftHandIK.IkTarget != proxyLeftAnchor || !Character.LeftHandIK.Enabled) {
-                    Character.LeftHandIK.PositionWeight = currentLeftWeight;
-                    Character.LeftHandIK.RotationWeight = currentLeftWeight;
-                    Character.LeftHandIK.Enabled = true;
-                    Character.LeftHandIK.IkTarget = proxyLeftAnchor;
-                    Character.LeftHandIK.Broadcast();
-                }
+                Character.LeftHandIK.PositionWeight = 0f;
+                Character.LeftHandIK.RotationWeight = 0f;
+                Character.LeftHandIK.BendGoalWeight = 0f;
+                Character.LeftHandIK.Enabled = true;
+                Character.LeftHandIK.IkTarget = proxyLeftAnchor;
+                Character.LeftHandIK.Broadcast();
             }
 
             if (Character.RightHandIK != null && proxyRightAnchor != null) {
-                if (Character.RightHandIK.IkTarget != proxyRightAnchor || !Character.RightHandIK.Enabled) {
-                    Character.RightHandIK.PositionWeight = currentRightWeight;
-                    Character.RightHandIK.RotationWeight = currentRightWeight;
-                    Character.RightHandIK.Enabled = true;
-                    Character.RightHandIK.IkTarget = proxyRightAnchor;
-                    Character.RightHandIK.Broadcast();
-                }
+                Character.RightHandIK.PositionWeight = 0f;
+                Character.RightHandIK.RotationWeight = 0f;
+                Character.RightHandIK.BendGoalWeight = 0f;
+                Character.RightHandIK.Enabled = true;
+                Character.RightHandIK.IkTarget = proxyRightAnchor;
+                Character.RightHandIK.Broadcast();
             }
 
             // 4. Smooth fade-in weights using ActiveTransition
@@ -364,6 +411,7 @@ namespace FlameStream {
         }
 
         void ReleaseCharacterIK(bool instant = false) {
+            bindSettleCountdown = 0;
             leftWeightTween?.Kill();
             rightWeightTween?.Kill();
 
@@ -485,6 +533,15 @@ namespace FlameStream {
 
         void OnUpdateIK() {
             if (!IsEnabled || !EnableHands || Character == null) return;
+
+            if (bindSettleCountdown > 0) {
+                --bindSettleCountdown;
+                if (bindSettleCountdown == 0) {
+                    FinalizeBindCharacterIK();
+                } else {
+                    return;
+                }
+            }
 
             if (proxyLeftAnchor == null || proxyLeftAnchor.GameObject == null) proxyLeftAnchor = GetProxyLeftAnchor();
             if (proxyRightAnchor == null || proxyRightAnchor.GameObject == null) proxyRightAnchor = GetProxyRightAnchor();
@@ -934,23 +991,98 @@ namespace FlameStream {
             } else {
                 // Settled in state: lock 1:1 to live target world position and rotation in real time
                 ApplyProxyWorldPose(proxy, liveDestPos, liveDestRot);
-                if (isLeft) currentLeftWeight = weight;
-                else currentRightWeight = weight;
+                bool isWeightTweening = isLeft
+                    ? (leftWeightTween != null && leftWeightTween.IsActive() && leftWeightTween.IsPlaying())
+                    : (rightWeightTween != null && rightWeightTween.IsActive() && rightWeightTween.IsPlaying());
+                if (!isWeightTweening) {
+                    if (isLeft) currentLeftWeight = weight;
+                    else currentRightWeight = weight;
+                }
             }
         }
 
-        void GetTargetWorldPose(bool isLeft, CoordinatorHandState state, out Vector3 worldPos, out Vector3 worldRot, out float weight) {
+        bool TryGetAnchorWorldPose(AnchorAsset anchor, out Vector3 worldPos, out Vector3 worldRot) {
             worldPos = Vector3.zero;
-            worldRot = isLeft ? new Vector3(0, 90f, 0) : new Vector3(0, -90f, 0);
+            worldRot = Vector3.zero;
+            if (anchor == null) return false;
+
+            if (TryResolveAnchorWorldPoseRecursive(anchor, 0, out worldPos, out Quaternion quatRot)) {
+                worldRot = quatRot.eulerAngles;
+                return true;
+            }
+
+            if (anchor.GameObject != null && anchor.GameObject.transform.position != Vector3.zero) {
+                worldPos = anchor.GameObject.transform.position;
+                worldRot = anchor.GameObject.transform.eulerAngles;
+                return true;
+            }
+
+            return false;
+        }
+
+        bool TryResolveAnchorWorldPoseRecursive(AnchorAsset anchor, int depth, out Vector3 worldPos, out Quaternion worldRot) {
+            worldPos = Vector3.zero;
+            worldRot = Quaternion.identity;
+            if (anchor == null || depth > 8) return false;
+
+            Vector3 localPos = anchor.Transform.Position;
+            Quaternion localRot = Quaternion.Euler(anchor.Transform.Rotation);
+
+            var parent = anchor.Attachable?.Parent;
+            if (parent == null) {
+                worldPos = localPos;
+                worldRot = localRot;
+                return true;
+            }
+
+            if (parent is AnchorAsset parentAnchor) {
+                if (TryResolveAnchorWorldPoseRecursive(parentAnchor, depth + 1, out Vector3 pPos, out Quaternion pRot)) {
+                    worldPos = pPos + pRot * localPos;
+                    worldRot = pRot * localRot;
+                    return true;
+                }
+            } else if (parent is CharacterAsset character) {
+                if (anchor.Attachable != null && anchor.Attachable.AttachType == Warudo.Plugins.Core.Assets.Mixins.AttachType.HumanBodyBone) {
+                    var bone = anchor.Attachable.AttachToBone;
+                    Transform boneTransform = character.Animator != null ? character.Animator.GetBoneTransform(bone) : null;
+                    if (boneTransform != null) {
+                        worldPos = boneTransform.position + boneTransform.rotation * localPos;
+                        worldRot = boneTransform.rotation * localRot;
+                        return true;
+                    }
+                }
+                Transform charTransform = character.GameObject != null ? character.GameObject.transform : null;
+                Vector3 pPos = charTransform != null ? charTransform.position : character.Transform.Position;
+                Quaternion pRot = charTransform != null ? charTransform.rotation : Quaternion.Euler(character.Transform.Rotation);
+                worldPos = pPos + pRot * localPos;
+                worldRot = pRot * localRot;
+                return true;
+            } else if (parent is GameObjectAsset goa) {
+                Transform goaTransform = goa.GameObject != null ? goa.GameObject.transform : null;
+                Vector3 pPos = goaTransform != null ? goaTransform.position : goa.Transform.Position;
+                Quaternion pRot = goaTransform != null ? goaTransform.rotation : Quaternion.Euler(goa.Transform.Rotation);
+                worldPos = pPos + pRot * localPos;
+                worldRot = pRot * localRot;
+                return true;
+            }
+
+            return false;
+        }
+
+        void GetTargetWorldPose(bool isLeft, CoordinatorHandState state, out Vector3 worldPos, out Vector3 worldRot, out float weight) {
+            Transform handBone = null;
+            if (Character != null && Character.Animator != null) {
+                handBone = Character.Animator.GetBoneTransform(isLeft ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand);
+            }
+            worldPos = handBone != null ? handBone.position : (Character != null && Character.GameObject != null ? Character.GameObject.transform.position + (isLeft ? new Vector3(-0.2f, 1f, 0.2f) : new Vector3(0.2f, 1f, 0.2f)) : Vector3.zero);
+            worldRot = handBone != null ? handBone.eulerAngles : (isLeft ? new Vector3(0, 90f, 0) : new Vector3(0, -90f, 0));
             weight = 1f;
 
             switch (state) {
                 case CoordinatorHandState.Keyboard:
                     if (KeyboardReceiver != null) {
                         var anchor = isLeft ? KeyboardReceiver.LeftHandAnchor : KeyboardReceiver.RightHandAnchor;
-                        if (anchor != null && anchor.GameObject != null) {
-                            worldPos = anchor.GameObject.transform.position;
-                            worldRot = anchor.GameObject.transform.eulerAngles;
+                        if (TryGetAnchorWorldPose(anchor, out worldPos, out worldRot)) {
                             return;
                         }
                     }
@@ -961,18 +1093,13 @@ namespace FlameStream {
                     if (MouseReceiver != null && MouseReceiver.IsEnabled && MouseReceiver.IsHandEnabled) {
                         bool isDominant = (isLeft == !MouseReceiver.IsRightHanded);
                         if (isDominant) {
-                            if (MouseReceiver.HandAnchor != null && MouseReceiver.HandAnchor.GameObject != null) {
-                                worldPos = MouseReceiver.HandAnchor.GameObject.transform.position;
-                                worldRot = MouseReceiver.HandAnchor.GameObject.transform.eulerAngles;
+                            if (TryGetAnchorWorldPose(MouseReceiver.HandAnchor, out worldPos, out worldRot)) {
                                 weight = 1f;
                                 return;
                             }
                         } else {
                             if (MouseReceiver.IsRestHandActive || MouseReceiver.IsInRestHandVisualSetup) {
-                                var restAnchor = MouseReceiver.RestHandAnchor;
-                                if (restAnchor != null && restAnchor.GameObject != null) {
-                                    worldPos = restAnchor.GameObject.transform.position;
-                                    worldRot = restAnchor.GameObject.transform.eulerAngles;
+                                if (TryGetAnchorWorldPose(MouseReceiver.RestHandAnchor, out worldPos, out worldRot)) {
                                     weight = 1f;
                                     return;
                                 }
@@ -986,18 +1113,13 @@ namespace FlameStream {
                     if (PenReceiver != null && PenReceiver.IsEnabled && PenReceiver.IsHandEnabled) {
                         bool isDominant = (isLeft == !PenReceiver.IsRightHanded);
                         if (isDominant) {
-                            if (PenReceiver.HandAnchor != null && PenReceiver.HandAnchor.GameObject != null) {
-                                worldPos = PenReceiver.HandAnchor.GameObject.transform.position;
-                                worldRot = PenReceiver.HandAnchor.GameObject.transform.eulerAngles;
+                            if (TryGetAnchorWorldPose(PenReceiver.HandAnchor, out worldPos, out worldRot)) {
                                 weight = 1f;
                                 return;
                             }
                         } else {
                             if (PenReceiver.IsRestHandActive || PenReceiver.IsInRestHandVisualSetup) {
-                                var restAnchor = PenReceiver.RestHandAnchor;
-                                if (restAnchor != null && restAnchor.GameObject != null) {
-                                    worldPos = restAnchor.GameObject.transform.position;
-                                    worldRot = restAnchor.GameObject.transform.eulerAngles;
+                                if (TryGetAnchorWorldPose(PenReceiver.RestHandAnchor, out worldPos, out worldRot)) {
                                     weight = 1f;
                                     return;
                                 }

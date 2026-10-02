@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using DG.Tweening;
 using UnityEngine;
 using Warudo.Core;
@@ -65,6 +66,18 @@ namespace FlameStream {
             }
             if (isNewlyCreated && anchor != null) {
                 InitializeRestHandAnchor(anchor);
+            } else if (anchor != null && RestHand != null) {
+                var expectedParentType = RestHand.ParentType;
+                if (expectedParentType == AnchorParentType.Screen) {
+                    var screen = screenAsset ?? GetSurfaceScreen();
+                    if (anchor.Attachable.Parent != screen) {
+                        AttachAnchorToParent(anchor, expectedParentType, !IsRightHanded);
+                    }
+                } else if (expectedParentType == AnchorParentType.Character || expectedParentType == AnchorParentType.CharacterShoulder) {
+                    if (anchor.Attachable.Parent != Character) {
+                        AttachAnchorToParent(anchor, expectedParentType, !IsRightHanded);
+                    }
+                }
             }
             return anchor;
         }
@@ -87,6 +100,18 @@ namespace FlameStream {
             }
             if (isNewlyCreated && anchor != null) {
                 InitializeRestHandPoleAnchor(anchor);
+            } else if (anchor != null && RestHand?.ElbowPole != null) {
+                var expectedParentType = RestHand.ElbowPole.ParentType;
+                if (expectedParentType == AnchorParentType.Screen) {
+                    var screen = screenAsset ?? GetSurfaceScreen();
+                    if (anchor.Attachable.Parent != screen) {
+                        AttachAnchorToParent(anchor, expectedParentType, !IsRightHanded);
+                    }
+                } else if (expectedParentType == AnchorParentType.Character || expectedParentType == AnchorParentType.CharacterShoulder) {
+                    if (anchor.Attachable.Parent != Character) {
+                        AttachAnchorToParent(anchor, expectedParentType, !IsRightHanded);
+                    }
+                }
             }
             return anchor;
         }
@@ -182,36 +207,53 @@ namespace FlameStream {
         }
 
         public void AttachAnchorToParent(AnchorAsset anchor, AnchorParentType parentType, bool isRight) {
-            if (anchor == null) return;
+            if (anchor == null || anchor.Attachable == null) return;
             switch (parentType) {
                 case AnchorParentType.Character:
                     anchor.Attachable.Parent = Character;
                     anchor.Attachable.AttachType = Warudo.Plugins.Core.Assets.Mixins.AttachType.TransformPath;
                     anchor.Attachable.AttachToTransform = null;
+                    anchor.DataInputPortCollection?.SetValueAtPath("Attachable.Parent", Character, true);
+                    anchor.DataInputPortCollection?.SetValueAtPath("Attachable.AttachType", Warudo.Plugins.Core.Assets.Mixins.AttachType.TransformPath, true);
+                    anchor.DataInputPortCollection?.SetValueAtPath("Attachable.AttachToTransform", null, true);
+                    anchor.Broadcast();
                     break;
                 case AnchorParentType.CharacterShoulder:
                     anchor.Attachable.Parent = Character;
                     anchor.Attachable.AttachType = Warudo.Plugins.Core.Assets.Mixins.AttachType.HumanBodyBone;
                     var animCheck = Character?.Animator ?? Character?.CloneAnimator;
                     var hasShoulder = animCheck != null && animCheck.GetBoneTransform(isRight ? HumanBodyBones.RightShoulder : HumanBodyBones.LeftShoulder) != null;
+                    HumanBodyBones attachBone;
                     if (hasShoulder) {
-                        anchor.Attachable.AttachToBone = isRight ? HumanBodyBones.RightShoulder : HumanBodyBones.LeftShoulder;
+                        attachBone = isRight ? HumanBodyBones.RightShoulder : HumanBodyBones.LeftShoulder;
                     } else {
                         // Fallback to torso (UpperChest -> Chest -> Spine)
                         var hasUpperChest = animCheck != null && animCheck.GetBoneTransform(HumanBodyBones.UpperChest) != null;
                         var hasChest = animCheck != null && animCheck.GetBoneTransform(HumanBodyBones.Chest) != null;
-                        anchor.Attachable.AttachToBone = hasUpperChest ? HumanBodyBones.UpperChest : (hasChest ? HumanBodyBones.Chest : HumanBodyBones.Spine);
+                        attachBone = hasUpperChest ? HumanBodyBones.UpperChest : (hasChest ? HumanBodyBones.Chest : HumanBodyBones.Spine);
                     }
+                    anchor.Attachable.AttachToBone = attachBone;
                     anchor.Attachable.AttachToTransform = null;
+                    anchor.DataInputPortCollection?.SetValueAtPath("Attachable.Parent", Character, true);
+                    anchor.DataInputPortCollection?.SetValueAtPath("Attachable.AttachType", Warudo.Plugins.Core.Assets.Mixins.AttachType.HumanBodyBone, true);
+                    anchor.DataInputPortCollection?.SetValueAtPath("Attachable.AttachToBone", attachBone, true);
+                    anchor.DataInputPortCollection?.SetValueAtPath("Attachable.AttachToTransform", null, true);
+                    anchor.Broadcast();
                     break;
                 case AnchorParentType.Screen:
                     var screen = screenAsset ?? GetSurfaceScreen();
                     anchor.Attachable.Parent = screen;
                     anchor.Attachable.AttachType = Warudo.Plugins.Core.Assets.Mixins.AttachType.TransformPath;
                     anchor.Attachable.AttachToTransform = null;
+                    anchor.DataInputPortCollection?.SetValueAtPath("Attachable.Parent", screen, true);
+                    anchor.DataInputPortCollection?.SetValueAtPath("Attachable.AttachType", Warudo.Plugins.Core.Assets.Mixins.AttachType.TransformPath, true);
+                    anchor.DataInputPortCollection?.SetValueAtPath("Attachable.AttachToTransform", null, true);
+                    anchor.Broadcast();
                     break;
                 case AnchorParentType.World:
                     anchor.Attachable.Parent = null;
+                    anchor.DataInputPortCollection?.SetValueAtPath("Attachable.Parent", null, true);
+                    anchor.Broadcast();
                     break;
             }
             if (anchor.GameObject != null && anchor.Attachable?.Transform != null) {
@@ -419,6 +461,9 @@ namespace FlameStream {
 
             if (enable) {
                 var anchor = GetRestHandAnchor();
+                if (anchor != null && RestHand != null) {
+                    AttachAnchorToParent(anchor, RestHand.ParentType, !IsRightHanded);
+                }
                 if (restLimb != null && activeCoordinator == null) {
                     if (restLimb.IkTarget != anchor || !restLimb.Enabled) {
                         restLimb.PositionWeight = 0f;
@@ -518,6 +563,9 @@ namespace FlameStream {
 
             if (enable) {
                 var poleAnchor = GetRestHandPoleAnchor();
+                if (poleAnchor != null && RestHand?.ElbowPole != null) {
+                    AttachAnchorToParent(poleAnchor, RestHand.ElbowPole.ParentType, !IsRightHanded);
+                }
                 if (restLimb != null && activeCoordinator == null) {
                     if (restLimb.BendGoalTarget != poleAnchor) {
                         restLimb.BendGoalWeight = 0f;
@@ -657,12 +705,20 @@ namespace FlameStream {
                 var restLimb = IsRightHanded ? Character?.LeftHandIK : Character?.RightHandIK;
                 if (restLimb != null) {
                     restLimb.Enabled = true;
-                    restLimb.IkTarget = GetRestHandAnchor();
+                    var anchor = GetRestHandAnchor();
+                    if (anchor != null && RestHand != null) {
+                        AttachAnchorToParent(anchor, RestHand.ParentType, !IsRightHanded);
+                    }
+                    restLimb.IkTarget = anchor;
                     currentRestLimbWeight = 1.0f;
                     restLimb.PositionWeight = 1.0f;
                     restLimb.RotationWeight = 1.0f;
                     if (IsRestHandPoleActive) {
-                        restLimb.BendGoalTarget = GetRestHandPoleAnchor();
+                        var poleAnchor = GetRestHandPoleAnchor();
+                        if (poleAnchor != null && RestHand?.ElbowPole != null) {
+                            AttachAnchorToParent(poleAnchor, RestHand.ElbowPole.ParentType, !IsRightHanded);
+                        }
+                        restLimb.BendGoalTarget = poleAnchor;
                         currentRestPoleWeight = 1.0f;
                         restLimb.BendGoalWeight = 1.0f;
                     } else {
@@ -922,6 +978,23 @@ namespace FlameStream {
         void OnUpdateRestHand() {
             if (IsInRestHandVisualSetup) {
                 UpdateRestHandVisualSetupLiveTransforms();
+            }
+
+            if (RestHand != null && RestHand.Enabled) {
+                if (RestHand.ParentType == AnchorParentType.Screen) {
+                    var screen = screenAsset ?? GetSurfaceScreen();
+                    var anchor = restHandAnchor ?? (RestHandAnchorAssetId != Guid.Empty ? Scene?.GetAssets<AnchorAsset>().FirstOrDefault(a => a.Id == RestHandAnchorAssetId) : null);
+                    if (anchor != null && screen != null && anchor.Attachable.Parent != screen) {
+                        AttachAnchorToParent(anchor, AnchorParentType.Screen, !IsRightHanded);
+                    }
+                }
+                if (RestHand.ElbowPole != null && RestHand.ElbowPole.ParentType == AnchorParentType.Screen) {
+                    var screen = screenAsset ?? GetSurfaceScreen();
+                    var pole = restHandPoleAnchor ?? (RestHandPoleAnchorAssetId != Guid.Empty ? Scene?.GetAssets<AnchorAsset>().FirstOrDefault(a => a.Id == RestHandPoleAnchorAssetId) : null);
+                    if (pole != null && screen != null && pole.Attachable.Parent != screen) {
+                        AttachAnchorToParent(pole, AnchorParentType.Screen, !IsRightHanded);
+                    }
+                }
             }
 
             if (Character == null) return;
