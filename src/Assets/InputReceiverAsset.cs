@@ -49,16 +49,30 @@ namespace FlameStream
         protected Vector3 TranslationDownVeryStrong = new Vector3(0f, -2f, 0f);
         protected Vector3 TranslationUpVeryStrong = new Vector3(0f, 2f, 0f);
 
-        protected override int CURRENT_ASSET_VERSION => 1;
+        protected override int CURRENT_ASSET_VERSION => 2;
 
         protected override void OnCreate() {
             base.OnCreate();
+            if (AdvancedOptions == null) {
+                AdvancedOptions = StructuredData.Create<AdvancedBindings>();
+                SetDataInput(nameof(AdvancedOptions), AdvancedOptions, true);
+            }
             SignalDefinitionGenerationSectionInstance.Parent = this;
             OnCreateSignalDefinition();
             OnCreateAnimation();
 
             Watch(nameof(IsEnabled), HandleIsControlEnabledChanged);
             Watch(nameof(IsControlEnabled), HandleIsControlEnabledChanged);
+        }
+
+        protected override void OnPostMigrateAsset(int fromVersion, int toVersion) {
+            base.OnPostMigrateAsset(fromVersion, toVersion);
+            if (fromVersion < 2) {
+                if (AdvancedOptions?.LimbIkEnterTransition != null && AdvancedOptions.LimbIkEnterTransition.Delay == 0f) {
+                    AdvancedOptions.LimbIkEnterTransition.Delay = 0.1f;
+                    AdvancedOptions.BroadcastDataInput(nameof(AdvancedOptions.LimbIkEnterTransition));
+                }
+            }
         }
 
         public override void OnUpdate() {

@@ -821,8 +821,14 @@ namespace FlameStream
                 targetWeight,
                 transition.Time
             )
-            .SetEase(transition.Ease)
-            .OnComplete(() => {
+            .SetEase(transition.Ease);
+
+            var delay = (isEnabledWanted && transition != null) ? transition.Delay : 0f;
+            if (delay > 0f) {
+                handIkTween.SetDelay(delay);
+            }
+
+            handIkTween.OnComplete(() => {
                 if (!isEnabledWanted) {
                     if (leftIk != null && leftAnchor != null && leftIk.IkTarget == leftAnchor) { leftIk.Enabled = false; leftIk.IkTarget = null; leftIk.Broadcast(); }
                     if (rightIk != null && rightAnchor != null && rightIk.IkTarget == rightAnchor) { rightIk.Enabled = false; rightIk.IkTarget = null; rightIk.Broadcast(); }
