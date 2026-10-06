@@ -83,7 +83,10 @@ namespace FlameStream {
 
         void OnDestroyIK() {
             bindSettleCountdown = 0;
+            isIkBound = false;
             ReleaseCharacterIK(instant: true);
+            proxyLeftAnchor = null;
+            proxyRightAnchor = null;
         }
 
         void KillAllTweens() {
@@ -163,7 +166,7 @@ namespace FlameStream {
         }
 
         T GetAsset<T>(ref Guid assetId, bool skipAutoCreate = false, string newAssetName = null) where T : Warudo.Core.Scenes.Asset {
-            if (Scene == null) return null;
+            if (isDestroyed || Scene == null) return null;
             var category = (!string.IsNullOrEmpty(newAssetName) && newAssetName.StartsWith("🔒"))
                 ? "FS_ASSET_CATEGORY_INTERNAL".Localized()
                 : "FS_ASSET_CATEGORY_INPUT".Localized();
@@ -212,26 +215,32 @@ namespace FlameStream {
             }
         }
 
-        void UnregisterAllReceivers() {
+        void UnregisterAllReceivers(bool isTeardown = false) {
             if (KeyboardReceiver != null) {
                 var kr = KeyboardReceiver;
-                kr.UnregisterCoordinator(this);
-                kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsEnabled), disabled: false, description: "KEYBOARD_ENABLE_DESC".Localized());
-                kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsHandEnabled), disabled: false, description: "KEYBOARD_ENABLE_DESC".Localized());
+                kr.UnregisterCoordinator(this, isTeardown);
+                if (!isTeardown) {
+                    kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsEnabled), disabled: false, description: "KEYBOARD_ENABLE_DESC".Localized());
+                    kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsHandEnabled), disabled: false, description: "KEYBOARD_ENABLE_DESC".Localized());
+                }
             }
             if (MouseReceiver != null) {
                 var mr = MouseReceiver;
                 mr.LayerPrefix = "🔥👆";
-                mr.UnregisterCoordinator(this);
-                mr.SetDataInputPropertyAndBroadcast(nameof(mr.IsEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
-                mr.SetDataInputPropertyAndBroadcast(nameof(mr.IsHandEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
+                mr.UnregisterCoordinator(this, isTeardown);
+                if (!isTeardown) {
+                    mr.SetDataInputPropertyAndBroadcast(nameof(mr.IsEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
+                    mr.SetDataInputPropertyAndBroadcast(nameof(mr.IsHandEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
+                }
             }
             if (PenReceiver != null) {
                 var pr = PenReceiver;
                 pr.LayerPrefix = "🔥👆";
-                pr.UnregisterCoordinator(this);
-                pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
-                pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsHandEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
+                pr.UnregisterCoordinator(this, isTeardown);
+                if (!isTeardown) {
+                    pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
+                    pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsHandEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
+                }
             }
         }
 
@@ -438,7 +447,6 @@ namespace FlameStream {
                 }
                 currentLeftWeight = 0f;
                 currentRightWeight = 0f;
-                DestroyProxyAnchors();
                 return;
             }
 
@@ -529,9 +537,6 @@ namespace FlameStream {
         }
 
         void CheckCleanupAnchorsAfterFadeOut() {
-            if ((!IsEnabled || !EnableHands) && currentLeftWeight <= 0.001f && currentRightWeight <= 0.001f) {
-                DestroyProxyAnchors();
-            }
         }
 
         void OnUpdateIK() {

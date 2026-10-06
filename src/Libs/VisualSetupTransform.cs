@@ -181,7 +181,7 @@ namespace FlameStream {
         protected override void OnDestroy() {
             base.OnDestroy();
             DestroyOriginIndicator();
-            DestroyAnchor();
+            setupAnchor = null;
         }
 
         public virtual VisualSetupAnchorAsset CreateAnchor() {

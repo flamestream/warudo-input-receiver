@@ -78,15 +78,14 @@ namespace FlameStream
             base.OnDestroy();
 
             DestroyDebugSpheres(true);
-            CleanDestroy(bodySetupRootAnchor);
+            bodySetupRootAnchor = null;
             GameObject.Destroy(calculator);
             tweenLeftIK?.Kill();
             tweenRightIK?.Kill();
             tweenActivePole?.Kill();
-            DestroyActiveHandPoleAnchor();
+            activeHandPoleAnchor = null;
             OnDestroyRestHand();
             OnDestroyHand();
-            ScreenSetup?.Transform?.DestroyAnchor();
         }
 
         public override void OnUpdate() {
@@ -539,6 +538,7 @@ namespace FlameStream
         }
 
         void OnBasicSettingChange() {
+            if (isDestroyed) return;
             bool isMissingRequirements = Character == null || string.IsNullOrEmpty(DisplayName);
             string enableDesc;
             if (Character == null && string.IsNullOrEmpty(DisplayName)) {
@@ -602,9 +602,10 @@ namespace FlameStream
 
         void OnSurfaceSettingChange() {
             // Scene check
-            if (Scene == null) return;
+            if (isDestroyed || Scene == null) return;
 
             bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            bool shouldAutoCreate = ((IsEnabled && IsHandEnabled) || isPuppeteered) && !isDestroyed;
             bool isRemoveWanted = (!IsEnabled && !isPuppeteered) && (ScreenSetup?.RemoveOnDisable ?? false);
             if (isRemoveWanted) {
                 var dominantLimb = Character != null ? (IsRightHanded ? Character.RightHandIK : Character.LeftHandIK) : null;
@@ -618,7 +619,7 @@ namespace FlameStream
             }
 
             // Screen check
-            screenAsset = GetSurfaceScreen(skipAutoCreate: isRemoveWanted);
+            screenAsset = GetSurfaceScreen(skipAutoCreate: !shouldAutoCreate || isRemoveWanted);
             if (screenAsset == null) return;
 
             SyncDrawingScreenTransform(screenAsset);
@@ -634,7 +635,7 @@ namespace FlameStream
             bool isDisplayMustBeVisible = (IsEnabled && IsHandEnabled) || isPuppeteered;
             if (isDisplayMustBeVisible) {
                 // Bind cursor anchor to screen
-                cursorAnchorAsset = GetCursorAnchor();
+                cursorAnchorAsset = GetCursorAnchor(skipAutoCreate: !shouldAutoCreate);
                 if (cursorAnchorAsset != null && cursorAnchorAsset.Attachable.Parent != screenAsset) {
                     cursorAnchorAsset.Attachable.Parent = screenAsset;
                     cursorAnchorAsset.DataInputPortCollection?.SetValueAtPath("Attachable.Parent", screenAsset, true);
@@ -1012,8 +1013,8 @@ namespace FlameStream
         T GetAsset<T>(ref Guid assetId, out bool isNewlyCreated, bool skipAutoCreate = false, string newAssetName = null, string category = null) where T : Asset  {
             isNewlyCreated = false;
 
-            // Return null if Scene is not ready yet (during creation)
-            if (Scene == null) {
+            // Return null if Scene is not ready yet or asset is destroyed
+            if (isDestroyed || Scene == null) {
                 return null;
             }
 

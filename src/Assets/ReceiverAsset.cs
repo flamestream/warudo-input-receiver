@@ -64,6 +64,8 @@ namespace FlameStream {
             }
         }
 
+        protected bool isDestroyed = false;
+
         protected override void OnCreate() {
             if (Port == 0) Port = DEFAULT_PORT;
             base.OnCreate();
@@ -75,6 +77,7 @@ namespace FlameStream {
         }
 
         protected override void OnDestroy() {
+            isDestroyed = true;
             StopReceiver();
             base.OnDestroy();
         }

@@ -131,7 +131,7 @@ result: {result}
 
         protected override void OnDestroy() {
             base.OnDestroy();
-            DestroyAnchor();
+            setupAnchor = null;
             DestroyDebugVisuals();
         }
 

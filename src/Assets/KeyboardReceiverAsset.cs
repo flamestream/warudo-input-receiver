@@ -57,15 +57,18 @@ namespace FlameStream
             RequestUiRefresh();
         }
 
-        public void UnregisterCoordinator(MultiInputCoordinatorAsset coordinator) {
+        public void UnregisterCoordinator(MultiInputCoordinatorAsset coordinator, bool isTeardown = false) {
             if (activeCoordinator != coordinator) return;
             activeCoordinator = null;
             OnHandDelegationChanged();
-            OnCoordinatorStateChanged();
-            RequestUiRefresh();
+            if (!isTeardown && !isDestroyed) {
+                OnCoordinatorStateChanged();
+                RequestUiRefresh();
+            }
         }
 
         public void OnCoordinatorStateChanged() {
+            if (isDestroyed) return;
             bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled;
             SetDataInputPropertyAndBroadcast(
                 nameof(IsEnabled),

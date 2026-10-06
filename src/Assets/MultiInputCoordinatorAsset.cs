@@ -203,7 +203,8 @@ namespace FlameStream {
         }
 
         protected override void OnDestroy() {
-            UnregisterAllReceivers();
+            isDestroyed = true;
+            UnregisterAllReceivers(isTeardown: true);
             OnDestroyIK();
             OnDestroyAnimation();
             base.OnDestroy();
