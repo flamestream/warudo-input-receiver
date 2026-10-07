@@ -470,6 +470,7 @@
         "DELTA_POSITION": "変位位置 (X, Y, Z)",
         "DELTA_ROTATION": "変位回転 (X, Y, Z)",
         "ENABLE_HAND_MOVEMENT": "手の移動を有効化",
+        "VIRTUAL_KEY_PRESET_STANDARD_QWERTY_FULL": "標準 フルキーボード (100% QWERTY)",
         "VIRTUAL_KEY_PRESET_SPLIT_QWERTY": "左右分離 QWERTY",
         "VIRTUAL_KEY_PRESET_GAMING_WASD": "ゲーミング WASD (コンパクト)",
         "VIRTUAL_KEY_PRESET_GAMING_WASD_EXTENDED": "ゲーミング WASD (拡張)",

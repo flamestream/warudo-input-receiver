@@ -14,8 +14,10 @@ namespace FlameStream
 
     public enum VirtualKeyLayoutPreset
     {
+        [Label("VIRTUAL_KEY_PRESET_STANDARD_QWERTY_FULL")]
+        StandardQWERTYFull = 9,
         [Label("VIRTUAL_KEY_PRESET_SPLIT_QWERTY")]
-        SplitQWERTY,
+        SplitQWERTY = 0,
         [Label("VIRTUAL_KEY_PRESET_GAMING_WASD")]
         GamingWASD,
         [Label("VIRTUAL_KEY_PRESET_GAMING_WASD_EXTENDED")]

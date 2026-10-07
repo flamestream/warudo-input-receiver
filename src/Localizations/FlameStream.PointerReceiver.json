@@ -558,6 +558,7 @@
         "DELTA_POSITION": "Delta Position (X, Y, Z)",
         "DELTA_ROTATION": "Delta Rotation (X, Y, Z)",
         "ENABLE_HAND_MOVEMENT": "Enable Hand Displacement",
+        "VIRTUAL_KEY_PRESET_STANDARD_QWERTY_FULL": "Standard QWERTY (Full 100%)",
         "VIRTUAL_KEY_PRESET_SPLIT_QWERTY": "Split QWERTY",
         "VIRTUAL_KEY_PRESET_GAMING_WASD": "Gaming WASD (Compact)",
         "VIRTUAL_KEY_PRESET_GAMING_WASD_EXTENDED": "Gaming WASD (Extended)",

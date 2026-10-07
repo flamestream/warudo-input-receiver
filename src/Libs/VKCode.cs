@@ -12,7 +12,9 @@ namespace FlameStream {
         CLEAR = 12,
         [Label("Enter (13)")]
         RETURN = 13,
-        // Adding a gap for future use (14, 15)
+        [Label("Numpad Enter (14)")]
+        NUMPAD_RETURN = 14,
+        // Adding a gap for future use (15)
         [Label("Shift (16) (Unused; use LSHIFT or RSHIFT)")]
         SHIFT = 16,
         [Label("Control (17) (Unused; use LCONTROL or RCONTROL)")]
