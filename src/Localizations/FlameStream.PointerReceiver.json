@@ -560,6 +560,7 @@
         "ENABLE_HAND_MOVEMENT": "Enable Hand Displacement",
         "VIRTUAL_KEY_PRESET_STANDARD_QWERTY_FULL": "Full-size (100%)",
         "VIRTUAL_KEY_PRESET_COMPACT_FULL_SIZE_96": "Compact Full-Size (96%)",
+        "VIRTUAL_KEY_PRESET_TENKEYLESS_80": "Tenkeyless (80%)",
         "VIRTUAL_KEY_PRESET_SPLIT_QWERTY": "Split QWERTY",
         "VIRTUAL_KEY_PRESET_GAMING_WASD": "Gaming WASD (Compact)",
         "VIRTUAL_KEY_PRESET_GAMING_WASD_EXTENDED": "Gaming WASD (Extended)",
