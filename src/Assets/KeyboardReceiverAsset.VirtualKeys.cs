@@ -508,7 +508,7 @@ namespace FlameStream
             identifyPulseBodyMr = bodyGo.AddComponent<MeshRenderer>();
             identifyPulseBodyMat = CreateKeyMaterial();
             identifyPulseBodyMat.renderQueue = 3050;
-            identifyPulseBodyMr.material = identifyPulseBodyMat;
+            identifyPulseBodyMr.sharedMaterial = identifyPulseBodyMat;
 
             var frameGo = new GameObject("PulseFrame");
             frameGo.transform.SetParent(identifyPulseGo.transform, false);
@@ -517,7 +517,7 @@ namespace FlameStream
             identifyPulseFrameMr = frameGo.AddComponent<MeshRenderer>();
             identifyPulseFrameMat = CreateKeyMaterial();
             identifyPulseFrameMat.renderQueue = 3051;
-            identifyPulseFrameMr.material = identifyPulseFrameMat;
+            identifyPulseFrameMr.sharedMaterial = identifyPulseFrameMat;
         }
 
         public void UpdateIdentifyVisuals() {
@@ -913,13 +913,12 @@ namespace FlameStream
                 Color bodyGlowColor = Color.Lerp(bodyNormal.GlowColor, targetBodyGlowColor, glowFactor);
                 float bodyGlowIntensity = Mathf.Lerp(bodyNormal.GlowIntensity, targetBodyGlowIntensity, glowFactor);
 
-                // When SelfIllumination = 1, diffuse albedo is dimmed to 0 so scene lighting/shadows cannot darken or tint it.
-                // The base color is self-emitted, with any additional glow/bloom added on top.
-                Color albedo = new Color(bodyColor.r * (1f - bodySelfIllum), bodyColor.g * (1f - bodySelfIllum), bodyColor.b * (1f - bodySelfIllum), bodyColor.a);
+                Color albedo = new Color(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a);
                 Color emission = (bodyColor * bodySelfIllum) + (bodyGlowColor * bodyGlowIntensity);
 
                 keyDef.BodyMaterial.color = albedo;
                 keyDef.BodyMaterial.SetColor("_EmissionColor", emission);
+                keyDef.BodyMaterial.EnableKeyword("_EMISSION");
             }
 
             // Apply Border (Color & Glow)
@@ -945,11 +944,12 @@ namespace FlameStream
                 Color borderGlowColor = Color.Lerp(borderNormal.GlowColor, targetBorderGlowColor, glowFactor);
                 float borderGlowIntensity = Mathf.Lerp(borderNormal.GlowIntensity, targetBorderGlowIntensity, glowFactor);
 
-                Color albedo = new Color(borderColor.r * (1f - borderSelfIllum), borderColor.g * (1f - borderSelfIllum), borderColor.b * (1f - borderSelfIllum), borderColor.a);
+                Color albedo = new Color(borderColor.r, borderColor.g, borderColor.b, borderColor.a);
                 Color emission = (borderColor * borderSelfIllum) + (borderGlowColor * borderGlowIntensity);
 
                 keyDef.BorderMaterial.color = albedo;
                 keyDef.BorderMaterial.SetColor("_EmissionColor", emission);
+                keyDef.BorderMaterial.EnableKeyword("_EMISSION");
             }
         }
 
@@ -1063,7 +1063,7 @@ namespace FlameStream
 
             var bodyMat = CreateKeyMaterial();
             bodyMat.renderQueue = 3000;
-            bodyMr.material = bodyMat;
+            bodyMr.sharedMaterial = bodyMat;
 
             // 2. Hollow Border Frame Mesh & Material
             var frameMesh = VirtualKeyMeshBuilder.CreateRoundedRectFrameMesh(initialSize.x, initialSize.y, absoluteCorners, initialBorders);
@@ -1078,7 +1078,7 @@ namespace FlameStream
 
             var borderMat = CreateKeyMaterial();
             borderMat.renderQueue = 3001;
-            frameMr.material = borderMat;
+            frameMr.sharedMaterial = borderMat;
 
             // Cache on definition
             keyDef.KeyGameObject = keyGo;
