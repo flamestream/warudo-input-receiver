@@ -14,32 +14,18 @@ namespace FlameStream
 
     public enum VirtualKeyLayoutPreset
     {
-        [Label("VIRTUAL_KEY_PRESET_STANDARD_QWERTY_FULL")]
-        StandardQWERTYFull = 9,
+        [Label("VIRTUAL_KEY_PRESET_FULL_SIZE_100")]
+        FullSize100 = 0,
         [Label("VIRTUAL_KEY_PRESET_COMPACT_FULL_SIZE_96")]
-        CompactFullSize96 = 10,
+        CompactFullSize96,
         [Label("VIRTUAL_KEY_PRESET_TENKEYLESS_80")]
-        Tenkeyless80 = 11,
+        Tenkeyless80,
         [Label("VIRTUAL_KEY_PRESET_COMPACT_75")]
-        Compact75 = 12,
+        Compact75,
         [Label("VIRTUAL_KEY_PRESET_COMPACT_65")]
-        Compact65 = 13,
-        [Label("VIRTUAL_KEY_PRESET_SPLIT_QWERTY")]
-        SplitQWERTY = 0,
-        [Label("VIRTUAL_KEY_PRESET_GAMING_WASD")]
-        GamingWASD,
-        [Label("VIRTUAL_KEY_PRESET_GAMING_WASD_EXTENDED")]
-        GamingWASDExtended,
-        [Label("VIRTUAL_KEY_PRESET_RHYTHM_4KEY")]
-        Rhythm4Key,
-        [Label("VIRTUAL_KEY_PRESET_RHYTHM_7KEY")]
-        Rhythm7Key,
-        [Label("VIRTUAL_KEY_PRESET_LEVERLESS_ARCADE")]
-        LeverlessArcade,
-        [Label("VIRTUAL_KEY_PRESET_NUMPAD")]
-        Numpad,
-        [Label("VIRTUAL_KEY_PRESET_STANDARD_60PERCENT")]
-        Standard60Percent,
+        Compact65,
+        [Label("VIRTUAL_KEY_PRESET_COMPACT_60")]
+        Compact60,
         [Label("VIRTUAL_KEY_PRESET_KEYCHRON_Q11")]
         KeychronQ11
     }

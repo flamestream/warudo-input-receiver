@@ -82,7 +82,7 @@ namespace FlameStream
         }
 
         public VirtualKeyLayoutPreset KeysLayoutPreset {
-            get => VirtualKeysCollection?.Preset ?? VirtualKeyLayoutPreset.GamingWASDExtended;
+            get => VirtualKeysCollection?.Preset ?? VirtualKeyLayoutPreset.FullSize100;
             set {
                 if (VirtualKeysCollection != null) {
                     VirtualKeysCollection.Preset = value;
@@ -1321,7 +1321,7 @@ namespace FlameStream
             }
 
             switch (preset) {
-                case VirtualKeyLayoutPreset.StandardQWERTYFull: {
+                case VirtualKeyLayoutPreset.FullSize100: {
                     var anchor = VirtualKeyAnchor.KeyboardRoot;
                     float startX = -6.75f * pitch;
 
@@ -1881,292 +1881,85 @@ namespace FlameStream
                     break;
                 }
 
-                case VirtualKeyLayoutPreset.GamingWASDExtended: {
-                    // Extended gaming left-hand cluster:
-                    // ` 1 2 3 4 5 6
-                    // Tab Q W E R T
-                    // Caps A S D F G
-                    // Shift Z X C V B
-                    // Ctrl Win Alt Space
-                    var anchor = VirtualKeyAnchor.LeftHand;
-                    float startX = -2.5f * pitch;
-                    float z = 2f * pitch;
-
-                    // Number row: ` (OEM_3 / 192), 1, 2, 3, 4, 5, 6
-                    AddKey(VKCode.OEM_3, "`", anchor, startX + 0 * pitch, z);
-                    AddKey(VKCode.KEY_1, "1", anchor, startX + 1 * pitch, z);
-                    AddKey(VKCode.KEY_2, "2", anchor, startX + 2 * pitch, z);
-                    AddKey(VKCode.KEY_3, "3", anchor, startX + 3 * pitch, z);
-                    AddKey(VKCode.KEY_4, "4", anchor, startX + 4 * pitch, z);
-                    AddKey(VKCode.KEY_5, "5", anchor, startX + 5 * pitch, z);
-                    AddKey(VKCode.KEY_6, "6", anchor, startX + 6 * pitch, z);
-
-                    // Row 1: Tab (1.5u), Q, W, E, R, T
-                    z -= pitch;
-                    AddKey(VKCode.TAB, "Tab", anchor, startX + 0.25f * pitch, z, 1.5f, 1f);
-                    AddKey(VKCode.Q, "Q", anchor, startX + 1.5f * pitch, z);
-                    AddKey(VKCode.W, "W", anchor, startX + 2.5f * pitch, z);
-                    AddKey(VKCode.E, "E", anchor, startX + 3.5f * pitch, z);
-                    AddKey(VKCode.R, "R", anchor, startX + 4.5f * pitch, z);
-                    AddKey(VKCode.T, "T", anchor, startX + 5.5f * pitch, z);
-
-                    // Row 2: Caps (1.75u), A, S, D, F, G
-                    z -= pitch;
-                    AddKey(VKCode.CAPITAL, "Caps", anchor, startX + 0.375f * pitch, z, 1.75f, 1f);
-                    AddKey(VKCode.A, "A", anchor, startX + 1.75f * pitch, z);
-                    AddKey(VKCode.S, "S", anchor, startX + 2.75f * pitch, z);
-                    AddKey(VKCode.D, "D", anchor, startX + 3.75f * pitch, z);
-                    AddKey(VKCode.F, "F", anchor, startX + 4.75f * pitch, z);
-                    AddKey(VKCode.G, "G", anchor, startX + 5.75f * pitch, z);
-
-                    // Row 3: Shift (2.25u), Z, X, C, V, B
-                    z -= pitch;
-                    AddKey(VKCode.LSHIFT, "Shift", anchor, startX + 0.625f * pitch, z, 2.25f, 1f);
-                    AddKey(VKCode.Z, "Z", anchor, startX + 2.25f * pitch, z);
-                    AddKey(VKCode.X, "X", anchor, startX + 3.25f * pitch, z);
-                    AddKey(VKCode.C, "C", anchor, startX + 4.25f * pitch, z);
-                    AddKey(VKCode.V, "V", anchor, startX + 5.25f * pitch, z);
-                    AddKey(VKCode.B, "B", anchor, startX + 6.25f * pitch, z);
-
-                    // Bottom Row: Ctrl (1.25u), Win (1.25u), Alt (1.25u), Space (3.5u)
-                    z -= pitch;
-                    AddKey(VKCode.LCONTROL, "Ctrl", anchor, startX + 0.125f * pitch, z, 1.25f, 1f);
-                    AddKey(VKCode.LWIN, "Win", anchor, startX + 1.375f * pitch, z, 1.25f, 1f);
-                    AddKey(VKCode.LMENU, "Alt", anchor, startX + 2.625f * pitch, z, 1.25f, 1f);
-                    AddKey(VKCode.SPACE, "Space", anchor, startX + 5.0f * pitch, z, 3.5f, 1f);
-                    break;
-                }
-
-                case VirtualKeyLayoutPreset.GamingWASD: {
-                    var anchor = VirtualKeyAnchor.LeftHand;
-                    // Compact WASD cluster
-                    AddKey(VKCode.KEY_1, "1", anchor, -1 * pitch, 2 * pitch);
-                    AddKey(VKCode.KEY_2, "2", anchor, 0, 2 * pitch);
-                    AddKey(VKCode.KEY_3, "3", anchor, 1 * pitch, 2 * pitch);
-                    AddKey(VKCode.KEY_4, "4", anchor, 2 * pitch, 2 * pitch);
-
-                    AddKey(VKCode.Q, "Q", anchor, -1 * pitch, 1 * pitch);
-                    AddKey(VKCode.W, "W", anchor, 0, 1 * pitch);
-                    AddKey(VKCode.E, "E", anchor, 1 * pitch, 1 * pitch);
-                    AddKey(VKCode.R, "R", anchor, 2 * pitch, 1 * pitch);
-
-                    AddKey(VKCode.A, "A", anchor, -1 * pitch, 0);
-                    AddKey(VKCode.S, "S", anchor, 0, 0);
-                    AddKey(VKCode.D, "D", anchor, 1 * pitch, 0);
-                    AddKey(VKCode.F, "F", anchor, 2 * pitch, 0);
-
-                    AddKey(VKCode.LSHIFT, "Shift", anchor, -1.25f * pitch, -1 * pitch, 1.75f, 1f);
-                    AddKey(VKCode.SPACE, "Space", anchor, 0.75f * pitch, -1 * pitch, 3.0f, 1f);
-                    break;
-                }
-
-                case VirtualKeyLayoutPreset.SplitQWERTY: {
-                    // Left Hand
-                    var L = VirtualKeyAnchor.LeftHand;
-                    AddKey(VKCode.KEY_1, "1", L, -2 * pitch, 2 * pitch);
-                    AddKey(VKCode.KEY_2, "2", L, -1 * pitch, 2 * pitch);
-                    AddKey(VKCode.KEY_3, "3", L, 0, 2 * pitch);
-                    AddKey(VKCode.KEY_4, "4", L, 1 * pitch, 2 * pitch);
-                    AddKey(VKCode.KEY_5, "5", L, 2 * pitch, 2 * pitch);
-
-                    AddKey(VKCode.Q, "Q", L, -2 * pitch, 1 * pitch);
-                    AddKey(VKCode.W, "W", L, -1 * pitch, 1 * pitch);
-                    AddKey(VKCode.E, "E", L, 0, 1 * pitch);
-                    AddKey(VKCode.R, "R", L, 1 * pitch, 1 * pitch);
-                    AddKey(VKCode.T, "T", L, 2 * pitch, 1 * pitch);
-
-                    AddKey(VKCode.A, "A", L, -2 * pitch, 0);
-                    AddKey(VKCode.S, "S", L, -1 * pitch, 0);
-                    AddKey(VKCode.D, "D", L, 0, 0);
-                    AddKey(VKCode.F, "F", L, 1 * pitch, 0);
-                    AddKey(VKCode.G, "G", L, 2 * pitch, 0);
-
-                    AddKey(VKCode.Z, "Z", L, -2 * pitch, -1 * pitch);
-                    AddKey(VKCode.X, "X", L, -1 * pitch, -1 * pitch);
-                    AddKey(VKCode.C, "C", L, 0, -1 * pitch);
-                    AddKey(VKCode.V, "V", L, 1 * pitch, -1 * pitch);
-                    AddKey(VKCode.B, "B", L, 2 * pitch, -1 * pitch);
-
-                    AddKey(VKCode.SPACE, "Space", L, 1 * pitch, -2 * pitch, 2.5f, 1f);
-
-                    // Right Hand
-                    var R = VirtualKeyAnchor.RightHand;
-                    AddKey(VKCode.KEY_6, "6", R, -2 * pitch, 2 * pitch);
-                    AddKey(VKCode.KEY_7, "7", R, -1 * pitch, 2 * pitch);
-                    AddKey(VKCode.KEY_8, "8", R, 0, 2 * pitch);
-                    AddKey(VKCode.KEY_9, "9", R, 1 * pitch, 2 * pitch);
-                    AddKey(VKCode.KEY_0, "0", R, 2 * pitch, 2 * pitch);
-
-                    AddKey(VKCode.Y, "Y", R, -2 * pitch, 1 * pitch);
-                    AddKey(VKCode.U, "U", R, -1 * pitch, 1 * pitch);
-                    AddKey(VKCode.I, "I", R, 0, 1 * pitch);
-                    AddKey(VKCode.O, "O", R, 1 * pitch, 1 * pitch);
-                    AddKey(VKCode.P, "P", R, 2 * pitch, 1 * pitch);
-
-                    AddKey(VKCode.H, "H", R, -2 * pitch, 0);
-                    AddKey(VKCode.J, "J", R, -1 * pitch, 0);
-                    AddKey(VKCode.K, "K", R, 0, 0);
-                    AddKey(VKCode.L, "L", R, 1 * pitch, 0);
-                    AddKey(VKCode.RETURN, "Enter", R, 2.25f * pitch, 0, 1.75f, 1f);
-
-                    AddKey(VKCode.N, "N", R, -2 * pitch, -1 * pitch);
-                    AddKey(VKCode.M, "M", R, -1 * pitch, -1 * pitch);
-                    AddKey(VKCode.OEM_COMMA, ",", R, 0, -1 * pitch);
-                    AddKey(VKCode.OEM_PERIOD, ".", R, 1 * pitch, -1 * pitch);
-                    AddKey(VKCode.RSHIFT, "Shift", R, 2.25f * pitch, -1 * pitch, 1.75f, 1f);
-
-                    AddKey(VKCode.SPACE, "Space", R, -1 * pitch, -2 * pitch, 2.5f, 1f);
-                    break;
-                }
-
-                case VirtualKeyLayoutPreset.Rhythm4Key: {
-                    var L = VirtualKeyAnchor.LeftHand;
-                    var R = VirtualKeyAnchor.RightHand;
-                    AddKey(VKCode.D, "D", L, -0.6f * pitch, 0, 1.2f, 1.3f);
-                    AddKey(VKCode.F, "F", L, 0.6f * pitch, 0, 1.2f, 1.3f);
-
-                    AddKey(VKCode.J, "J", R, -0.6f * pitch, 0, 1.2f, 1.3f);
-                    AddKey(VKCode.K, "K", R, 0.6f * pitch, 0, 1.2f, 1.3f);
-                    break;
-                }
-
-                case VirtualKeyLayoutPreset.Rhythm7Key: {
-                    var L = VirtualKeyAnchor.LeftHand;
-                    var R = VirtualKeyAnchor.RightHand;
-                    AddKey(VKCode.S, "S", L, -1.1f * pitch, 0, 1.1f, 1.25f);
-                    AddKey(VKCode.D, "D", L, 0, 0, 1.1f, 1.25f);
-                    AddKey(VKCode.F, "F", L, 1.1f * pitch, 0, 1.1f, 1.25f);
-
-                    AddKey(VKCode.SPACE, "Space", VirtualKeyAnchor.KeyboardRoot, 0, -0.05f, 3.5f, 1.1f);
-
-                    AddKey(VKCode.J, "J", R, -1.1f * pitch, 0, 1.1f, 1.25f);
-                    AddKey(VKCode.K, "K", R, 0, 0, 1.1f, 1.25f);
-                    AddKey(VKCode.L, "L", R, 1.1f * pitch, 0, 1.1f, 1.25f);
-                    break;
-                }
-
-                case VirtualKeyLayoutPreset.LeverlessArcade: {
-                    // Left hand directions
-                    var L = VirtualKeyAnchor.LeftHand;
-                    AddKey(VKCode.A, "Left", L, -1 * pitch, 0, 1.15f, 1.15f);
-                    AddKey(VKCode.S, "Down", L, 0, 0, 1.15f, 1.15f);
-                    AddKey(VKCode.D, "Right", L, 1 * pitch, 0, 1.15f, 1.15f);
-                    AddKey(VKCode.SPACE, "Up (Jump)", L, 0.5f * pitch, -1.2f * pitch, 1.5f, 1.5f);
-
-                    // Right hand 8 attack buttons
-                    var R = VirtualKeyAnchor.RightHand;
-                    AddKey(VKCode.U, "LP", R, -1.5f * pitch, 0.6f * pitch, 1.15f, 1.15f);
-                    AddKey(VKCode.I, "MP", R, -0.5f * pitch, 0.7f * pitch, 1.15f, 1.15f);
-                    AddKey(VKCode.O, "HP", R, 0.5f * pitch, 0.6f * pitch, 1.15f, 1.15f);
-                    AddKey(VKCode.P, "3P", R, 1.5f * pitch, 0.4f * pitch, 1.15f, 1.15f);
-
-                    AddKey(VKCode.J, "LK", R, -1.5f * pitch, -0.4f * pitch, 1.15f, 1.15f);
-                    AddKey(VKCode.K, "MK", R, -0.5f * pitch, -0.3f * pitch, 1.15f, 1.15f);
-                    AddKey(VKCode.L, "HK", R, 0.5f * pitch, -0.4f * pitch, 1.15f, 1.15f);
-                    AddKey(VKCode.OEM_1, "3K", R, 1.5f * pitch, -0.6f * pitch, 1.15f, 1.15f);
-                    break;
-                }
-
-                case VirtualKeyLayoutPreset.Numpad: {
-                    var R = VirtualKeyAnchor.RightHand;
-                    // Row 4: NumLock, /, *, -
-                    AddKey(VKCode.NUMLOCK, "Num", R, -1.5f * pitch, 2f * pitch);
-                    AddKey(VKCode.DIVIDE, "/", R, -0.5f * pitch, 2f * pitch);
-                    AddKey(VKCode.MULTIPLY, "*", R, 0.5f * pitch, 2f * pitch);
-                    AddKey(VKCode.SUBTRACT, "-", R, 1.5f * pitch, 2f * pitch);
-
-                    // Row 3: 7, 8, 9, + (2u vertical)
-                    AddKey(VKCode.NUMPAD7, "7", R, -1.5f * pitch, 1f * pitch);
-                    AddKey(VKCode.NUMPAD8, "8", R, -0.5f * pitch, 1f * pitch);
-                    AddKey(VKCode.NUMPAD9, "9", R, 0.5f * pitch, 1f * pitch);
-                    AddKey(VKCode.ADD, "+", R, 1.5f * pitch, 0.5f * pitch, 1.0f, 2.0f);
-
-                    // Row 2: 4, 5, 6
-                    AddKey(VKCode.NUMPAD4, "4", R, -1.5f * pitch, 0);
-                    AddKey(VKCode.NUMPAD5, "5", R, -0.5f * pitch, 0);
-                    AddKey(VKCode.NUMPAD6, "6", R, 0.5f * pitch, 0);
-
-                    // Row 1: 1, 2, 3, Enter (2u vertical)
-                    AddKey(VKCode.NUMPAD1, "1", R, -1.5f * pitch, -1f * pitch);
-                    AddKey(VKCode.NUMPAD2, "2", R, -0.5f * pitch, -1f * pitch);
-                    AddKey(VKCode.NUMPAD3, "3", R, 0.5f * pitch, -1f * pitch);
-                    AddKey(VKCode.NUMPAD_RETURN, "Enter", R, 1.5f * pitch, -1.5f * pitch, 1.0f, 2.0f);
-
-                    // Row 0: 0 (2u horizontal), .
-                    AddKey(VKCode.NUMPAD0, "0", R, -1.0f * pitch, -2f * pitch, 2.0f, 1.0f);
-                    AddKey(VKCode.DECIMAL, ".", R, 0.5f * pitch, -2f * pitch);
-                    break;
-                }
-
-                case VirtualKeyLayoutPreset.Standard60Percent: {
+                case VirtualKeyLayoutPreset.Compact60: {
                     var anchor = VirtualKeyAnchor.KeyboardRoot;
-                    float startX = -6.5f * pitch;
-                    float z = 2f * pitch;
+                    float startX = -6.75f * pitch;
 
-                    // Row 4: Number row: Esc, 1-0, Back (2u)
-                    AddKey(VKCode.ESCAPE, "Esc", anchor, startX + 0 * pitch, z);
-                    AddKey(VKCode.KEY_1, "1", anchor, startX + 1 * pitch, z);
-                    AddKey(VKCode.KEY_2, "2", anchor, startX + 2 * pitch, z);
-                    AddKey(VKCode.KEY_3, "3", anchor, startX + 3 * pitch, z);
-                    AddKey(VKCode.KEY_4, "4", anchor, startX + 4 * pitch, z);
-                    AddKey(VKCode.KEY_5, "5", anchor, startX + 5 * pitch, z);
-                    AddKey(VKCode.KEY_6, "6", anchor, startX + 6 * pitch, z);
-                    AddKey(VKCode.KEY_7, "7", anchor, startX + 7 * pitch, z);
-                    AddKey(VKCode.KEY_8, "8", anchor, startX + 8 * pitch, z);
-                    AddKey(VKCode.KEY_9, "9", anchor, startX + 9 * pitch, z);
-                    AddKey(VKCode.KEY_0, "0", anchor, startX + 10 * pitch, z);
-                    AddKey(VKCode.BACK, "Back", anchor, startX + 11.5f * pitch, z, 2.0f, 1f);
+                    // ===== 1. NUMBER ROW (Row 4, Z = 2u) =====
+                    float zNum = 2f * pitch;
+                    AddKey(VKCode.ESCAPE, "Esc", anchor, startX + 0.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_1, "1", anchor, startX + 1.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_2, "2", anchor, startX + 2.5f * pitch, zNum, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.KEY_3, "3", anchor, startX + 3.5f * pitch, zNum, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.KEY_4, "4", anchor, startX + 4.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_5, "5", anchor, startX + 5.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_6, "6", anchor, startX + 6.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_7, "7", anchor, startX + 7.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_8, "8", anchor, startX + 8.5f * pitch, zNum, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.KEY_9, "9", anchor, startX + 9.5f * pitch, zNum, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.KEY_0, "0", anchor, startX + 10.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_MINUS, "-", anchor, startX + 11.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_PLUS, "=", anchor, startX + 12.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.BACK, "Backspace", anchor, startX + 14.0f * pitch, zNum, 2.0f, 1f, finger: KeyboardFinger.RightPinky);
 
-                    // Row 3: Tab row: Tab (1.5u), Q-P
-                    z -= pitch;
-                    AddKey(VKCode.TAB, "Tab", anchor, startX + 0.25f * pitch, z, 1.5f, 1f);
-                    AddKey(VKCode.Q, "Q", anchor, startX + 1.5f * pitch, z);
-                    AddKey(VKCode.W, "W", anchor, startX + 2.5f * pitch, z);
-                    AddKey(VKCode.E, "E", anchor, startX + 3.5f * pitch, z);
-                    AddKey(VKCode.R, "R", anchor, startX + 4.5f * pitch, z);
-                    AddKey(VKCode.T, "T", anchor, startX + 5.5f * pitch, z);
-                    AddKey(VKCode.Y, "Y", anchor, startX + 6.5f * pitch, z);
-                    AddKey(VKCode.U, "U", anchor, startX + 7.5f * pitch, z);
-                    AddKey(VKCode.I, "I", anchor, startX + 8.5f * pitch, z);
-                    AddKey(VKCode.O, "O", anchor, startX + 9.5f * pitch, z);
-                    AddKey(VKCode.P, "P", anchor, startX + 10.5f * pitch, z);
+                    // ===== 2. QWERTY / TAB ROW (Row 3, Z = 1u) =====
+                    float zTab = 1f * pitch;
+                    AddKey(VKCode.TAB, "Tab", anchor, startX + 0.75f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Q, "Q", anchor, startX + 2.0f * pitch, zTab, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.W, "W", anchor, startX + 3.0f * pitch, zTab, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.E, "E", anchor, startX + 4.0f * pitch, zTab, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.R, "R", anchor, startX + 5.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.T, "T", anchor, startX + 6.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.Y, "Y", anchor, startX + 7.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.U, "U", anchor, startX + 8.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.I, "I", anchor, startX + 9.0f * pitch, zTab, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.O, "O", anchor, startX + 10.0f * pitch, zTab, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.P, "P", anchor, startX + 11.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_4, "[", anchor, startX + 12.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_6, "]", anchor, startX + 13.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_5, "\\", anchor, startX + 14.25f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.RightPinky);
 
-                    // Row 2: Home row: Caps (1.75u), A-L, Enter (2.25u)
-                    z -= pitch;
-                    AddKey(VKCode.CAPITAL, "Caps", anchor, startX + 0.375f * pitch, z, 1.75f, 1f);
-                    AddKey(VKCode.A, "A", anchor, startX + 1.75f * pitch, z);
-                    AddKey(VKCode.S, "S", anchor, startX + 2.75f * pitch, z);
-                    AddKey(VKCode.D, "D", anchor, startX + 3.75f * pitch, z);
-                    AddKey(VKCode.F, "F", anchor, startX + 4.75f * pitch, z);
-                    AddKey(VKCode.G, "G", anchor, startX + 5.75f * pitch, z);
-                    AddKey(VKCode.H, "H", anchor, startX + 6.75f * pitch, z);
-                    AddKey(VKCode.J, "J", anchor, startX + 7.75f * pitch, z);
-                    AddKey(VKCode.K, "K", anchor, startX + 8.75f * pitch, z);
-                    AddKey(VKCode.L, "L", anchor, startX + 9.75f * pitch, z);
-                    AddKey(VKCode.RETURN, "Enter", anchor, startX + 11.375f * pitch, z, 2.25f, 1f);
+                    // ===== 3. HOME / CAPS ROW (Row 2, Z = 0u) =====
+                    float zHome = 0f;
+                    AddKey(VKCode.CAPITAL, "Caps", anchor, startX + 0.875f * pitch, zHome, 1.75f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.A, "A", anchor, startX + 2.25f * pitch, zHome, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.S, "S", anchor, startX + 3.25f * pitch, zHome, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.D, "D", anchor, startX + 4.25f * pitch, zHome, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.F, "F", anchor, startX + 5.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.G, "G", anchor, startX + 6.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.H, "H", anchor, startX + 7.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.J, "J", anchor, startX + 8.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.K, "K", anchor, startX + 9.25f * pitch, zHome, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.L, "L", anchor, startX + 10.25f * pitch, zHome, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_1, ";", anchor, startX + 11.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_7, "'", anchor, startX + 12.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RETURN, "Enter", anchor, startX + 13.875f * pitch, zHome, 2.25f, 1f, finger: KeyboardFinger.RightPinky);
 
-                    // Row 1: Shift row: LShift (2.25u), Z-M, ,, ., RShift (2.5u)
-                    z -= pitch;
-                    AddKey(VKCode.LSHIFT, "Shift", anchor, startX + 0.625f * pitch, z, 2.25f, 1f);
-                    AddKey(VKCode.Z, "Z", anchor, startX + 2.25f * pitch, z);
-                    AddKey(VKCode.X, "X", anchor, startX + 3.25f * pitch, z);
-                    AddKey(VKCode.C, "C", anchor, startX + 4.25f * pitch, z);
-                    AddKey(VKCode.V, "V", anchor, startX + 5.25f * pitch, z);
-                    AddKey(VKCode.B, "B", anchor, startX + 6.25f * pitch, z);
-                    AddKey(VKCode.N, "N", anchor, startX + 7.25f * pitch, z);
-                    AddKey(VKCode.M, "M", anchor, startX + 8.25f * pitch, z);
-                    AddKey(VKCode.OEM_COMMA, ",", anchor, startX + 9.25f * pitch, z);
-                    AddKey(VKCode.OEM_PERIOD, ".", anchor, startX + 10.25f * pitch, z);
-                    AddKey(VKCode.RSHIFT, "Shift", anchor, startX + 11.75f * pitch, z, 2.5f, 1f);
+                    // ===== 4. SHIFT ROW (Row 1, Z = -1u) =====
+                    float zShift = -1f * pitch;
+                    AddKey(VKCode.LSHIFT, "Shift", anchor, startX + 1.125f * pitch, zShift, 2.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Z, "Z", anchor, startX + 2.75f * pitch, zShift, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.X, "X", anchor, startX + 3.75f * pitch, zShift, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.C, "C", anchor, startX + 4.75f * pitch, zShift, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.V, "V", anchor, startX + 5.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.B, "B", anchor, startX + 6.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.N, "N", anchor, startX + 7.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.M, "M", anchor, startX + 8.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.OEM_COMMA, ",", anchor, startX + 9.75f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.OEM_PERIOD, ".", anchor, startX + 10.75f * pitch, zShift, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_2, "/", anchor, startX + 11.75f * pitch, zShift, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RSHIFT, "Shift", anchor, startX + 13.625f * pitch, zShift, 2.75f, 1f, finger: KeyboardFinger.RightPinky);
 
-                    // Row 0: Bottom row: Ctrl (1.25u), Win (1.25u), Alt (1.25u), Space (6.25u), Alt (1.25u), Ctrl (1.25u)
-                    z -= pitch;
-                    AddKey(VKCode.LCONTROL, "Ctrl", anchor, startX + 0.125f * pitch, z, 1.25f, 1f);
-                    AddKey(VKCode.LWIN, "Win", anchor, startX + 1.375f * pitch, z, 1.25f, 1f);
-                    AddKey(VKCode.LMENU, "Alt", anchor, startX + 2.625f * pitch, z, 1.25f, 1f);
-                    AddKey(VKCode.SPACE, "Space", anchor, startX + 6.375f * pitch, z, 6.25f, 1f);
-                    AddKey(VKCode.RMENU, "Alt", anchor, startX + 10.125f * pitch, z, 1.25f, 1f);
-                    AddKey(VKCode.RCONTROL, "Ctrl", anchor, startX + 11.375f * pitch, z, 1.25f, 1f);
+                    // ===== 5. BOTTOM / MODIFIER ROW (Row 0, Z = -2u) =====
+                    float zBottom = -2f * pitch;
+                    AddKey(VKCode.LCONTROL, "Ctrl", anchor, startX + 0.625f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LWIN, "Win", anchor, startX + 1.875f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LMENU, "Alt", anchor, startX + 3.125f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftThumb);
+                    AddKey(VKCode.SPACE, "Space", anchor, startX + 6.875f * pitch, zBottom, 6.25f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RMENU, "Alt", anchor, startX + 10.625f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RWIN, "Win", anchor, startX + 11.875f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.APPS, "Fn", anchor, startX + 13.125f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RCONTROL, "Ctrl", anchor, startX + 14.375f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightPinky);
                     break;
                 }
 

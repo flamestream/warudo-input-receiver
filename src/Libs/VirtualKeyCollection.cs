@@ -12,7 +12,7 @@ namespace FlameStream
 
         [DataInput(10)]
         [Label("KEYS_LAYOUT_PRESET")]
-        public VirtualKeyLayoutPreset Preset = VirtualKeyLayoutPreset.GamingWASDExtended;
+        public VirtualKeyLayoutPreset Preset = VirtualKeyLayoutPreset.FullSize100;
 
         [Trigger(20)]
         [Label("APPLY_KEYS_LAYOUT_PRESET")]
@@ -51,7 +51,7 @@ namespace FlameStream
         }
 
         public VirtualKeyLayoutPreset Preset {
-            get => LayoutPreset?.Preset ?? VirtualKeyLayoutPreset.GamingWASDExtended;
+            get => LayoutPreset?.Preset ?? VirtualKeyLayoutPreset.FullSize100;
             set {
                 if (LayoutPreset != null) {
                     LayoutPreset.Preset = value;
