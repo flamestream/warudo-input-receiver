@@ -20,6 +20,8 @@ namespace FlameStream
         CompactFullSize96 = 10,
         [Label("VIRTUAL_KEY_PRESET_TENKEYLESS_80")]
         Tenkeyless80 = 11,
+        [Label("VIRTUAL_KEY_PRESET_COMPACT_75")]
+        Compact75 = 12,
         [Label("VIRTUAL_KEY_PRESET_SPLIT_QWERTY")]
         SplitQWERTY = 0,
         [Label("VIRTUAL_KEY_PRESET_GAMING_WASD")]
