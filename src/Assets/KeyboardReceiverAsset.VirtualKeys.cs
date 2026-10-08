@@ -113,6 +113,7 @@ namespace FlameStream
         MeshFilter identifyPulseFrameMf;
         MeshRenderer identifyPulseFrameMr;
         Material identifyPulseFrameMat;
+        static MaterialPropertyBlock keyPropertyBlock;
 
         void OnCreateVirtualKeys() {
             if (VirtualKeysCollection == null) {
@@ -585,9 +586,23 @@ namespace FlameStream
                 identifyPulseFrameMat.color = cyanFrame;
                 identifyPulseFrameMat.SetColor("_EmissionColor", cyanFrameEmission);
             }
+            if (identifyPulseFrameMr != null) {
+                if (keyPropertyBlock == null) keyPropertyBlock = new MaterialPropertyBlock();
+                identifyPulseFrameMr.GetPropertyBlock(keyPropertyBlock);
+                keyPropertyBlock.SetColor("_Color", cyanFrame);
+                keyPropertyBlock.SetColor("_EmissionColor", cyanFrameEmission);
+                identifyPulseFrameMr.SetPropertyBlock(keyPropertyBlock);
+            }
             if (identifyPulseBodyMat != null) {
                 identifyPulseBodyMat.color = cyanBody;
                 identifyPulseBodyMat.SetColor("_EmissionColor", cyanBodyEmission);
+            }
+            if (identifyPulseBodyMr != null) {
+                if (keyPropertyBlock == null) keyPropertyBlock = new MaterialPropertyBlock();
+                identifyPulseBodyMr.GetPropertyBlock(keyPropertyBlock);
+                keyPropertyBlock.SetColor("_Color", cyanBody);
+                keyPropertyBlock.SetColor("_EmissionColor", cyanBodyEmission);
+                identifyPulseBodyMr.SetPropertyBlock(keyPropertyBlock);
             }
         }
 
@@ -751,7 +766,7 @@ namespace FlameStream
         void ApplyKeyGlowState(VirtualKeyDefinition keyDef, bool isDown, float dt = 0f) {
             if (keyDef.BorderMaterial == null || keyDef.BodyMaterial == null) return;
 
-            bool isIdentifying = (keyDef == IdentifiedVirtualKey);
+            bool isIdentifying = (IdentifiedVirtualKey != null && (keyDef == IdentifiedVirtualKey || keyDef.Key == IdentifiedVirtualKey.Key));
             var customApp = (keyDef.UseCustomAppearance && keyDef.CustomAppearance != null) ? keyDef.CustomAppearance : null;
             var baseApp = DefaultAppearance;
 
@@ -919,6 +934,14 @@ namespace FlameStream
                 keyDef.BodyMaterial.color = albedo;
                 keyDef.BodyMaterial.SetColor("_EmissionColor", emission);
                 keyDef.BodyMaterial.EnableKeyword("_EMISSION");
+
+                if (keyDef.BodyRenderer != null) {
+                    if (keyPropertyBlock == null) keyPropertyBlock = new MaterialPropertyBlock();
+                    keyDef.BodyRenderer.GetPropertyBlock(keyPropertyBlock);
+                    keyPropertyBlock.SetColor("_Color", albedo);
+                    keyPropertyBlock.SetColor("_EmissionColor", emission);
+                    keyDef.BodyRenderer.SetPropertyBlock(keyPropertyBlock);
+                }
             }
 
             // Apply Border (Color & Glow)
@@ -950,6 +973,14 @@ namespace FlameStream
                 keyDef.BorderMaterial.color = albedo;
                 keyDef.BorderMaterial.SetColor("_EmissionColor", emission);
                 keyDef.BorderMaterial.EnableKeyword("_EMISSION");
+
+                if (keyDef.FrameRenderer != null) {
+                    if (keyPropertyBlock == null) keyPropertyBlock = new MaterialPropertyBlock();
+                    keyDef.FrameRenderer.GetPropertyBlock(keyPropertyBlock);
+                    keyPropertyBlock.SetColor("_Color", albedo);
+                    keyPropertyBlock.SetColor("_EmissionColor", emission);
+                    keyDef.FrameRenderer.SetPropertyBlock(keyPropertyBlock);
+                }
             }
         }
 
@@ -1084,10 +1115,12 @@ namespace FlameStream
             keyDef.KeyGameObject = keyGo;
             keyDef.BodyMesh = bodyMesh;
             keyDef.FrameMesh = frameMesh;
+            keyDef.BodyRenderer = bodyMr;
+            keyDef.FrameRenderer = frameMr;
             keyDef.BodyMaterial = bodyMat;
             keyDef.BorderMaterial = borderMat;
 
-            if (keyDef == IdentifiedVirtualKey) {
+            if (keyDef == IdentifiedVirtualKey || (IdentifiedVirtualKey != null && keyDef.Key == IdentifiedVirtualKey.Key)) {
                 UpdateIdentifyVisuals();
             }
 
@@ -1115,7 +1148,7 @@ namespace FlameStream
 
             // Always enable emission keyword on both Body & Border materials
             mat.EnableKeyword("_EMISSION");
-            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             mat.SetColor("_EmissionColor", Color.black);
 
             return mat;

@@ -133,7 +133,7 @@ namespace FlameStream
             BroadcastDataInput(nameof(Transform));
         }
 
-        public bool IsLocating => Parent != null && Parent.IdentifiedVirtualKey == this;
+        public bool IsLocating => Parent != null && Parent.IdentifiedVirtualKey != null && (Parent.IdentifiedVirtualKey == this || Parent.IdentifiedVirtualKey.Key == this.Key);
 
         public void UpdateLocateButtonLabel(bool isLocating) {
             var port = GetTriggerPort(nameof(TriggerLocateKey));
@@ -156,6 +156,8 @@ namespace FlameStream
         public GameObject KeyGameObject { get; internal set; }
         public Mesh BodyMesh { get; internal set; }
         public Mesh FrameMesh { get; internal set; }
+        public MeshRenderer BodyRenderer { get; internal set; }
+        public MeshRenderer FrameRenderer { get; internal set; }
         public Material BodyMaterial { get; internal set; }
         public Material BorderMaterial { get; internal set; }
 
@@ -397,6 +399,8 @@ namespace FlameStream
                 UnityEngine.Object.Destroy(BorderMaterial);
                 BorderMaterial = null;
             }
+            BodyRenderer = null;
+            FrameRenderer = null;
             CurrentSize = new Vector2(-1f, -1f);
             CurrentBorderWidths = new Vector4(-1f, -1f, -1f, -1f);
             CurrentCornerRadii = new Vector4(-1f, -1f, -1f, -1f);
