@@ -27,6 +27,8 @@ namespace FlameStream
         [Label("VIRTUAL_KEY_PRESET_COMPACT_60")]
         Compact60,
         [Label("VIRTUAL_KEY_PRESET_KEYCHRON_Q11")]
-        KeychronQ11
+        KeychronQ11,
+        [Label("VIRTUAL_KEY_PRESET_FANNED_SOUTHPAW_96")]
+        FannedSouthpaw96
     }
 }

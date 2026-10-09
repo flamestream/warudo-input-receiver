@@ -2087,6 +2087,168 @@ namespace FlameStream
                     AddKey(VKCode.RIGHT, "Right", R, 6.50f * pitch, -2.00f * pitch, finger: KeyboardFinger.RightRing);
                     break;
                 }
+
+                case VirtualKeyLayoutPreset.FannedSouthpaw96: {
+                    var anchor = VirtualKeyAnchor.KeyboardRoot;
+                    float degPerU = 3.05f;
+                    float rHome = 21f * pitch;
+
+                    void AddFannedKey(VKCode key, string label, float rowU, float colU, float unitWidth = 1f, float unitHeight = 1f, bool isCircle = false, KeyboardFinger? finger = null) {
+                        float thetaDeg = colU * degPerU;
+                        float thetaRad = thetaDeg * Mathf.Deg2Rad;
+                        float r = rHome + (rowU * pitch);
+                        float posX = r * Mathf.Sin(thetaRad);
+                        float posZ = -rHome + (r * Mathf.Cos(thetaRad));
+                        // Pass exact unit dimensions directly so standard 1u keys do not receive custom size overrides
+                        AddKey(key, label, anchor, posX, posZ, unitWidth, unitHeight, thetaDeg, isCircle, finger);
+                    }
+
+                    // Derived unitWidth for flush-aligned boundary keys:
+                    // unitWidth = (targetPhysicalWidth + (pitch - BaseKeySize.x)) / pitch
+                    float backspaceUnitWidth = (0.075f + (pitch - BaseKeySize.x)) / pitch; // 0.075m (~2.1944u)
+                    float tabUnitWidth       = (0.071f + (pitch - BaseKeySize.x)) / pitch; // 0.071m (~2.0833u)
+                    float capsUnitWidth      = (0.069f + (pitch - BaseKeySize.x)) / pitch; // 0.069m (~2.0278u)
+                    float enterUnitWidth     = (0.071f + (pitch - BaseKeySize.x)) / pitch; // 0.071m (~2.0833u)
+
+                    // ===== 1. SOUTHPAW NUMPAD (Left Flank, snug 0.4u gap to Alphas) =====
+                    // Row 4 (Number row level: 2.0u)
+                    AddFannedKey(VKCode.NUMLOCK, "Num", 2.0f, -10.9f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.DIVIDE, "/", 2.0f, -9.9f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.MULTIPLY, "*", 2.0f, -8.9f, finger: KeyboardFinger.LeftMiddle);
+                    AddFannedKey(VKCode.SUBTRACT, "-", 2.0f, -7.9f, finger: KeyboardFinger.LeftIndex);
+
+                    // Row 3 (QWERTY level: 1.0u)
+                    AddFannedKey(VKCode.NUMPAD7, "7", 1.0f, -10.9f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.NUMPAD8, "8", 1.0f, -9.9f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.NUMPAD9, "9", 1.0f, -8.9f, finger: KeyboardFinger.LeftMiddle);
+
+                    // Row 2 (Home level: 0.0u)
+                    AddFannedKey(VKCode.NUMPAD4, "4", 0.0f, -10.9f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.NUMPAD5, "5", 0.0f, -9.9f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.NUMPAD6, "6", 0.0f, -8.9f, finger: KeyboardFinger.LeftMiddle);
+                    // 2u tall + on Col 4 (spanning Row 2 and Row 3, centered at 0.5u - zero overlap with -)
+                    AddFannedKey(VKCode.ADD, "+", 0.5f, -7.9f, unitWidth: 1.0f, unitHeight: 2.0f, finger: KeyboardFinger.LeftIndex);
+
+                    // Row 1 (Shift level: -1.0u)
+                    AddFannedKey(VKCode.NUMPAD1, "1", -1.0f, -10.9f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.NUMPAD2, "2", -1.0f, -9.9f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.NUMPAD3, "3", -1.0f, -8.9f, finger: KeyboardFinger.LeftMiddle);
+
+                    // Row 0 (Bottom level: -2.0u)
+                    AddFannedKey(VKCode.NUMPAD0, "0", -2.0f, -10.4f, unitWidth: 2.0f, unitHeight: 1.0f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.DECIMAL, ".", -2.0f, -8.9f, finger: KeyboardFinger.LeftMiddle);
+                    // 2u tall Enter on Col 4 (spanning Row 0 and Row 1, centered at -1.5u - zero overlap with +)
+                    AddFannedKey(VKCode.NUMPAD_RETURN, "Ent", -1.5f, -7.9f, unitWidth: 1.0f, unitHeight: 2.0f, finger: KeyboardFinger.LeftThumb);
+
+                    // ===== 2. ALPHANUMERIC CLUSTER & FUNCTION ROW =====
+                    // --- Row 5 (Function Row: 3.25u, Exploded Gap) ---
+                    AddFannedKey(VKCode.ESCAPE, "Esc", 3.25f, -6.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.F1, "F1", 3.25f, -5.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.F2, "F2", 3.25f, -4.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.F3, "F3", 3.25f, -3.5f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.F4, "F4", 3.25f, -2.5f, finger: KeyboardFinger.LeftMiddle);
+                    AddFannedKey(VKCode.F5, "F5", 3.25f, -1.5f, finger: KeyboardFinger.LeftIndex);
+                    AddFannedKey(VKCode.F6, "F6", 3.25f, -0.5f, finger: KeyboardFinger.LeftIndex);
+                    // Forward Dividing Line at 0.0u separates F6 and F7
+                    AddFannedKey(VKCode.F7, "F7", 3.25f, 0.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.F8, "F8", 3.25f, 1.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.F9, "F9", 3.25f, 2.5f, finger: KeyboardFinger.RightMiddle);
+                    AddFannedKey(VKCode.F10, "F10", 3.25f, 3.5f, finger: KeyboardFinger.RightRing);
+                    AddFannedKey(VKCode.F11, "F11", 3.25f, 4.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.F12, "F12", 3.25f, 5.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.INSERT, "Ins", 3.25f, 6.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.DELETE, "Del", 3.25f, 7.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.VOLUME_MUTE, "Mute", 3.25f, 9.1f, 1.0f, 1.0f, isCircle: true, finger: KeyboardFinger.RightPinky);
+
+                    // --- Row 4 (Number Row: 2.0u) ---
+                    AddFannedKey(VKCode.OEM_3, "`", 2.0f, -6.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.KEY_1, "1", 2.0f, -5.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.KEY_2, "2", 2.0f, -4.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.KEY_3, "3", 2.0f, -3.5f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.KEY_4, "4", 2.0f, -2.5f, finger: KeyboardFinger.LeftMiddle);
+                    AddFannedKey(VKCode.KEY_5, "5", 2.0f, -1.5f, finger: KeyboardFinger.LeftIndex);
+                    AddFannedKey(VKCode.KEY_6, "6", 2.0f, -0.5f, finger: KeyboardFinger.LeftIndex);
+                    // Forward Dividing Line at 0.0u separates 6 and 7
+                    AddFannedKey(VKCode.KEY_7, "7", 2.0f, 0.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.KEY_8, "8", 2.0f, 1.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.KEY_9, "9", 2.0f, 2.5f, finger: KeyboardFinger.RightMiddle);
+                    AddFannedKey(VKCode.KEY_0, "0", 2.0f, 3.5f, finger: KeyboardFinger.RightRing);
+                    AddFannedKey(VKCode.OEM_MINUS, "-", 2.0f, 4.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.OEM_PLUS, "=", 2.0f, 5.5f, finger: KeyboardFinger.RightPinky);
+                    // Backspace: 0.075m wide (~2.1944u)
+                    AddFannedKey(VKCode.BACK, "Backspace", 2.0f, 7.0f, unitWidth: backspaceUnitWidth, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.PRIOR, "PgUp", 2.0f, 9.1f, finger: KeyboardFinger.RightPinky);
+
+                    // --- Row 3 (QWERTY / Tab Row: 1.0u) ---
+                    // Tab: 0.071m wide (~2.0833u)
+                    AddFannedKey(VKCode.TAB, "Tab", 1.0f, -6.0f, unitWidth: tabUnitWidth, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.Q, "Q", 1.0f, -4.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.W, "W", 1.0f, -3.5f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.E, "E", 1.0f, -2.5f, finger: KeyboardFinger.LeftMiddle);
+                    AddFannedKey(VKCode.R, "R", 1.0f, -1.5f, finger: KeyboardFinger.LeftIndex);
+                    AddFannedKey(VKCode.T, "T", 1.0f, -0.5f, finger: KeyboardFinger.LeftIndex);
+                    // Forward Dividing Line at 0.0u separates T and Y
+                    AddFannedKey(VKCode.Y, "Y", 1.0f, 0.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.U, "U", 1.0f, 1.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.I, "I", 1.0f, 2.5f, finger: KeyboardFinger.RightMiddle);
+                    AddFannedKey(VKCode.O, "O", 1.0f, 3.5f, finger: KeyboardFinger.RightRing);
+                    AddFannedKey(VKCode.P, "P", 1.0f, 4.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.OEM_4, "[", 1.0f, 5.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.OEM_6, "]", 1.0f, 6.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.OEM_5, "\\", 1.0f, 7.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.NEXT, "PgDn", 1.0f, 9.1f, finger: KeyboardFinger.RightPinky);
+
+                    // --- Row 2 (Home Row: 0.0u Baseline) ---
+                    // Caps: 0.069m wide (~2.0278u)
+                    AddFannedKey(VKCode.CAPITAL, "Caps", 0.0f, -6.0f, unitWidth: capsUnitWidth, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.A, "A", 0.0f, -4.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.S, "S", 0.0f, -3.5f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.D, "D", 0.0f, -2.5f, finger: KeyboardFinger.LeftMiddle);
+                    AddFannedKey(VKCode.F, "F", 0.0f, -1.5f, finger: KeyboardFinger.LeftIndex); // Left Hand Alignment Reference
+                    AddFannedKey(VKCode.G, "G", 0.0f, -0.5f, finger: KeyboardFinger.LeftIndex);
+                    // Forward Dividing Line at 0.0u separates G and H (KeyboardRoot origin)
+                    AddFannedKey(VKCode.H, "H", 0.0f, 0.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.J, "J", 0.0f, 1.5f, finger: KeyboardFinger.RightIndex); // Right Hand Alignment Reference
+                    AddFannedKey(VKCode.K, "K", 0.0f, 2.5f, finger: KeyboardFinger.RightMiddle);
+                    AddFannedKey(VKCode.L, "L", 0.0f, 3.5f, finger: KeyboardFinger.RightRing);
+                    AddFannedKey(VKCode.OEM_1, ";", 0.0f, 4.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.OEM_7, "'", 0.0f, 5.5f, finger: KeyboardFinger.RightPinky);
+                    // Enter: 0.071m wide (~2.0833u)
+                    AddFannedKey(VKCode.RETURN, "Enter", 0.0f, 7.0f, unitWidth: enterUnitWidth, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.HOME, "Home", 0.0f, 9.1f, finger: KeyboardFinger.RightPinky);
+
+                    // --- Row 1 (Shift Row: -1.0u) ---
+                    // LShift: 2.0u wide, flush left at -7.0u, meets Z at -5.0u
+                    AddFannedKey(VKCode.LSHIFT, "Shift", -1.0f, -6.0f, unitWidth: 2.0f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.Z, "Z", -1.0f, -4.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.X, "X", -1.0f, -3.5f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.C, "C", -1.0f, -2.5f, finger: KeyboardFinger.LeftMiddle);
+                    AddFannedKey(VKCode.V, "V", -1.0f, -1.5f, finger: KeyboardFinger.LeftIndex);
+                    AddFannedKey(VKCode.B, "B", -1.0f, -0.5f, finger: KeyboardFinger.LeftIndex);
+                    // Forward Dividing Line at 0.0u separates B and N
+                    AddFannedKey(VKCode.N, "N", -1.0f, 0.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.M, "M", -1.0f, 1.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.OEM_COMMA, ",", -1.0f, 2.5f, finger: KeyboardFinger.RightMiddle);
+                    AddFannedKey(VKCode.OEM_PERIOD, ".", -1.0f, 3.5f, finger: KeyboardFinger.RightRing);
+                    AddFannedKey(VKCode.OEM_2, "/", -1.0f, 4.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.RSHIFT, "Shift", -1.0f, 6.0f, unitWidth: 2.0f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.UP, "↑", -1.0f, 8.05f, finger: KeyboardFinger.RightMiddle);
+
+                    // --- Row 0 (Bottom / Modifiers Row: -2.0u & Lowered Spacebar) ---
+                    // Option B: 1.25u Modifiers with harmonious uniform 0.17u (3.2mm) gaps
+                    AddFannedKey(VKCode.LCONTROL, "Ctrl", -2.0f, -6.375f, unitWidth: 1.25f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.LWIN, "Win", -2.0f, -4.958f, unitWidth: 1.25f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.LMENU, "Alt", -2.0f, -3.542f, unitWidth: 1.25f, finger: KeyboardFinger.LeftThumb);
+                    // 5.5u Centered Spacebar (Left Thumb Actuated)
+                    AddFannedKey(VKCode.SPACE, "Space", -2.18f, 0.0f, unitWidth: 5.5f, finger: KeyboardFinger.LeftThumb);
+                    AddFannedKey(VKCode.RMENU, "Alt", -2.0f, 3.542f, unitWidth: 1.25f, finger: KeyboardFinger.RightThumb);
+                    AddFannedKey(VKCode.RCONTROL, "Ctrl", -2.0f, 4.958f, unitWidth: 1.25f, finger: KeyboardFinger.RightPinky);
+                    // Balanced Inverted-T Arrow Cluster (standard 1.0u keys)
+                    AddFannedKey(VKCode.LEFT, "←", -2.0f, 7.0f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.DOWN, "↓", -2.0f, 8.05f, finger: KeyboardFinger.RightMiddle);
+                    AddFannedKey(VKCode.RIGHT, "→", -2.0f, 9.1f, finger: KeyboardFinger.RightRing);
+                    break;
+                }
             }
 
             // Set default hand alignment reference keys (F for Left, J for Right, or W/K fallback)
