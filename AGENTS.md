@@ -116,7 +116,7 @@ Use the two-phase pipeline in `ReceiverAsset.Deserialize()`: `OnPreMigrateAsset`
 
 | File | Covers |
 |------|--------|
-| [warudo_runtime_gotchas.md](.ai/warudo_runtime_gotchas.md) | All runtime quirks, crash bugs, and serialization traps (44 entries) |
+| [warudo_runtime_gotchas.md](.ai/warudo_runtime_gotchas.md) | All runtime quirks, crash bugs, and serialization traps (47 entries) |
 | [plugin_development_cheatsheet.md](.ai/plugin_development_cheatsheet.md) | Plugin/Node/Asset patterns, port attributes, UniTask, toasts |
 | [animancer_integration_guide.md](.ai/animancer_integration_guide.md) | Animancer Pro/Lite conflict, assembly identity, layer blending patterns |
 | [warudo_modding_architecture.md](.ai/warudo_modding_architecture.md) | UMod build pipeline, `.warudo` package structure, SDK vs runtime env |

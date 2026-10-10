@@ -1641,5 +1641,88 @@ Decompilation of `Warudo.Plugins.Core.Assets.Mixins.Attachable` and `GameObjectA
 - Never use `Transform.InverseTransformPoint` or scale temporary GameObjects when reparenting Warudo `Attachable` assets. Convert coordinate frames using pure position offsets and rotation quaternions: $\mathbf{p}_{\text{local}} = \mathbf{R}_{\text{parent}}^{-1} \cdot (\mathbf{P}_{\text{world}} - \mathbf{P}_{\text{parent}})$.
 - Never use absolute vertical threshold sanity checks (e.g. `Position.y < 0.2f`) on properties that can be parented to props or screens.
 
+---
+
+## 45. Never Call `.Localized()` in C# Field Initializers (`ECall` SecurityException Outside Unity Runtime)
+
+### The Symptom
+When running automated unit tests (`dotnet test`), standalone test runners, or instantiating classes outside a running Unity player, object instantiation crashes with:
+```
+System.Security.SecurityException : ECall methods must be packaged into a system module.
+   at UnityEngine.Object.FindObjectOfType(Type type)
+   at Warudo.Core.SingletonMonoBehavior`1.get_Instance()
+   at Warudo.Core.Localization.LocalizationExtensions.Localized(String str, Object[] args)
+   at FlameStream.ReceiverAsset..ctor()
+```
+
+### The Cause
+In C#, field initializers (e.g. `public string Message = "RECEIVER_NOT_STARTED".Localized();`) execute *before* the constructor runs. 
+Warudo's `.Localized()` extension accesses `SingletonMonoBehavior<LocalizationService>.Instance`, which executes Unity's internal native `UnityEngine.Object.FindObjectOfType`.
+In a standard .NET CLI runtime or test runner (outside Unity's embedded Mono/IL2CPP native runtime), invoking Unity engine `ECall` (native C++ extern) methods is forbidden and throws a `SecurityException`.
+Furthermore, inside Warudo itself, if an asset is instantiated during early scene deserialization before `LocalizationService` is spawned, calling `.Localized()` in a field initializer can return empty strings or throw a `NullReferenceException`.
+
+### The Solution
+Never call `.Localized()` directly inside field initializers. Initialize string fields with `""` (or raw fallback text) and populate them inside `OnCreate()` or `OnReady()`:
+```csharp
+// BAD - crashes external unit tests and during early deserialization
+[Markdown(0)]
+public string Message = "RECEIVER_NOT_STARTED".Localized();
+
+// GOOD - safely deferred until Warudo runtime lifecycle begins
+[Markdown(0)]
+public string Message = "";
+
+protected override void OnCreate() {
+    base.OnCreate();
+    Message = "RECEIVER_NOT_STARTED".Localized();
+}
+```
+
+---
+
+## 46. Per-Frame Port Property & Metadata Broadcasting (`SetDataInputPropertyAndBroadcast`) Saturates WebSocket IPC
+
+### The Symptom
+High CPU usage, micro-stutters, and excessive WebSocket IPC traffic between Warudo and its web inspector UI, even when the scene is completely idle and no settings are being changed.
+
+### The Cause
+Calling `SetDataInputPropertyAndBroadcast(name, disabled: ..., description: ...)` every frame in `OnUpdate()` (e.g. inside configuration validation loops):
+1. Allocates string and dictionary structures per call.
+2. Triggers WebSocket serialization of the modified port metadata.
+3. Forces the web UI frontend to re-render inspector cards 60–120 times every second per active asset.
+
+### The Solution
+1. **Cache Broadcast State**: Track the last emitted `disabled` and `description` values. Only invoke `SetDataInputPropertyAndBroadcast` when the state or message actually transitions:
+   ```csharp
+   void SetEnablePropertyIfChanged(bool disabled, string description) {
+       if (lastEnableDisabled != disabled || lastEnableDescription != description) {
+           lastEnableDisabled = disabled;
+           lastEnableDescription = description;
+           SetDataInputPropertyAndBroadcast(nameof(IsEnabled), disabled: disabled, description: description);
+       }
+   }
+   ```
+2. **Throttle Background Validation**: Execute per-frame validations at a reduced rate (e.g. $\ge 0.25\text{s}$) during `OnUpdate()`, while keeping reactive `Watch(...)` listeners immediate when user settings change in the inspector.
+
+---
+
+## 47. MaterialPropertyBlock & Dynamic Mesh Overhead on Dense Idle Renderers (e.g. Virtual Keyboards)
+
+### The Symptom
+Substantial frame rate drops when large numbers of visual elements (e.g. an 80–110 key virtual keyboard mesh with body and border renderers) are rendered in the scene, even when no typing is occurring.
+
+### The Cause
+Calling `GetPropertyBlock`, `SetPropertyBlock`, `Vector.Lerp`, easing calculations, and vertex array updates across 100+ keys *every frame* in `OnUpdate()` produces $\sim$12,000+ native calls and allocations per second—even though 99% of keys are completely idle.
+
+### The Solution
+Implement an idle resting state machine (`IsGlowResting`):
+1. When a key is down, identifying, or transitioning (`CurrentPressProgress > 0`), animate smoothly and clear resting state (`IsGlowResting = false`).
+2. When a key finishes releasing and reaches 0 (`CurrentPressProgress <= 0.0001f` and `!isDown && !isIdentifying`):
+   - Apply the normal/resting state **once**.
+   - Set `IsGlowResting = true;` and `CurrentPressProgress = 0f;`.
+3. On all subsequent frames, if `keyDef.IsGlowResting == true`, immediately early-exit before executing any easing, color lerping, or `MaterialPropertyBlock` mutations.
+4. When appearances or themes change globally, reset `IsGlowResting = false` on all keys to force a single refresh frame.
+
+
 
 

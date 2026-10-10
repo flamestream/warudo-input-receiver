@@ -103,3 +103,26 @@ PUT /api/openedScene/save: "200 OK"
    - Verifies whether UI sliders/vectors actually updated the backend port in `DataInputPortCollection`.
    - Distinguishes between code calculation bugs versus unexpected input configurations with 100% certainty.
 
+---
+
+## 5. Automated Unit Testing (`dotnet test`)
+
+Automated unit tests live in `tests/FSInputReceiver.Tests/` targeting `.NET Framework 4.8` with NUnit.
+
+### Running Tests
+```powershell
+dotnet test tests/FSInputReceiver.Tests/FSInputReceiver.Tests.csproj
+```
+
+### Accessing Plugin Internals
+`PointerReceiverPlugin.cs` contains:
+```csharp
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("FSInputReceiver.Tests")]
+```
+This allows tests to inspect and verify `internal` properties (e.g. `CurrentPressProgress`, `IsGlowResting`) without exposing them as public API surface.
+
+### Test Architecture Rules
+1. **ECall Safety**: Do not invoke methods that call native Unity `ECall` externs (such as `UnityEngine.Object.FindObjectOfType` or unmocked physics/render loops) during test setup. Ensure localized string initializations are deferred to `OnCreate()`. (See Gotcha #45).
+2. **Pure Logic & Calculations**: Ideal test coverage targets rotation wraps (`Helper.NormalizeRotationAngles`), coordinate and layout transforms, border extensions, state-machine transitions, and coordinator gating logic.
+
+
