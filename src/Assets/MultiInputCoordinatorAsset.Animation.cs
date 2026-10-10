@@ -14,9 +14,8 @@ namespace FlameStream {
         }
 
         void OnUpdateAnimation() {
-            if (KeyboardReceiver != null) {
-                bool shouldKeyboardBaseBeActive = IsEnabled && EnableHands && Character != null;
-                KeyboardReceiver.SetBaseHandPoseWeight(shouldKeyboardBaseBeActive ? 1f : 0f);
+            if (IsEnabled && EnableHands && Character != null && KeyboardReceiver != null && KeyboardReceiver.ActiveCoordinator == this) {
+                KeyboardReceiver.SetBaseHandPoseWeight(1f);
             }
         }
 

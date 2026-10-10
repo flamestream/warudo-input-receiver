@@ -70,6 +70,7 @@ namespace FlameStream {
 
         private MultiInputCoordinatorAsset activeCoordinator;
         public MultiInputCoordinatorAsset ActiveCoordinator => activeCoordinator;
+        public bool IsHandPuppeteered => activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
 
         public void RegisterCoordinator(MultiInputCoordinatorAsset coordinator) {
             if (activeCoordinator == coordinator) return;
@@ -117,16 +118,20 @@ namespace FlameStream {
                 StartReceiver();
             }
 
-            if (isPuppeteered && activeCoordinator.EnableHands) {
+            bool shouldEnableHands = isPuppeteered ? activeCoordinator.EnableHands : (IsEnabled && IsHandEnabled);
+            if (shouldEnableHands) {
                 OnSurfaceSettingChange();
                 OnPropEnabledChanged();
                 OnBodyEnabledChanged();
                 SynchronizeHandAnimationLayers();
+                OnInputAffectingHandSetupChange();
             } else {
                 CleanupCharacterAnimationLayers();
-                if (ScreenSetup?.RemoveOnDisable ?? false) {
+                if (!IsEnabled && (ScreenSetup?.RemoveOnDisable ?? false)) {
                     DestroySurfaceScreen();
                     DestroyCursorAnchor();
+                } else {
+                    OnSurfaceSettingChange();
                 }
             }
             OnBasicSettingChange();
@@ -134,13 +139,9 @@ namespace FlameStream {
         }
 
         public string GetDelegationStatusMessage() {
-            if (activeCoordinator != null) {
+            if (activeCoordinator != null && activeCoordinator.IsEnabled) {
                 var handStr = (IsRightHanded ? "RIGHT_HAND" : "LEFT_HAND").Localized();
-                if (activeCoordinator.IsEnabled) {
-                    return string.Format("IK_DELEGATED_TO".Localized(), handStr, activeCoordinator.Name);
-                } else {
-                    return string.Format("IK_PAUSED_COORDINATOR_DISABLED".Localized(), handStr, activeCoordinator.Name);
-                }
+                return string.Format("IK_DELEGATED_TO".Localized(), handStr, activeCoordinator.Name);
             }
             if (Character != null && IsEnabled && IsHandEnabled) {
                 var dominantLimb = IsRightHanded ? Character.RightHandIK : Character.LeftHandIK;

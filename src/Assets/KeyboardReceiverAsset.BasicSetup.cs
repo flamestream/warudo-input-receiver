@@ -769,7 +769,7 @@ namespace FlameStream
         float currentHandIkWeight = 0f;
 
         public void OnHandDelegationChanged() {
-            if (activeCoordinator != null) {
+            if (IsHandPuppeteered) {
                 handIkTween?.Kill();
             } else {
                 UpdateHandTrackingState();
@@ -778,7 +778,7 @@ namespace FlameStream
 
         void TransitionIkLimbs(bool isEnabledWanted, DG.Tweening.TweenCallback onComplete = null) {
             if (Character == null) return;
-            if (activeCoordinator != null) {
+            if (IsHandPuppeteered) {
                 return;
             }
 
@@ -862,7 +862,7 @@ namespace FlameStream
 
         void ApplyHandIkWeight(float weight) {
             SetBaseHandPoseWeight(weight);
-            if (activeCoordinator != null) return;
+            if (IsHandPuppeteered) return;
             if (Character == null) return;
 
             var leftAnchor = LeftHandAnchor;

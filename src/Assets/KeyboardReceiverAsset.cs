@@ -48,6 +48,7 @@ namespace FlameStream
 
         private MultiInputCoordinatorAsset activeCoordinator;
         public MultiInputCoordinatorAsset ActiveCoordinator => activeCoordinator;
+        public bool IsHandPuppeteered => activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
 
         public void RegisterCoordinator(MultiInputCoordinatorAsset coordinator) {
             if (activeCoordinator == coordinator) return;
@@ -85,12 +86,8 @@ namespace FlameStream
         }
 
         public string GetDelegationStatusMessage() {
-            if (activeCoordinator != null) {
-                if (activeCoordinator.IsEnabled) {
-                    return string.Format("IK_DELEGATED_TO".Localized(), "HAND".Localized(), activeCoordinator.Name);
-                } else {
-                    return string.Format("IK_PAUSED_COORDINATOR_DISABLED".Localized(), "HAND".Localized(), activeCoordinator.Name);
-                }
+            if (activeCoordinator != null && activeCoordinator.IsEnabled) {
+                return string.Format("IK_DELEGATED_TO".Localized(), "HAND".Localized(), activeCoordinator.Name);
             }
             if (Character != null && IsEnabled && IsHandEnabled) {
                 var leftAnchor = LeftHandAnchor;

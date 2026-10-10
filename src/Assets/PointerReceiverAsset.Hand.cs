@@ -112,7 +112,7 @@ namespace FlameStream
         }
 
         public void OnHandDelegationChanged() {
-            if (activeCoordinator != null) {
+            if (IsHandPuppeteered) {
                 tweenLeftIK?.Kill();
                 tweenRightIK?.Kill();
             } else {
@@ -261,18 +261,23 @@ namespace FlameStream
         }
 
         void OnUpdateHand() {
-            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
-            if (!isPuppeteered && (!IsEnabled || !IsHandEnabled)) return;
+            if (!IsHandPuppeteered && (!IsEnabled || !IsHandEnabled)) return;
             if (handAnchor == null) handAnchor = GetHandIK();
             if (handAnchor == null) return;
 
-            // Self-healing: if Dominant Limb IK was cleared or deactivated while we are active, restore it unless another asset is controlling it
-            if (activeCoordinator == null && Character != null && !isHandDisabledByOutOfBound) {
+            // Ensure handAnchor is properly attached under cursorAnchorAsset
+            if (cursorAnchorAsset != null && handAnchor != null && handAnchor.Attachable.Parent != cursorAnchorAsset) {
+                handAnchor.Attachable.Parent = cursorAnchorAsset;
+                handAnchor.Broadcast();
+            }
+
+            // Self-healing: if Dominant Limb IK was cleared or deactivated while we are active, restore it unless coordinator is actively puppeteering
+            if (!IsHandPuppeteered && Character != null && !isHandDisabledByOutOfBound) {
                 var dominantLimb = IsRightHanded ? Character.RightHandIK : Character.LeftHandIK;
                 var activeTween = IsRightHanded ? tweenRightIK : tweenLeftIK;
                 bool isTweening = activeTween != null && activeTween.IsActive();
                 if (!isTweening && dominantLimb != null && (dominantLimb.IkTarget == null || dominantLimb.IkTarget == handAnchor)) {
-                    if (!dominantLimb.Enabled || dominantLimb.IkTarget == null) {
+                    if (!dominantLimb.Enabled || dominantLimb.IkTarget == null || dominantLimb.PositionWeight < 0.99f || dominantLimb.RotationWeight < 0.99f) {
                         dominantLimb.Enabled = true;
                         dominantLimb.IkTarget = handAnchor;
                         dominantLimb.PositionWeight = 1.0f;
@@ -285,7 +290,7 @@ namespace FlameStream
 
             if (IsInActiveHandPoleVisualSetup && Character != null) {
                 var dominantLimb = IsRightHanded ? Character.RightHandIK : Character.LeftHandIK;
-                if (dominantLimb != null && activeCoordinator == null) {
+                if (dominantLimb != null && !IsHandPuppeteered) {
                     dominantLimb.BendGoalTarget = ActiveHandPoleAnchor;
                     dominantLimb.BendGoalWeight = 1.0f;
                     dominantLimb.Broadcast();
@@ -449,7 +454,7 @@ namespace FlameStream
             }
 
             var dominantLimb = Character != null ? (IsRightHanded ? Character.RightHandIK : Character.LeftHandIK) : null;
-            if (Character != null && activeCoordinator == null) {
+            if (Character != null && !IsHandPuppeteered) {
                 if (IsRightHanded) {
                     EnableLimb(isHandActive, dominantLimb, handAnchor, ref tweenRightIK, instant);
                 } else {
@@ -464,7 +469,7 @@ namespace FlameStream
                     nonDominantLimb.BendGoalWeight = 0f;
                     nonDominantLimb.Broadcast();
                 }
-            } else if (!isHandActive && activeCoordinator == null) {
+            } else if (!isHandActive && !IsHandPuppeteered) {
                 DestroyHandIK();
                 DestroyCursorAnchor();
             }
@@ -623,7 +628,7 @@ namespace FlameStream
         }
 
         void EnableLimb(bool isEnabled, LimbIKData limb, AnchorAsset anchor, ref Tween tween, bool instant = false) {
-            if (activeCoordinator != null) {
+            if (IsHandPuppeteered) {
                 return;
             }
             if (limb == null) {

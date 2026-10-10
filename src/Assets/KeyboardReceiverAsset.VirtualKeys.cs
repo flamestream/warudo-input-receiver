@@ -2158,7 +2158,7 @@ namespace FlameStream
                     AddFannedKey(VKCode.F12, "F12", 3.25f, 5.5f, finger: KeyboardFinger.RightPinky);
                     AddFannedKey(VKCode.INSERT, "Ins", 3.25f, 6.5f, finger: KeyboardFinger.RightPinky);
                     AddFannedKey(VKCode.DELETE, "Del", 3.25f, 7.5f, finger: KeyboardFinger.RightPinky);
-                    AddFannedKey(VKCode.VOLUME_MUTE, "Mute", 3.25f, 9.1f, 1.0f, 1.0f, isCircle: true, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.VOLUME_MUTE, "Mute", 3.25f, 9.1f, 1.0f, 1.0f, isCircle: true, finger: KeyboardFinger.RightIndex);
 
                     // --- Row 4 (Number Row: 2.0u) ---
                     AddFannedKey(VKCode.OEM_3, "`", 2.0f, -6.5f, finger: KeyboardFinger.LeftPinky);

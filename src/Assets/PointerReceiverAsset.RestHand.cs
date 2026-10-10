@@ -464,7 +464,7 @@ namespace FlameStream {
                 if (anchor != null && RestHand != null) {
                     AttachAnchorToParent(anchor, RestHand.ParentType, !IsRightHanded);
                 }
-                if (restLimb != null && activeCoordinator == null) {
+                if (restLimb != null && !IsHandPuppeteered) {
                     if (restLimb.IkTarget != anchor || !restLimb.Enabled) {
                         restLimb.PositionWeight = 0f;
                         restLimb.RotationWeight = 0f;
@@ -481,7 +481,7 @@ namespace FlameStream {
 
                 if (actualDuration <= 0f) {
                     currentRestLimbWeight = 1.0f;
-                    if (restLimb != null && activeCoordinator == null) {
+                    if (restLimb != null && !IsHandPuppeteered) {
                         restLimb.PositionWeight = 1.0f;
                         restLimb.RotationWeight = 1.0f;
                         restLimb.Broadcast();
@@ -494,7 +494,7 @@ namespace FlameStream {
                     () => currentRestLimbWeight,
                     (w) => {
                         currentRestLimbWeight = w;
-                        if (restLimb != null && activeCoordinator == null) {
+                        if (restLimb != null && !IsHandPuppeteered) {
                             restLimb.PositionWeight = w;
                             restLimb.RotationWeight = w;
                             restLimb.Broadcast();
@@ -513,7 +513,7 @@ namespace FlameStream {
 
                 if (currentWeight <= 0.001f || actualDuration <= 0f) {
                     currentRestLimbWeight = 0f;
-                    if (restLimb != null && activeCoordinator == null) {
+                    if (restLimb != null && !IsHandPuppeteered) {
                         restLimb.PositionWeight = 0f;
                         restLimb.RotationWeight = 0f;
                         if (restLimb.IkTarget == restHandAnchor) {
@@ -531,7 +531,7 @@ namespace FlameStream {
                     () => currentRestLimbWeight,
                     (w) => {
                         currentRestLimbWeight = w;
-                        if (restLimb != null && activeCoordinator == null) {
+                        if (restLimb != null && !IsHandPuppeteered) {
                             restLimb.PositionWeight = w;
                             restLimb.RotationWeight = w;
                             restLimb.Broadcast();
@@ -540,7 +540,7 @@ namespace FlameStream {
                     0.0f,
                     actualDuration
                 ).SetEase(ease).OnComplete(() => {
-                    if (restLimb != null && restLimb.IkTarget == restHandAnchor && activeCoordinator == null) {
+                    if (restLimb != null && restLimb.IkTarget == restHandAnchor && !IsHandPuppeteered) {
                         restLimb.IkTarget = null;
                         restLimb.Enabled = false;
                         restLimb.Broadcast();
@@ -566,7 +566,7 @@ namespace FlameStream {
                 if (poleAnchor != null && RestHand?.ElbowPole != null) {
                     AttachAnchorToParent(poleAnchor, RestHand.ElbowPole.ParentType, !IsRightHanded);
                 }
-                if (restLimb != null && activeCoordinator == null) {
+                if (restLimb != null && !IsHandPuppeteered) {
                     if (restLimb.BendGoalTarget != poleAnchor) {
                         restLimb.BendGoalWeight = 0f;
                         currentRestPoleWeight = 0f;
@@ -581,7 +581,7 @@ namespace FlameStream {
 
                 if (actualDuration <= 0f) {
                     currentRestPoleWeight = 1.0f;
-                    if (restLimb != null && activeCoordinator == null) {
+                    if (restLimb != null && !IsHandPuppeteered) {
                         restLimb.BendGoalWeight = 1.0f;
                         restLimb.Broadcast();
                     }
@@ -593,7 +593,7 @@ namespace FlameStream {
                     () => currentRestPoleWeight,
                     (w) => {
                         currentRestPoleWeight = w;
-                        if (restLimb != null && activeCoordinator == null) {
+                        if (restLimb != null && !IsHandPuppeteered) {
                             restLimb.BendGoalWeight = w;
                             restLimb.Broadcast();
                         }
@@ -611,7 +611,7 @@ namespace FlameStream {
 
                 if (currentWeight <= 0.001f || actualDuration <= 0f) {
                     currentRestPoleWeight = 0f;
-                    if (restLimb != null && activeCoordinator == null) {
+                    if (restLimb != null && !IsHandPuppeteered) {
                         restLimb.BendGoalWeight = 0f;
                         if (restLimb.BendGoalTarget == restHandPoleAnchor) {
                             restLimb.BendGoalTarget = null;
@@ -627,7 +627,7 @@ namespace FlameStream {
                     () => currentRestPoleWeight,
                     (w) => {
                         currentRestPoleWeight = w;
-                        if (restLimb != null && activeCoordinator == null) {
+                        if (restLimb != null && !IsHandPuppeteered) {
                             restLimb.BendGoalWeight = w;
                             restLimb.Broadcast();
                         }
@@ -635,7 +635,7 @@ namespace FlameStream {
                     0.0f,
                     actualDuration
                 ).SetEase(ease).OnComplete(() => {
-                    if (restLimb != null && restLimb.BendGoalTarget == restHandPoleAnchor && activeCoordinator == null) {
+                    if (restLimb != null && restLimb.BendGoalTarget == restHandPoleAnchor && !IsHandPuppeteered) {
                         restLimb.BendGoalTarget = null;
                         restLimb.Broadcast();
                     }

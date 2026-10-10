@@ -220,8 +220,11 @@ namespace FlameStream {
                 var kr = KeyboardReceiver;
                 kr.UnregisterCoordinator(this, isTeardown);
                 if (!isTeardown) {
+                    if (EnableRegisteredReceivers && kr.IsEnabled) {
+                        kr.SetDataInput(nameof(kr.IsEnabled), false, true);
+                    }
                     kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsEnabled), disabled: false, description: "KEYBOARD_ENABLE_DESC".Localized());
-                    kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsHandEnabled), disabled: false, description: "KEYBOARD_ENABLE_DESC".Localized());
+                    kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsHandEnabled), disabled: false, description: "ENABLE_HANDS_DESC".Localized());
                 }
             }
             if (MouseReceiver != null) {
@@ -229,6 +232,9 @@ namespace FlameStream {
                 mr.LayerPrefix = "🔥👆";
                 mr.UnregisterCoordinator(this, isTeardown);
                 if (!isTeardown) {
+                    if (EnableRegisteredReceivers && mr.IsEnabled) {
+                        mr.SetDataInput(nameof(mr.IsEnabled), false, true);
+                    }
                     mr.SetDataInputPropertyAndBroadcast(nameof(mr.IsEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
                     mr.SetDataInputPropertyAndBroadcast(nameof(mr.IsHandEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
                 }
@@ -238,6 +244,9 @@ namespace FlameStream {
                 pr.LayerPrefix = "🔥👆";
                 pr.UnregisterCoordinator(this, isTeardown);
                 if (!isTeardown) {
+                    if (EnableRegisteredReceivers && pr.IsEnabled) {
+                        pr.SetDataInput(nameof(pr.IsEnabled), false, true);
+                    }
                     pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
                     pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsHandEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
                 }
@@ -427,17 +436,20 @@ namespace FlameStream {
             leftWeightTween?.Kill();
             rightWeightTween?.Kill();
 
+            bool ownsLeft = Character?.LeftHandIK != null && proxyLeftAnchor != null && Character.LeftHandIK.IkTarget == proxyLeftAnchor;
+            bool ownsRight = Character?.RightHandIK != null && proxyRightAnchor != null && Character.RightHandIK.IkTarget == proxyRightAnchor;
+
             if (instant || Character == null) {
                 KillAllTweens();
                 if (Character != null) {
-                    if (Character.LeftHandIK != null && (proxyLeftAnchor == null || Character.LeftHandIK.IkTarget == proxyLeftAnchor)) {
+                    if (ownsLeft) {
                         Character.LeftHandIK.PositionWeight = 0f;
                         Character.LeftHandIK.RotationWeight = 0f;
                         Character.LeftHandIK.Enabled = false;
                         Character.LeftHandIK.IkTarget = null;
                         Character.LeftHandIK.Broadcast();
                     }
-                    if (Character.RightHandIK != null && (proxyRightAnchor == null || Character.RightHandIK.IkTarget == proxyRightAnchor)) {
+                    if (ownsRight) {
                         Character.RightHandIK.PositionWeight = 0f;
                         Character.RightHandIK.RotationWeight = 0f;
                         Character.RightHandIK.Enabled = false;
@@ -450,40 +462,21 @@ namespace FlameStream {
                 return;
             }
 
+            if (!ownsLeft && !ownsRight) {
+                currentLeftWeight = 0f;
+                currentRightWeight = 0f;
+                return;
+            }
+
             float duration = InactiveTransition != null ? InactiveTransition.Time : 0.5f;
             Ease ease = InactiveTransition != null ? InactiveTransition.Ease : Ease.Linear;
 
-            float leftCurrent = Mathf.Clamp01(currentLeftWeight);
-            float leftDuration = duration * leftCurrent;
-            if (leftDuration <= 0.001f || Character.LeftHandIK == null) {
-                currentLeftWeight = 0f;
-                if (Character?.LeftHandIK != null && (proxyLeftAnchor == null || Character.LeftHandIK.IkTarget == proxyLeftAnchor)) {
-                    Character.LeftHandIK.PositionWeight = 0f;
-                    Character.LeftHandIK.RotationWeight = 0f;
-                    Character.LeftHandIK.Enabled = false;
-                    Character.LeftHandIK.IkTarget = null;
-                    Character.LeftHandIK.Broadcast();
-                }
-                CheckCleanupAnchorsAfterFadeOut();
-            } else {
-                leftWeightTween = DOTween.To(
-                    () => currentLeftWeight,
-                    v => {
-                        currentLeftWeight = v;
-                        if (Character?.LeftHandIK != null && Character.LeftHandIK.Enabled) {
-                            Character.LeftHandIK.PositionWeight = v;
-                            Character.LeftHandIK.RotationWeight = v;
-                            if (Character.LeftHandIK.BendGoalTarget != null) {
-                                Character.LeftHandIK.BendGoalWeight = v;
-                            }
-                            Character.LeftHandIK.Broadcast();
-                        }
-                    },
-                    0f,
-                    leftDuration
-                ).SetEase(ease).OnComplete(() => {
+            if (ownsLeft) {
+                float leftCurrent = Mathf.Clamp01(currentLeftWeight);
+                float leftDuration = duration * leftCurrent;
+                if (leftDuration <= 0.001f) {
                     currentLeftWeight = 0f;
-                    if (Character?.LeftHandIK != null && (proxyLeftAnchor == null || Character.LeftHandIK.IkTarget == proxyLeftAnchor)) {
+                    if (Character?.LeftHandIK != null && proxyLeftAnchor != null && Character.LeftHandIK.IkTarget == proxyLeftAnchor) {
                         Character.LeftHandIK.PositionWeight = 0f;
                         Character.LeftHandIK.RotationWeight = 0f;
                         Character.LeftHandIK.Enabled = false;
@@ -491,40 +484,44 @@ namespace FlameStream {
                         Character.LeftHandIK.Broadcast();
                     }
                     CheckCleanupAnchorsAfterFadeOut();
-                });
+                } else {
+                    leftWeightTween = DOTween.To(
+                        () => currentLeftWeight,
+                        v => {
+                            currentLeftWeight = v;
+                            if (Character?.LeftHandIK != null && Character.LeftHandIK.Enabled && proxyLeftAnchor != null && Character.LeftHandIK.IkTarget == proxyLeftAnchor) {
+                                Character.LeftHandIK.PositionWeight = v;
+                                Character.LeftHandIK.RotationWeight = v;
+                                if (Character.LeftHandIK.BendGoalTarget != null) {
+                                    Character.LeftHandIK.BendGoalWeight = v;
+                                }
+                                Character.LeftHandIK.Broadcast();
+                            }
+                        },
+                        0f,
+                        leftDuration
+                    ).SetEase(ease).OnComplete(() => {
+                        currentLeftWeight = 0f;
+                        if (Character?.LeftHandIK != null && proxyLeftAnchor != null && Character.LeftHandIK.IkTarget == proxyLeftAnchor) {
+                            Character.LeftHandIK.PositionWeight = 0f;
+                            Character.LeftHandIK.RotationWeight = 0f;
+                            Character.LeftHandIK.Enabled = false;
+                            Character.LeftHandIK.IkTarget = null;
+                            Character.LeftHandIK.Broadcast();
+                        }
+                        CheckCleanupAnchorsAfterFadeOut();
+                    });
+                }
+            } else {
+                currentLeftWeight = 0f;
             }
 
-            float rightCurrent = Mathf.Clamp01(currentRightWeight);
-            float rightDuration = duration * rightCurrent;
-            if (rightDuration <= 0.001f || Character.RightHandIK == null) {
-                currentRightWeight = 0f;
-                if (Character?.RightHandIK != null && (proxyRightAnchor == null || Character.RightHandIK.IkTarget == proxyRightAnchor)) {
-                    Character.RightHandIK.PositionWeight = 0f;
-                    Character.RightHandIK.RotationWeight = 0f;
-                    Character.RightHandIK.Enabled = false;
-                    Character.RightHandIK.IkTarget = null;
-                    Character.RightHandIK.Broadcast();
-                }
-                CheckCleanupAnchorsAfterFadeOut();
-            } else {
-                rightWeightTween = DOTween.To(
-                    () => currentRightWeight,
-                    v => {
-                        currentRightWeight = v;
-                        if (Character?.RightHandIK != null && Character.RightHandIK.Enabled) {
-                            Character.RightHandIK.PositionWeight = v;
-                            Character.RightHandIK.RotationWeight = v;
-                            if (Character.RightHandIK.BendGoalTarget != null) {
-                                Character.RightHandIK.BendGoalWeight = v;
-                            }
-                            Character.RightHandIK.Broadcast();
-                        }
-                    },
-                    0f,
-                    rightDuration
-                ).SetEase(ease).OnComplete(() => {
+            if (ownsRight) {
+                float rightCurrent = Mathf.Clamp01(currentRightWeight);
+                float rightDuration = duration * rightCurrent;
+                if (rightDuration <= 0.001f) {
                     currentRightWeight = 0f;
-                    if (Character?.RightHandIK != null && (proxyRightAnchor == null || Character.RightHandIK.IkTarget == proxyRightAnchor)) {
+                    if (Character?.RightHandIK != null && proxyRightAnchor != null && Character.RightHandIK.IkTarget == proxyRightAnchor) {
                         Character.RightHandIK.PositionWeight = 0f;
                         Character.RightHandIK.RotationWeight = 0f;
                         Character.RightHandIK.Enabled = false;
@@ -532,7 +529,36 @@ namespace FlameStream {
                         Character.RightHandIK.Broadcast();
                     }
                     CheckCleanupAnchorsAfterFadeOut();
-                });
+                } else {
+                    rightWeightTween = DOTween.To(
+                        () => currentRightWeight,
+                        v => {
+                            currentRightWeight = v;
+                            if (Character?.RightHandIK != null && Character.RightHandIK.Enabled && proxyRightAnchor != null && Character.RightHandIK.IkTarget == proxyRightAnchor) {
+                                Character.RightHandIK.PositionWeight = v;
+                                Character.RightHandIK.RotationWeight = v;
+                                if (Character.RightHandIK.BendGoalTarget != null) {
+                                    Character.RightHandIK.BendGoalWeight = v;
+                                }
+                                Character.RightHandIK.Broadcast();
+                            }
+                        },
+                        0f,
+                        rightDuration
+                    ).SetEase(ease).OnComplete(() => {
+                        currentRightWeight = 0f;
+                        if (Character?.RightHandIK != null && proxyRightAnchor != null && Character.RightHandIK.IkTarget == proxyRightAnchor) {
+                            Character.RightHandIK.PositionWeight = 0f;
+                            Character.RightHandIK.RotationWeight = 0f;
+                            Character.RightHandIK.Enabled = false;
+                            Character.RightHandIK.IkTarget = null;
+                            Character.RightHandIK.Broadcast();
+                        }
+                        CheckCleanupAnchorsAfterFadeOut();
+                    });
+                }
+            } else {
+                currentRightWeight = 0f;
             }
         }
 

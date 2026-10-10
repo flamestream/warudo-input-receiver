@@ -604,9 +604,10 @@ namespace FlameStream
             // Scene check
             if (isDestroyed || Scene == null) return;
 
-            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
-            bool shouldAutoCreate = ((IsEnabled && IsHandEnabled) || isPuppeteered) && !isDestroyed;
-            bool isRemoveWanted = (!IsEnabled && !isPuppeteered) && (ScreenSetup?.RemoveOnDisable ?? false);
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled;
+            bool isHandPuppeteered = isPuppeteered && activeCoordinator.EnableHands;
+            bool shouldAutoCreate = IsEnabled && !isDestroyed;
+            bool isRemoveWanted = !IsEnabled && (ScreenSetup?.RemoveOnDisable ?? false);
             if (isRemoveWanted) {
                 var dominantLimb = Character != null ? (IsRightHanded ? Character.RightHandIK : Character.LeftHandIK) : null;
                 bool isLimbActive = dominantLimb != null && (dominantLimb.PositionWeight > 0.001f || dominantLimb.Enabled);
@@ -626,13 +627,13 @@ namespace FlameStream
 
             // Screen visibility depends on ShowOnEnable or if visual setup mode is active
             bool isVisualSetup = ScreenSetup?.Transform != null && ScreenSetup.Transform.InVisualSetupMode;
-            bool showScreen = isVisualSetup || (ScreenSetup?.ShowOnEnable ?? true);
+            bool showScreen = isVisualSetup || ((ScreenSetup?.ShowOnEnable ?? true) && IsEnabled);
             screenAsset.DataInputPortCollection.SetValueAtPath("Enabled", showScreen, true);
             screenAsset.DataInputPortCollection.SetValueAtPath("DisplayName", DisplayName, true);
 
             UpdateDrawingScreenAppearance();
 
-            bool isDisplayMustBeVisible = (IsEnabled && IsHandEnabled) || isPuppeteered;
+            bool isDisplayMustBeVisible = (IsEnabled && IsHandEnabled) || isHandPuppeteered;
             if (isDisplayMustBeVisible) {
                 // Bind cursor anchor to screen
                 cursorAnchorAsset = GetCursorAnchor(skipAutoCreate: !shouldAutoCreate);

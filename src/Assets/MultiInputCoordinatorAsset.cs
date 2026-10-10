@@ -51,8 +51,13 @@ namespace FlameStream {
         [Section("BASIC_SETUP")]
 
         [DataInput]
-        [Label("ENABLE")]
-        [Description("ENABLE_HANDS_DESC")]
+        [Label("ENABLE_REGISTERED_RECEIVERS")]
+        [Description("ENABLE_REGISTERED_RECEIVERS_DESC")]
+        public bool EnableRegisteredReceivers = true;
+
+        [DataInput]
+        [Label("ENABLE_REGISTERED_RECEIVERS_BASIC_SETUP")]
+        [Description("ENABLE_REGISTERED_RECEIVERS_BASIC_SETUP_DESC")]
         public bool EnableHands = true;
 
         [DataInput]
@@ -184,6 +189,7 @@ namespace FlameStream {
             }
 
             Watch(nameof(IsEnabled), delegate { OnCoordinatorSettingChange(); });
+            Watch(nameof(EnableRegisteredReceivers), delegate { PuppetRegisteredReceivers(); });
             Watch(nameof(EnableHands), delegate { OnEnableHandsChange(); });
             Watch(nameof(Character), delegate { OnCoordinatorSettingChange(); });
             Watch(nameof(KeyboardReceiver), delegate { OnReceiverLinksChanged(); });
@@ -217,12 +223,16 @@ namespace FlameStream {
                 --onReadyCountdown;
                 if (onReadyCountdown == 0) {
                     isReady = true;
-                    EnsureReceiversRegistered();
-                    ValidateConfiguration();
-                    PuppetRegisteredReceivers();
-                    if (IsEnabled && EnableHands && Character != null && !HasCharacterMismatch()) {
-                        BindCharacterIK();
-                        KeyboardReceiver?.SetBaseHandPoseWeight(1f);
+                    if (IsEnabled) {
+                        EnsureReceiversRegistered();
+                        ValidateConfiguration();
+                        PuppetRegisteredReceivers();
+                        if (EnableHands && Character != null && !HasCharacterMismatch()) {
+                            BindCharacterIK();
+                            KeyboardReceiver?.SetBaseHandPoseWeight(1f);
+                        }
+                    } else {
+                        ValidateConfiguration();
                     }
                 }
                 return;
@@ -245,10 +255,8 @@ namespace FlameStream {
             if (!isReady) return;
             if (!IsEnabled) {
                 lockedPort = 0;
-                PuppetRegisteredReceivers();
                 UnregisterAllReceivers();
-                ReleaseCharacterIK();
-                KeyboardReceiver?.SetBaseHandPoseWeight(0f);
+                if (isIkBound) ReleaseCharacterIK();
             } else {
                 lockedPort = Port;
                 RegisterAllReceivers();
@@ -265,9 +273,9 @@ namespace FlameStream {
         }
 
         void OnEnableHandsChange() {
-            if (!isReady) return;
+            if (!isReady || !IsEnabled) return;
             PuppetRegisteredReceivers();
-            if (IsEnabled && EnableHands && Character != null && !HasCharacterMismatch()) {
+            if (EnableHands && Character != null && !HasCharacterMismatch()) {
                 BindCharacterIK();
                 KeyboardReceiver?.SetBaseHandPoseWeight(1f);
             } else {
@@ -278,48 +286,44 @@ namespace FlameStream {
         }
 
         public void PuppetRegisteredReceivers() {
+            if (!IsEnabled) return;
+
             var receivers = new ReceiverAsset[] { KeyboardReceiver, MouseReceiver, PenReceiver };
             string desc = string.Format("IK_DELEGATED_TO".Localized(), "ENABLE".Localized(), Name);
 
             foreach (var r in receivers) {
                 if (r == null) continue;
 
-                if (IsEnabled) {
+                if (EnableRegisteredReceivers) {
                     if (!r.IsEnabled) {
                         r.SetDataInput(nameof(r.IsEnabled), true, true);
                     }
                     r.SetDataInputPropertyAndBroadcast(nameof(r.IsEnabled), disabled: true, description: desc);
                 } else {
-                    r.SetDataInputPropertyAndBroadcast(nameof(r.IsEnabled), disabled: false, description: (r is KeyboardReceiverAsset) ? "KEYBOARD_ENABLE_DESC".Localized() : "POINTER_ENABLE_DESC".Localized());
                     if (r.IsEnabled) {
                         r.SetDataInput(nameof(r.IsEnabled), false, true);
                     }
+                    r.SetDataInputPropertyAndBroadcast(nameof(r.IsEnabled), disabled: true, description: desc);
                 }
 
                 if (r is PointerReceiverAsset pr) {
-                    if (IsEnabled && EnableHands) {
+                    if (EnableHands) {
                         if (!pr.IsHandEnabled) {
                             pr.SetDataInput(nameof(pr.IsHandEnabled), true, true);
                         }
                         pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsHandEnabled), disabled: true, description: desc);
                     } else {
                         pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsHandEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
-                        if (pr.IsHandEnabled) {
-                            pr.SetDataInput(nameof(pr.IsHandEnabled), false, true);
-                        }
                     }
                     pr.OnCoordinatorStateChanged();
                 } else if (r is KeyboardReceiverAsset kr) {
-                    if (IsEnabled && EnableHands) {
+                    if (EnableHands) {
                         if (!kr.IsHandEnabled) {
                             kr.SetDataInput(nameof(kr.IsHandEnabled), true, true);
                         }
                         kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsHandEnabled), disabled: true, description: desc);
                     } else {
                         kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsHandEnabled), disabled: false, description: "ENABLE_HANDS_DESC".Localized());
-                        if (kr.IsHandEnabled) {
-                            kr.SetDataInput(nameof(kr.IsHandEnabled), false, true);
-                        }
                     }
                     kr.OnCoordinatorStateChanged();
                 }
@@ -353,9 +357,13 @@ namespace FlameStream {
 
             hasInitializedMouse = false;
             hasInitializedPen = false;
-            EnsureReceiversRegistered();
-            ValidateConfiguration();
-            PuppetRegisteredReceivers();
+            if (IsEnabled) {
+                EnsureReceiversRegistered();
+                ValidateConfiguration();
+                PuppetRegisteredReceivers();
+            } else {
+                ValidateConfiguration();
+            }
             RequestUiRefresh();
         }
 
