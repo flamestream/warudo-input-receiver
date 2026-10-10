@@ -29,6 +29,7 @@ namespace FlameStream
         static Vector3 IK_BASIS_RIGHT_HANDED = new Vector3(0, 90f, 90f);
 
         Monitor monitor;
+        float lastMonitorLookupTime;
         DrawingScreenAsset screenAsset;
         AnchorAsset cursorAnchorAsset;
         Tween cursorMoveTween;
@@ -218,8 +219,12 @@ namespace FlameStream
                 SetupActiveHandPoleTransform();
             });
 
-            Watch(nameof(DisplayName), delegate { OnSurfaceSettingChange(); });
-            // OnSurfaceSettingChange(); // No need; will be called by #OnBasicSettingChange
+            Watch(nameof(DisplayName), delegate {
+                monitor = null;
+                lastMonitorLookupTime = 0f;
+                OnSurfaceSettingChange();
+                OnBasicSettingChange();
+            });
 
             Watch(nameof(IsEnabled), delegate { OnBasicSettingChange(); });
             Watch(nameof(IsHandEnabled), delegate { OnBasicSettingChange(); });
@@ -251,7 +256,6 @@ namespace FlameStream
                 ScreenSetup?.UpdateAutoSetupStatus();
                 BroadcastDataInput(nameof(ScreenSetup));
             });
-            Watch(nameof(DisplayName), delegate { OnBasicSettingChange(); });
             Watch(nameof(ScreenSetup), delegate {
                 SetupDrawingScreenTransform();
                 OnSurfaceSettingChange();
@@ -284,7 +288,10 @@ namespace FlameStream
             if (!isPuppeteered && (!IsEnabled || !IsHandEnabled)) return;
             if (screenAsset == null) screenAsset = GetSurfaceScreen();
             if (monitor == null && !string.IsNullOrEmpty(DisplayName)) {
-                monitor = Manager.monitors.FirstOrDefault((Monitor it) => it.name == DisplayName);
+                if (Time.time - lastMonitorLookupTime >= 0.5f) {
+                    lastMonitorLookupTime = Time.time;
+                    monitor = Manager.monitors.FirstOrDefault((Monitor it) => it.name == DisplayName);
+                }
             }
             if (cursorAnchorAsset == null) cursorAnchorAsset = GetCursorAnchor();
             if (cursorAnchorAsset != null && screenAsset != null && cursorAnchorAsset.Attachable.Parent != screenAsset) {

@@ -1,6 +1,7 @@
 using Cysharp.Threading.Tasks;
 using System.Linq;
 using uDesktopDuplication;
+using UnityEngine;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
 using Warudo.Core.Localization;
@@ -179,7 +180,12 @@ namespace FlameStream {
             return "";
         }
 
-        public void UpdateUiStatus() {
+        private float lastUiStatusUpdateTime;
+
+        public void UpdateUiStatus(bool force = false) {
+            if (!force && Time.time - lastUiStatusUpdateTime < 0.15f) return;
+            lastUiStatusUpdateTime = Time.time;
+
             var newDelegation = GetDelegationStatusMessage();
             if (DelegationStatus != newDelegation) {
                 DelegationStatus = newDelegation;

@@ -45,14 +45,14 @@ namespace FlameStream {
         public bool IsSocketListening => udpClient != null;
 
         [Markdown(0)]
-        public string VersionUpdate = "FS_INPUT_RECEIVER_VERSION_UPDATE".Localized();
+        public string VersionUpdate = "";
 
         [DataInput(0)]
         [Label("ENABLE")]
         public bool IsEnabled;
 
         [Markdown(0)]
-        public string Message = "RECEIVER_NOT_STARTED".Localized();
+        public string Message = "";
 
         [DataInput(0)]
         [Label("PORT")]
@@ -69,6 +69,9 @@ namespace FlameStream {
         protected override void OnCreate() {
             if (Port == 0) Port = DEFAULT_PORT;
             base.OnCreate();
+
+            VersionUpdate = "FS_INPUT_RECEIVER_VERSION_UPDATE".Localized();
+            Message = "RECEIVER_NOT_STARTED".Localized();
 
             Watch(nameof(IsEnabled), delegate { OnIsEnabledChange(); });
             Watch(nameof(Port), delegate { OnPortChange(); });

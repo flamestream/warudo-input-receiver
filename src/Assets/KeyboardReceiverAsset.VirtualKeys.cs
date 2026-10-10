@@ -767,6 +767,12 @@ namespace FlameStream
             if (keyDef.BorderMaterial == null || keyDef.BodyMaterial == null) return;
 
             bool isIdentifying = (IdentifiedVirtualKey != null && (keyDef == IdentifiedVirtualKey || keyDef.Key == IdentifiedVirtualKey.Key));
+
+            // Early exit if the key is already at rest
+            if (!isDown && !isIdentifying && keyDef.CurrentPressProgress <= 0.0001f) {
+                if (keyDef.IsGlowResting) return;
+            }
+
             var customApp = (keyDef.UseCustomAppearance && keyDef.CustomAppearance != null) ? keyDef.CustomAppearance : null;
             var baseApp = DefaultAppearance;
 
@@ -982,6 +988,13 @@ namespace FlameStream
                     keyDef.FrameRenderer.SetPropertyBlock(keyPropertyBlock);
                 }
             }
+
+            if (!isDown && !isIdentifying && keyDef.CurrentPressProgress <= 0.0001f) {
+                keyDef.CurrentPressProgress = 0f;
+                keyDef.IsGlowResting = true;
+            } else {
+                keyDef.IsGlowResting = false;
+            }
         }
 
         public void UpdateVirtualKeyParenting(VirtualKeyDefinition keyDef) {
@@ -1124,6 +1137,7 @@ namespace FlameStream
                 UpdateIdentifyVisuals();
             }
 
+            keyDef.IsGlowResting = false;
             bool isDown = Down((int)keyDef.Key);
             ApplyKeyGlowState(keyDef, isDown, 0f);
         }
@@ -1165,6 +1179,7 @@ namespace FlameStream
 
         public void UpdateVirtualKeyColors(VirtualKeyDefinition keyDef) {
             if (keyDef == null) return;
+            keyDef.IsGlowResting = false;
             ApplyKeyGlowState(keyDef, false, 0f);
         }
 

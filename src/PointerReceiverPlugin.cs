@@ -1,6 +1,8 @@
 using Warudo.Core.Attributes;
 using Warudo.Core.Plugins;
 
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("FSInputReceiver.Tests")]
+
 namespace FlameStream {
     [PluginType(
         Id = "FlameStream.PointerReceiver",

@@ -238,7 +238,10 @@ namespace FlameStream {
                 return;
             }
 
-            ValidateConfiguration();
+            if (Time.time - lastConfigValidationTime >= 0.25f) {
+                lastConfigValidationTime = Time.time;
+                ValidateConfiguration();
+            }
 
             if (IsEnabled && lastState != null) {
                 MouseReceiver?.InjectRawState(lastState);
@@ -269,6 +272,7 @@ namespace FlameStream {
                     KeyboardReceiver?.SetBaseHandPoseWeight(0f);
                 }
             }
+            ValidateConfiguration();
             RequestUiRefresh();
         }
 
@@ -282,6 +286,7 @@ namespace FlameStream {
                 ReleaseCharacterIK();
                 KeyboardReceiver?.SetBaseHandPoseWeight(0f);
             }
+            ValidateConfiguration();
             RequestUiRefresh();
         }
 
@@ -373,18 +378,44 @@ namespace FlameStream {
             RequestUiRefresh();
         }
 
+        private float lastConfigValidationTime;
+        private bool isPortAndCharLocked;
+        private string lastEnableDescription;
+        private bool? lastEnableDisabled;
+        private string lastEnableHandsDescription;
+        private bool? lastEnableHandsDisabled;
+
+        void SetEnablePropertyIfChanged(bool disabled, string description) {
+            if (lastEnableDisabled != disabled || lastEnableDescription != description) {
+                lastEnableDisabled = disabled;
+                lastEnableDescription = description;
+                SetDataInputPropertyAndBroadcast(nameof(IsEnabled), disabled: disabled, description: description);
+            }
+        }
+
+        void SetEnableHandsPropertyIfChanged(bool disabled, string description) {
+            if (lastEnableHandsDisabled != disabled || lastEnableHandsDescription != description) {
+                lastEnableHandsDisabled = disabled;
+                lastEnableHandsDescription = description;
+                SetDataInputPropertyAndBroadcast(nameof(EnableHands), disabled: disabled, description: description);
+            }
+        }
+
         void ValidateConfiguration() {
-            // Port and Character inspector lock
-            SetDataInputPropertyAndBroadcast(
-                nameof(Port),
-                disabled: true,
-                description: "COORDINATOR_PORT_DESC".Localized()
-            );
-            SetDataInputPropertyAndBroadcast(
-                nameof(Character),
-                disabled: true,
-                description: "COORDINATOR_CHARACTER_AUTO_DESC".Localized()
-            );
+            // Port and Character inspector lock (static, only broadcast once)
+            if (!isPortAndCharLocked) {
+                SetDataInputPropertyAndBroadcast(
+                    nameof(Port),
+                    disabled: true,
+                    description: "COORDINATOR_PORT_DESC".Localized()
+                );
+                SetDataInputPropertyAndBroadcast(
+                    nameof(Character),
+                    disabled: true,
+                    description: "COORDINATOR_CHARACTER_AUTO_DESC".Localized()
+                );
+                isPortAndCharLocked = true;
+            }
 
             // Auto-derive Character when coordinator is disabled
             if (!IsEnabled) {
@@ -419,8 +450,7 @@ namespace FlameStream {
             if (!IsEnabled) {
                 if (MouseReceiver != null && PenReceiver != null) {
                     if (MouseReceiver.Port != PenReceiver.Port) {
-                        SetDataInputPropertyAndBroadcast(
-                            nameof(IsEnabled),
+                        SetEnablePropertyIfChanged(
                             disabled: true,
                             description: $"Pointer receivers have conflicting UDP ports (Mouse: {MouseReceiver.Port}, Pen: {PenReceiver.Port}). Both must be set to the same port."
                         );
@@ -429,8 +459,7 @@ namespace FlameStream {
                             Port = MouseReceiver.Port;
                             BroadcastDataInput(nameof(Port));
                         }
-                        SetDataInputPropertyAndBroadcast(
-                            nameof(IsEnabled),
+                        SetEnablePropertyIfChanged(
                             disabled: false,
                             description: "COORDINATOR_ENABLE_DESC".Localized()
                         );
@@ -440,8 +469,7 @@ namespace FlameStream {
                         Port = MouseReceiver.Port;
                         BroadcastDataInput(nameof(Port));
                     }
-                    SetDataInputPropertyAndBroadcast(
-                        nameof(IsEnabled),
+                    SetEnablePropertyIfChanged(
                         disabled: false,
                         description: "COORDINATOR_ENABLE_DESC".Localized()
                     );
@@ -450,14 +478,12 @@ namespace FlameStream {
                         Port = PenReceiver.Port;
                         BroadcastDataInput(nameof(Port));
                     }
-                    SetDataInputPropertyAndBroadcast(
-                        nameof(IsEnabled),
+                    SetEnablePropertyIfChanged(
                         disabled: false,
                         description: "COORDINATOR_ENABLE_DESC".Localized()
                     );
                 } else {
-                    SetDataInputPropertyAndBroadcast(
-                        nameof(IsEnabled),
+                    SetEnablePropertyIfChanged(
                         disabled: false,
                         description: "COORDINATOR_ENABLE_DESC".Localized()
                     );
@@ -467,8 +493,7 @@ namespace FlameStream {
             // 2. EnableHands Preconditions
             // A. Same Character Check
             if (Character == null) {
-                SetDataInputPropertyAndBroadcast(
-                    nameof(EnableHands),
+                SetEnableHandsPropertyIfChanged(
                     disabled: true,
                     description: "COORDINATOR_CHAR_REQUIRED_DESC".Localized()
                 );
@@ -480,8 +505,7 @@ namespace FlameStream {
             bool penMismatch = PenReceiver != null && PenReceiver.Character != Character;
             if (kbMismatch || mouseMismatch || penMismatch) {
                 string mismatchedName = kbMismatch ? KeyboardReceiver.Name : (mouseMismatch ? MouseReceiver.Name : PenReceiver.Name);
-                SetDataInputPropertyAndBroadcast(
-                    nameof(EnableHands),
+                SetEnableHandsPropertyIfChanged(
                     disabled: true,
                     description: $"All registered receivers must be bound to {Character.Name}. '{mismatchedName}' is currently bound to another character or no character."
                 );
@@ -489,8 +513,7 @@ namespace FlameStream {
             }
 
             // All checks passed
-            SetDataInputPropertyAndBroadcast(
-                nameof(EnableHands),
+            SetEnableHandsPropertyIfChanged(
                 disabled: false,
                 description: "ENABLE_HANDS_DESC".Localized()
             );

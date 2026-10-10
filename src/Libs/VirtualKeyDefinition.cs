@@ -162,6 +162,7 @@ namespace FlameStream
         public Material BorderMaterial { get; internal set; }
 
         public float CurrentPressProgress { get; internal set; } = 0f;
+        public bool IsGlowResting { get; internal set; } = false;
         public Vector2 CurrentSize { get; internal set; } = new Vector2(-1f, -1f);
         public Vector4 CurrentBorderWidths { get; internal set; } = new Vector4(-1f, -1f, -1f, -1f);
         public Vector4 CurrentCornerRadii { get; internal set; } = new Vector4(-1f, -1f, -1f, -1f);
@@ -404,6 +405,7 @@ namespace FlameStream
             CurrentSize = new Vector2(-1f, -1f);
             CurrentBorderWidths = new Vector4(-1f, -1f, -1f, -1f);
             CurrentCornerRadii = new Vector4(-1f, -1f, -1f, -1f);
+            IsGlowResting = false;
         }
     }
 }
