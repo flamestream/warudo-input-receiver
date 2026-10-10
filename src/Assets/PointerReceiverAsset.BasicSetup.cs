@@ -633,7 +633,7 @@ namespace FlameStream
 
             UpdateDrawingScreenAppearance();
 
-            bool isDisplayMustBeVisible = (IsEnabled && IsHandEnabled) || isHandPuppeteered;
+            bool isDisplayMustBeVisible = IsEnabled && IsHandEnabled;
             if (isDisplayMustBeVisible) {
                 // Bind cursor anchor to screen
                 cursorAnchorAsset = GetCursorAnchor(skipAutoCreate: !shouldAutoCreate);

@@ -313,7 +313,10 @@ namespace FlameStream {
                         }
                         pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsHandEnabled), disabled: true, description: desc);
                     } else {
-                        pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsHandEnabled), disabled: false, description: "POINTER_ENABLE_DESC".Localized());
+                        if (pr.IsHandEnabled) {
+                            pr.SetDataInput(nameof(pr.IsHandEnabled), false, true);
+                        }
+                        pr.SetDataInputPropertyAndBroadcast(nameof(pr.IsHandEnabled), disabled: true, description: desc);
                     }
                     pr.OnCoordinatorStateChanged();
                 } else if (r is KeyboardReceiverAsset kr) {
@@ -323,7 +326,10 @@ namespace FlameStream {
                         }
                         kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsHandEnabled), disabled: true, description: desc);
                     } else {
-                        kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsHandEnabled), disabled: false, description: "ENABLE_HANDS_DESC".Localized());
+                        if (kr.IsHandEnabled) {
+                            kr.SetDataInput(nameof(kr.IsHandEnabled), false, true);
+                        }
+                        kr.SetDataInputPropertyAndBroadcast(nameof(kr.IsHandEnabled), disabled: true, description: desc);
                     }
                     kr.OnCoordinatorStateChanged();
                 }

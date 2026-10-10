@@ -118,7 +118,7 @@ namespace FlameStream {
                 StartReceiver();
             }
 
-            bool shouldEnableHands = isPuppeteered ? activeCoordinator.EnableHands : (IsEnabled && IsHandEnabled);
+            bool shouldEnableHands = IsEnabled && IsHandEnabled;
             if (shouldEnableHands) {
                 OnSurfaceSettingChange();
                 OnPropEnabledChanged();
