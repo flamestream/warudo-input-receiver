@@ -168,15 +168,6 @@ namespace FlameStream {
             } catch { }
         }
 
-        public override void Deserialize(SerializedStructuredData serialized) {
-            base.Deserialize(serialized);
-            if (serialized.dataInputs != null && serialized.dataInputs.TryGetValue("Key", out var legacyPort) && !string.IsNullOrEmpty(legacyPort?.value)) {
-                if (Enum.TryParse<VKCode>(legacyPort.value, out var legacyVk)) {
-                    Key = legacyVk;
-                }
-            }
-        }
-
         protected override void OnCreate() {
             base.OnCreate();
             EnsureKeyInput();

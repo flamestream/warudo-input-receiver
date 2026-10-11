@@ -47,13 +47,10 @@ namespace FlameStream
             set => MovementDefinitions = value;
         }
 
-        public Transition FingerPressTransition => FingerTransitions?.FingerPress ?? FingerTransitions?.Press;
-        public Transition FingerReleaseTransition => FingerTransitions?.FingerRelease ?? FingerTransitions?.Release;
+        public Transition FingerPressTransition => FingerTransitions?.FingerPress;
+        public Transition FingerReleaseTransition => FingerTransitions?.FingerRelease;
         public Transition HandMovementTransition => FingerTransitions?.HandMovement;
         public Transition HandReturnTransition => FingerTransitions?.HandReturn;
-
-        public Transition KeyPressTransition => FingerPressTransition;
-        public Transition KeyReleaseTransition => FingerReleaseTransition;
 
         // Runtime animation and movement state
         Tween[] fingerTweens = new Tween[10];
@@ -698,7 +695,7 @@ namespace FlameStream
         }
 
         public Vector3 GetFingerTipWorldPosition(Animator anim, KeyboardFinger finger) {
-            Vector3 offset = FingerMovementDefinitions?.FingertipOffsets?.GetOffset(finger) ?? new Vector3(0f, 0f, 0.012f);
+            Vector3 offset = BindingGenerator?.FingertipOffsets?.GetOffset(finger) ?? new Vector3(0f, 0f, 0.012f);
             var distalBone = GetDistalBoneForFinger(finger);
             var distalTransform = anim != null ? anim.GetBoneTransform(distalBone) : null;
             if (distalTransform != null) {
@@ -758,7 +755,7 @@ namespace FlameStream
         }
 
         public void SetupAllFingertipVisualSetupTransforms() {
-            var offsets = FingerMovementDefinitions?.FingertipOffsets;
+            var offsets = BindingGenerator?.FingertipOffsets;
             if (offsets == null) return;
             offsets.EnsureTransforms();
 
@@ -796,8 +793,8 @@ namespace FlameStream
 
 
             tr.OnMirrorToOppositeHand = (sourceTr) => {
-                if (FingerMovementDefinitions?.FingertipOffsets == null) return;
-                var offsets = FingerMovementDefinitions.FingertipOffsets;
+                if (BindingGenerator?.FingertipOffsets == null) return;
+                var offsets = BindingGenerator.FingertipOffsets;
                 var oppositeFinger = GetOppositeHandFinger(finger);
                 var oppositeTr = offsets.GetFingerTransform(oppositeFinger);
                 if (oppositeTr != null) {
@@ -828,7 +825,7 @@ namespace FlameStream
             tr.OnApplyAnchor = (transform, anchor) => {
                 transform.Position = anchor.Transform.Position;
                 if (isUnified) {
-                    FingerMovementDefinitions?.FingertipOffsets?.SyncUnifiedToIndividual();
+                    BindingGenerator?.FingertipOffsets?.SyncUnifiedToIndividual();
                 }
             };
 

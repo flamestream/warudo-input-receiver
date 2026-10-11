@@ -56,8 +56,6 @@ namespace FlameStream
         [Label("SAVED_DATA")]
         public KeyboardBasicSetupSavedData SavedData;
 
-        public KeyboardBasicSetupSavedData Advanced => SavedData;
-
         public string BaseHandAnimation {
             get => SavedData?.BaseHandAnimation;
             set {
@@ -131,7 +129,7 @@ namespace FlameStream
                 if (ActiveVirtualKeyInVisualSetup != null) return true;
                 if (ActiveKeyBindingInVisualSetup != null) return true;
                 if (activeVisualSetupFinger.HasValue) return true;
-                if (FingerMovementDefinitions?.FingertipOffsets != null && FingerMovementDefinitions.FingertipOffsets.IsInAnyVisualSetup()) return true;
+                if (BindingGenerator?.FingertipOffsets != null && BindingGenerator.FingertipOffsets.IsInAnyVisualSetup()) return true;
                 return false;
             }
         }

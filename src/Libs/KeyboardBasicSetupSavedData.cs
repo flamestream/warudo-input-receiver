@@ -56,7 +56,4 @@ namespace FlameStream
             });
         }
     }
-
-    [System.Obsolete]
-    public class KeyboardBasicSetupAdvanced : KeyboardBasicSetupSavedData { }
 }

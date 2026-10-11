@@ -113,14 +113,6 @@ namespace FlameStream
             }
         }
 
-        [DataInput(100)]
-        [Hidden]
-        public Transition Press;
-
-        [DataInput(101)]
-        [Hidden]
-        public Transition Release;
-
         public string GetHeader() {
             var fp = FingerPress != null ? $"{FingerPress.Time:0.##}s" : "0.05s";
             var hm = HandMovement != null ? $"{HandMovement.Time:0.##}s" : "0.12s";
@@ -142,23 +134,19 @@ namespace FlameStream
                 ResetToDefaults(false);
             } else {
                 if (FingerPress == null) {
-                    FingerPress = Press ?? StructuredData.Create<Transition>();
-                    if (Press == null) {
-                        FingerPress.Time = 0.05f;
-                        FingerPress.Ease = Ease.OutQuad;
-                        FingerPress.SetDataInput(nameof(FingerPress.Time), 0.05f, true);
-                        FingerPress.SetDataInput(nameof(FingerPress.Ease), Ease.OutQuad, true);
-                    }
+                    FingerPress = StructuredData.Create<Transition>();
+                    FingerPress.Time = 0.05f;
+                    FingerPress.Ease = Ease.OutQuad;
+                    FingerPress.SetDataInput(nameof(FingerPress.Time), 0.05f, true);
+                    FingerPress.SetDataInput(nameof(FingerPress.Ease), Ease.OutQuad, true);
                     SetDataInput(nameof(FingerPress), FingerPress, true);
                 }
                 if (FingerRelease == null) {
-                    FingerRelease = Release ?? StructuredData.Create<Transition>();
-                    if (Release == null) {
-                        FingerRelease.Time = 0.08f;
-                        FingerRelease.Ease = Ease.OutQuad;
-                        FingerRelease.SetDataInput(nameof(FingerRelease.Time), 0.08f, true);
-                        FingerRelease.SetDataInput(nameof(FingerRelease.Ease), Ease.OutQuad, true);
-                    }
+                    FingerRelease = StructuredData.Create<Transition>();
+                    FingerRelease.Time = 0.08f;
+                    FingerRelease.Ease = Ease.OutQuad;
+                    FingerRelease.SetDataInput(nameof(FingerRelease.Time), 0.08f, true);
+                    FingerRelease.SetDataInput(nameof(FingerRelease.Ease), Ease.OutQuad, true);
                     SetDataInput(nameof(FingerRelease), FingerRelease, true);
                 }
                 if (HandMovement == null) {

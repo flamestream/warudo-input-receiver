@@ -22,23 +22,6 @@ namespace FlameStream
         [Label("KEY_MOVEMENT_DEFINITIONS")]
         public KeyboardKeyBinding[] MovementDefinitions = new KeyboardKeyBinding[0];
 
-        // Compatibility forwarding to Generator
-        public KeyGenerationMode GenerationMode {
-            get => Generator?.GenerationMode ?? KeyGenerationMode.TiltToKeySurface;
-            set {
-                if (Generator != null) {
-                    Generator.GenerationMode = value;
-                    Generator.UpdateStatus();
-                }
-            }
-        }
-
-        public KeyboardFingertipOffsets FingertipOffsets => Generator?.FingertipOffsets;
-
-        public void TriggerAutoGenerateKeyBindings() {
-            Generator?.TriggerAutoGenerateKeyBindings();
-        }
-
         public string GetHeader() {
             int count = MovementDefinitions != null ? MovementDefinitions.Length : 0;
             return $"{"CLICK_TO_CONFIGURE".Localized()} ({count})";

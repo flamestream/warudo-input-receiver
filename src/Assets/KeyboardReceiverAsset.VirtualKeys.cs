@@ -466,11 +466,11 @@ namespace FlameStream
             var previous = IdentifiedVirtualKey;
             IdentifiedVirtualKey = keyDef;
             if (previous != null && previous != keyDef) {
-                previous.UpdateIdentifyButtonLabel(false);
+                previous.UpdateLocateButtonLabel(false);
                 UpdateVirtualKeyColors(previous);
             }
             if (keyDef != null) {
-                keyDef.UpdateIdentifyButtonLabel(true);
+                keyDef.UpdateLocateButtonLabel(true);
             }
             UpdateIdentifyVisuals();
             if (keyDef != null) {
@@ -490,7 +490,7 @@ namespace FlameStream
                 identifyPulseGo.SetActive(false);
             }
             if (previous != null) {
-                previous.UpdateIdentifyButtonLabel(false);
+                previous.UpdateLocateButtonLabel(false);
                 UpdateVirtualKeyColors(previous);
             }
         }
