@@ -9,6 +9,14 @@ namespace FlameStream
         [Markdown(10)]
         public string Instructions = "KEYBOARD_AUTO_SETUP_INSTRUCTIONS".Localized();
 
+        [DataInput(15)]
+        [AutoCompleteResource("CharacterAnimation", null)]
+        [PreviewGallery]
+        [Label("KEYBOARD_NEUTRAL_POSE")]
+        [Description("KEYBOARD_NEUTRAL_POSE_DESC")]
+        [DisabledIf(nameof(IsCharacterMissing))]
+        public string NeutralPose;
+
         [Trigger(20)]
         [Label("AUTO_SETUP_FROM_CHARACTER_POSE")]
         public void TriggerAutoSetup() {
@@ -17,20 +25,54 @@ namespace FlameStream
 
         public string GetHeader() => "CLICK_TO_SETUP_CHARACTER".Localized();
 
+        public bool IsCharacterMissing() => Parent == null || Parent.Character == null || !Parent.Character.Active;
+
         protected override void OnCreate() {
             base.OnCreate();
             CollapsedSelf = true;
             Instructions = "KEYBOARD_AUTO_SETUP_INSTRUCTIONS".Localized();
+
+            Watch(nameof(NeutralPose), delegate {
+                if (Parent != null && Parent.Character != null && !string.IsNullOrEmpty(NeutralPose)) {
+                    Helper.ApplyCharacterIdleAnimation(Parent.Character, NeutralPose);
+                }
+            });
+
+            UpdateButtonState();
+        }
+
+        public void OnCharacterChanged() {
+            if (Parent != null && Parent.Character != null && !string.IsNullOrEmpty(Parent.Character.DefaultIdleAnimation)) {
+                NeutralPose = Parent.Character.DefaultIdleAnimation;
+                SetDataInput(nameof(NeutralPose), NeutralPose, true);
+                BroadcastDataInput(nameof(NeutralPose));
+            }
             UpdateButtonState();
         }
 
         public void UpdateButtonState() {
+            Instructions = "KEYBOARD_AUTO_SETUP_INSTRUCTIONS".Localized();
+
+            bool missingChar = IsCharacterMissing();
+
+            var neutralPosePort = GetDataInputPort(nameof(NeutralPose));
+            if (neutralPosePort != null && neutralPosePort.Properties != null) {
+                neutralPosePort.Properties.disabled = missingChar;
+                BroadcastDataInputProperties(nameof(NeutralPose));
+            }
+
+            if (!missingChar && Parent.Character != null) {
+                if (string.IsNullOrEmpty(NeutralPose) && !string.IsNullOrEmpty(Parent.Character.DefaultIdleAnimation)) {
+                    NeutralPose = Parent.Character.DefaultIdleAnimation;
+                    SetDataInput(nameof(NeutralPose), NeutralPose, true);
+                    BroadcastDataInput(nameof(NeutralPose));
+                }
+            }
+
             var port = GetTriggerPort(nameof(TriggerAutoSetup));
             if (port == null || port.Properties == null) return;
 
-            Instructions = "KEYBOARD_AUTO_SETUP_INSTRUCTIONS".Localized();
-
-            if (Parent == null || Parent.Character == null || !Parent.Character.Active) {
+            if (missingChar) {
                 port.Properties.disabled = true;
                 port.Properties.description = "AUTO_SETUP_BLOCK_NO_CHARACTER".Localized();
                 BroadcastTriggerProperties(nameof(TriggerAutoSetup));

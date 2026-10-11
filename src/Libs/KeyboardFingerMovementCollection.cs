@@ -41,7 +41,7 @@ namespace FlameStream
 
         public string GetHeader() {
             int count = MovementDefinitions != null ? MovementDefinitions.Length : 0;
-            return $"{"FINGER_MOVEMENT_DEFINITIONS".Localized()} ({count})";
+            return $"{"CLICK_TO_CONFIGURE".Localized()} ({count})";
         }
 
         protected override void OnCreate() {

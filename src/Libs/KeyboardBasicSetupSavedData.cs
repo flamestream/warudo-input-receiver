@@ -33,7 +33,7 @@ namespace FlameStream
         [Description("BASIC_SETUP_DONE_DESC")]
         public bool IsBasicSetupDone;
 
-        public string GetHeader() => "SAVED_DATA".Localized();
+        public string GetHeader() => "CLICK_TO_VIEW_SAVED_DATA".Localized();
 
         protected override void OnCreate() {
             base.OnCreate();

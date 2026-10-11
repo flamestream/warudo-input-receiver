@@ -185,5 +185,19 @@ namespace FlameStream {
                 Warudo.Core.Context.Service?.BroadcastAssetHierarchy();
             } catch {}
         }
+
+        /// <summary>
+        /// Updates the character's DefaultIdleAnimation port using SetValueAtPath,
+        /// exactly replicating how Warudo's UI updates the character asset and triggers StartAnimation.
+        /// </summary>
+        public static void ApplyCharacterIdleAnimation(CharacterAsset character, string animationUri) {
+            if (character == null || string.IsNullOrEmpty(animationUri)) return;
+
+            try {
+                character.DataInputPortCollection?.SetValueAtPath(nameof(character.DefaultIdleAnimation), animationUri, true);
+            } catch (System.Exception ex) {
+                UnityEngine.Debug.LogWarning($"[Helper] Failed to set DefaultIdleAnimation via SetValueAtPath: {ex.Message}");
+            }
+        }
     }
 }

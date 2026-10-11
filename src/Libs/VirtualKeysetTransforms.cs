@@ -23,7 +23,7 @@ namespace FlameStream
         [Description("RIGHT_KEY_ORIGIN_DESC")]
         public CollapsibleVisualSetupTransform Right;
 
-        public string GetHeader() => "KEY_ORIGINS".Localized();
+        public string GetHeader() => "CLICK_TO_CONFIGURE".Localized();
 
         protected override void OnCreate() {
             base.OnCreate();

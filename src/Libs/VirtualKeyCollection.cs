@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using Warudo.Core;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
 using Warudo.Core.Localization;
@@ -17,10 +19,11 @@ namespace FlameStream
         [Trigger(20)]
         [Label("APPLY_KEYS_LAYOUT_PRESET")]
         public void TriggerApplyKeysLayoutPreset() {
-            Parent?.ApplyVirtualKeyPreset(Preset);
+            var target = Parent ?? Context.OpenedScene?.GetAssets<KeyboardReceiverAsset>()?.FirstOrDefault();
+            target?.ApplyVirtualKeyPreset(Preset);
         }
 
-        public string GetHeader() => "KEYS_LAYOUT_PRESET".Localized();
+        public string GetHeader() => "CLICK_TO_CONFIGURE".Localized();
 
         protected override void OnCreate() {
             base.OnCreate();
@@ -47,7 +50,7 @@ namespace FlameStream
 
         public string GetHeader() {
             int count = Keys != null ? Keys.Length : 0;
-            return $"{"FLOATING_KEY_LAYOUT".Localized()} ({count})";
+            return $"{"CLICK_TO_CONFIGURE".Localized()} ({count})";
         }
 
         public VirtualKeyLayoutPreset Preset {
@@ -66,6 +69,9 @@ namespace FlameStream
                 LayoutPreset = StructuredData.Create<VirtualKeyPresetConfig>();
                 LayoutPreset.Parent = Parent;
                 LayoutPreset.CollapsedSelf = true;
+                SetDataInput(nameof(LayoutPreset), LayoutPreset, true);
+            } else if (LayoutPreset.Parent == null) {
+                LayoutPreset.Parent = Parent;
             }
             Watch(nameof(Keys), delegate {
                 Parent?.OnVirtualKeysChanged();

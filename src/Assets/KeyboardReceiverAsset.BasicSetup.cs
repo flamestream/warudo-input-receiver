@@ -616,7 +616,7 @@ namespace FlameStream
                 }
                 UpdateHandTrackingState(); 
                 UpdateFloatingKeysState();
-                AutoSetup?.UpdateButtonState();
+                AutoSetup?.OnCharacterChanged();
                 UpdateInputEnableDescriptions();
                 RefreshSetupPorts();
             });
@@ -1119,9 +1119,11 @@ namespace FlameStream
                 RightHandRestTransform.BroadcastDataInput(nameof(RightHandRestTransform.Rotation));
             }
 
-            string capturedAnim = !string.IsNullOrEmpty(Character.DefaultIdleAnimation) 
-                ? Character.DefaultIdleAnimation 
-                : Character.OverlappingAnimations?.FirstOrDefault(a => !string.IsNullOrEmpty(a.Animation) && !(a.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false))?.Animation;
+            string capturedAnim = !string.IsNullOrEmpty(AutoSetup?.NeutralPose)
+                ? AutoSetup.NeutralPose
+                : (!string.IsNullOrEmpty(Character.DefaultIdleAnimation) 
+                    ? Character.DefaultIdleAnimation 
+                    : Character.OverlappingAnimations?.FirstOrDefault(a => !string.IsNullOrEmpty(a.Animation) && !(a.CustomLayerID?.StartsWith(CHARACTER_ANIM_LAYER_ID_PREFIX) ?? false))?.Animation);
 
             if (!string.IsNullOrEmpty(capturedAnim)) {
                 BaseHandAnimation = capturedAnim;

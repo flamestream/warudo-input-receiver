@@ -119,8 +119,12 @@ namespace FlameStream
             if (VirtualKeysCollection == null) {
                 VirtualKeysCollection = StructuredData.Create<VirtualKeyCollection>();
                 VirtualKeysCollection.CollapsedSelf = true;
+                SetDataInput(nameof(VirtualKeysCollection), VirtualKeysCollection, true);
             }
             VirtualKeysCollection.Parent = this;
+            if (VirtualKeysCollection.LayoutPreset != null) {
+                VirtualKeysCollection.LayoutPreset.Parent = this;
+            }
 
             if (KeysetTransforms == null) {
                 KeysetTransforms = StructuredData.Create<VirtualKeysetTransforms>();
@@ -434,6 +438,9 @@ namespace FlameStream
         public void RefreshVirtualKeysParent() {
             if (VirtualKeysCollection != null) {
                 VirtualKeysCollection.Parent = this;
+                if (VirtualKeysCollection.LayoutPreset != null) {
+                    VirtualKeysCollection.LayoutPreset.Parent = this;
+                }
             }
             if (VirtualKeys == null) return;
             for (int i = 0; i < VirtualKeys.Length; i++) {

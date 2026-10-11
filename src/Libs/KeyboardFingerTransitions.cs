@@ -125,7 +125,7 @@ namespace FlameStream
             var fp = FingerPress != null ? $"{FingerPress.Time:0.##}s" : "0.05s";
             var hm = HandMovement != null ? $"{HandMovement.Time:0.##}s" : "0.12s";
             var hr = (ReturnToRest && HandReturn != null) ? $", Return: {HandReturn.Time:0.##}s" : "";
-            return $"{"FINGER_TRANSITIONS".Localized()} (Finger: {fp}, Move: {hm}{hr})";
+            return $"{"CLICK_TO_CONFIGURE".Localized()} (Finger: {fp}, Move: {hm}{hr})";
         }
 
         protected override void OnCreate() {

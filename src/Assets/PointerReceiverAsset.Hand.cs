@@ -155,6 +155,11 @@ namespace FlameStream
 
             Watch(nameof(HandMouseMode), delegate { OnHandStateSettingChange(); });
             Watch(nameof(HandPenMode), delegate { OnHandStateSettingChange(); });
+            if (HandDynamicRotation == null) {
+                HandDynamicRotation = StructuredData.Create<HandRotationDynamicVector3>();
+                HandDynamicRotation.Enabled = true;
+                SetDataInput(nameof(HandDynamicRotation), HandDynamicRotation, true);
+            }
             Watch(nameof(HandDynamicRotation), delegate {
                 SetupHandDynamicRotation();
             });

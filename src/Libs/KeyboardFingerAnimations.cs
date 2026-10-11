@@ -66,7 +66,7 @@ namespace FlameStream
         [Label("RIGHT_PINKY_ANIMATION")]
         public string RightPinky;
 
-        public string GetHeader() => "FINGER_ANIMATIONS".Localized();
+        public string GetHeader() => "CLICK_TO_CONFIGURE".Localized();
 
         public string GetAnimation(KeyboardFinger finger) {
             switch (finger) {
