@@ -6,7 +6,7 @@ Available from the [Steam Workshop](https://steamcommunity.com/sharedfiles/filed
 ### Features
 
 * **Keyboard Tracking & Floating Keys**: Real-time 256-key input tracking, 3D floating keys with rounded borders and glow-on-press effects, 8 layout presets, per-finger reaching animations, and auto-binding generator.
-* **Multi-Input Coordination**: Intelligent hand IK arbitration between mouse/pen, keyboard, and controller with inactivity return-to-rest timers.
+* **Multi-Input Coordination**: Intelligent hand IK arbitration between mouse/pen and keyboard with inactivity return-to-rest timers.
 * **Pen & Mouse Tracking**: Pen detection support (Wacom Intuos Pro), planar body/elbow dynamic rotation, and full visual setup for mouse/pen tracking.
 * **Modern Game Controller Support**: GameInput (modern Xbox controllers), DirectInput, and XInput for wheels, pedals, flight sticks, and gamepads.
 * **Fingers & Props**: Finger animations and prop button/stick animations tied to controller/keyboard input.

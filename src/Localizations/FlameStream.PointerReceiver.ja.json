@@ -128,7 +128,7 @@
         "FS_ASSET_TITLE_KEYBOARD": "🔥 FS キーボードレシーバー",
         "FS_ASSET_TITLE_LEGACY_DIRECTINPUT": "🔥 FS レガシー DirectInput レシーバー",
         "FS_ASSET_TITLE_POINTER": "🔥 FS ポインターレシーバー",
-        "FS_INPUT_RECEIVER_VERSION_UPDATE": "**バージョン 6.0.0** (2026-10-11)\n\n✨ **主な新機能:**  \n• **キーボードレシーバー:** リアルタイム256キー追跡、3Dフローティングキー、8種類のレイアウトプリセット、指別アニメーションフレームワーク、自動キーバインド生成ツール。  \n• **マルチ入力コーディネーター:** ポインター（マウス/ペン）、キーボード、ゲームパッド間の手IKを賢く調停・自動待機ポーズ復帰。  \n• **ポインターレシーバーの強化:** 平面ボディ/肘ダイナミック回転、刷新されたビジュアルセットアップガイド、スクリーン外観のカスタマイズ。  \n• **新ブループリントノード:** キーボード押下・離脱イベントおよび状態取得ノードを追加。\n\n🔗 完全なリリースノート: https://github.com/flamestream/warudo-input-receiver/releases/latest  \n📚 ドキュメントとWiki: https://github.com/flamestream/warudo-input-receiver/wiki",
+        "FS_INPUT_RECEIVER_VERSION_UPDATE": "**バージョン 6.0.0** (2026-10-11)\n\n✨ **主な新機能:**  \n• **キーボードレシーバー:** リアルタイム256キー追跡、3Dフローティングキー、8種類のレイアウトプリセット、指別アニメーションフレームワーク、自動キーバインド生成ツール。  \n• **マルチ入力コーディネーター:** ポインター（マウス/ペン）とキーボード間の手IKを賢く調停・自動待機ポーズ復帰。  \n• **ポインターレシーバーの強化:** 平面ボディ/肘ダイナミック回転、刷新されたビジュアルセットアップガイド、スクリーン外観のカスタマイズ。  \n• **新ブループリントノード:** キーボード押下・離脱イベントおよび状態取得ノードを追加。\n\n🔗 完全なリリースノート: https://github.com/flamestream/warudo-input-receiver/releases/latest  \n📚 ドキュメントとWiki: https://github.com/flamestream/warudo-input-receiver/wiki",
         "FS_NODE_CATEGORY_GAMEPAD": "🔥🎮 レガシー DirectInput",
         "FS_NODE_CATEGORY_INPUT_RECEIVER": "🔥🎮 入力レシーバー",
         "FS_NODE_CATEGORY_KEYBOARD": "🔥 キーボードレシーバー",

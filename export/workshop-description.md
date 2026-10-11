@@ -11,7 +11,7 @@ Enhance Warudo with real-time input tracking and puppeteering tools tailored for
 
 ### 🌟 Key Features
 
-* 🎹 Keyboard Receiver & 3D Floating Keys
+* ⌨️ Keyboard Receiver & 3D Floating Keys
   - Real-time 256-key input tracking via companion emitter (tracks raw physical keys).
   - Procedural 3D Virtual Floating Keys with rounded borders and glow-on-press effects.
   - 8 Built-in layout presets: Full-Size 104, Compact 96%, TKL 80%, 75%, Keychron Q11 Split, 65%, 60%, and Ergonomic Southpaw.
@@ -20,8 +20,8 @@ Enhance Warudo with real-time input tracking and puppeteering tools tailored for
     https://steamcommunity.com/sharedfiles/filedetails/?id=3817573521
 
 * 🎛️ Multi-Input Coordinator
-  - Intelligently arbitrates hand IK target ownership between mouse/pen, keyboard, and controller.
-  - Inactivity return-to-rest timers to keep hands natural when you stop typing or gaming.
+  - Intelligently arbitrates hand IK target ownership between mouse/pen and keyboard.
+  - Inactivity return-to-rest timers to keep hands natural when you stop typing.
   - Live inspector dashboard showing active input layers.
 
 * 🎯 Pointer Receiver (Mouse & Pen Tracking)
