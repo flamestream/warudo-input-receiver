@@ -20,19 +20,6 @@ namespace FlameStream {
         CharacterUpperArm = 3
     }
 
-    public enum RestHandParentType {
-        [Label("PARENT_WORLD")]
-        World = 0,
-        [Label("PARENT_CHARACTER")]
-        Character = 1,
-        [Label("PARENT_SCREEN")]
-        Screen = 2,
-        [Label("PARENT_CHARACTER_SHOULDER")]
-        CharacterShoulder = 3,
-        [Hidden]
-        CharacterUpperArm = 3
-    }
-
     public class PointerHandRestSetup : StructuredData<PointerReceiverAsset>, ICollapsibleStructuredData {
         private long uiVersion = 0;
         public override long GetVersion() => base.GetVersion() + uiVersion;
