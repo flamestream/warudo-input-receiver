@@ -5,12 +5,32 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Warudo.Core.Attributes;
 using Warudo.Core.Localization;
 using Warudo.Core.Scenes;
+using Warudo.Core.Serializations;
 
 namespace FlameStream {
     public abstract class ReceiverAsset : Asset {
+
+        protected virtual int CURRENT_ASSET_VERSION => 1;
+
+        [Hidden]
+        [DataInput]
+        public int AssetVersion = 1;
+
+        protected long uiVersion = 0;
+
+        public override long GetVersion() {
+            return base.GetVersion() + uiVersion;
+        }
+
+        public async void RequestUiRefresh() {
+            await UniTask.Yield();
+            uiVersion++;
+            Broadcast();
+        }
 
         protected abstract ushort PROTOCOL_VERSION { get; }
         protected abstract string PROTOCOL_ID { get; }
@@ -21,25 +41,22 @@ namespace FlameStream {
         Task listenTask;
 
         protected string lastState;
+        public string LastRawState => lastState;
+        public bool IsSocketListening => udpClient != null;
 
         [Markdown(0)]
-        public string VersionUpdate = "FS_INPUT_RECEIVER_VERSION_UPDATE".Localized();
+        public string VersionUpdate = "";
 
         [DataInput(0)]
         [Label("ENABLE")]
         public bool IsEnabled;
 
         [Markdown(0)]
-        public string Message = "RECEIVER_NOT_STARTED".Localized();
+        public string Message = "";
 
         [DataInput(0)]
         [Label("PORT")]
         public int Port;
-
-        [Section("ADVANCED")]
-        [DataInput(1000)]
-        [Label("RECEIVER_ASSET_DEBUG_TOAST_WANTED")]
-        public bool IsDebugToastWanted;
 
         public bool IsReceiving {
             get {
@@ -47,9 +64,14 @@ namespace FlameStream {
             }
         }
 
+        protected bool isDestroyed = false;
+
         protected override void OnCreate() {
             if (Port == 0) Port = DEFAULT_PORT;
             base.OnCreate();
+
+            VersionUpdate = "FS_INPUT_RECEIVER_VERSION_UPDATE".Localized();
+            Message = "RECEIVER_NOT_STARTED".Localized();
 
             Watch(nameof(IsEnabled), delegate { OnIsEnabledChange(); });
             Watch(nameof(Port), delegate { OnPortChange(); });
@@ -58,8 +80,9 @@ namespace FlameStream {
         }
 
         protected override void OnDestroy() {
-            base.OnDestroy();
+            isDestroyed = true;
             StopReceiver();
+            base.OnDestroy();
         }
 
         public override void OnUpdate() {
@@ -73,36 +96,61 @@ namespace FlameStream {
         /// Background task loop for listener
         /// </summary>
         /// <param name="udpClient">Client waiting for messages</param>
-        protected void Listen(UdpClient udpClient) {
+        protected void Listen(UdpClient client) {
             // Create an IPEndPoint object to store the sender's information
             IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
 
             try {
-                // Loop until the UdpClient object is closed
-                while (udpClient != null && udpClient.Client != null)
+                // Loop until the UdpClient object is closed or receiver is deactivated
+                while (Active && client != null && client.Client != null)
                 {
                     try {
                         // Receive data from the port and print it to the console
-                        byte[] data = udpClient.Receive(ref remoteEP);
-                        lastState = Encoding.ASCII.GetString(data);
+                        byte[] data = client.Receive(ref remoteEP);
+                        if (data != null && data.Length > 0) {
+                            lastState = Encoding.ASCII.GetString(data);
+                        }
 
                     } catch (SocketException ex) {
                         if (Active) {
                             SetMessage(ex.Message);
                         } else {
-                            SetMessage("MSG_STOPPED_LISTENING");
+                            break;
                         }
+                    } catch (ObjectDisposedException) {
+                        break;
+                    } catch (NullReferenceException) {
+                        // Mono's UdpClient.Receive throws NullReferenceException when Client is disposed/closed while blocking
+                        break;
+                    } catch (Exception) {
+                        if (!Active) break;
                     }
                 }
-            } catch (ObjectDisposedException) {
-                // This will happen, since the client will be closed as we wait for thread to die.
+            } catch (Exception) {
+                // Safely absorb any shutdown exceptions on the background listener thread
             }
+        }
+
+        protected virtual bool ShouldStartReceiver() {
+            return true;
         }
 
         protected bool StartReceiver() {
             try {
+                if (!ShouldStartReceiver()) {
+                    SetActive(true);
+                    SetMessage("MSG_WAITING");
+                    return true;
+                }
+
                 Log($"Starting receiver on port {Port}");
-                udpClient = new UdpClient(Port);
+
+                // Enable SO_REUSEADDR so port can be rebound immediately across scene changes
+                var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+                socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                socket.Bind(new IPEndPoint(IPAddress.Any, Port));
+
+                udpClient = new UdpClient { Client = socket };
                 listenTask = Task.Run(() => Listen(udpClient));
 
                 SetActive(true);
@@ -121,12 +169,27 @@ namespace FlameStream {
         protected void StopReceiver() {
             SetActive(false);
 
-            if (udpClient != null) {
+            var client = udpClient;
+            udpClient = null;
+            var task = listenTask;
+            listenTask = null;
+
+            if (client != null) {
                 Log("Stopping receiver");
-                udpClient.Close();
-                udpClient = null;
-                listenTask.Wait();
-                listenTask = null;
+                try {
+                    client.Close();
+                } catch (Exception ex) {
+                    Log($"Error closing UDP client: {ex.Message}");
+                }
+            }
+
+            if (task != null) {
+                try {
+                    // Allow the background thread up to 500ms to exit cleanly
+                    task.Wait(500);
+                } catch (Exception) {
+                    // Absorb AggregateException / task cancellation during teardown
+                }
             }
 
             lastState = null;
@@ -207,7 +270,7 @@ namespace FlameStream {
             return null; // Valid new format
         }
 
-        protected void SetDataInputPropertyAndBroadcast(
+        public void SetDataInputPropertyAndBroadcast(
             string portName,
             bool? hidden = null,
             bool? alwaysHidden = null,
@@ -215,29 +278,75 @@ namespace FlameStream {
             bool? alwaysDisabled = null,
             string description = null
         ) {
+            var port = GetDataInputPort(portName);
+            if (port?.Properties == null) return;
+
             if (hidden != null)
-                GetDataInputPort(portName).Properties.hidden = hidden.Value;
+                port.Properties.hidden = hidden.Value;
             if (alwaysHidden != null)
-                GetDataInputPort(portName).Properties.alwaysHidden = alwaysHidden.Value;
+                port.Properties.alwaysHidden = alwaysHidden.Value;
             if (disabled != null)
-                GetDataInputPort(portName).Properties.disabled = disabled.Value;
+                port.Properties.disabled = disabled.Value;
             if (alwaysDisabled != null)
-                GetDataInputPort(portName).Properties.alwaysDisabled = alwaysDisabled.Value;
+                port.Properties.alwaysDisabled = alwaysDisabled.Value;
             if (description != null)
-                GetDataInputPort(portName).Properties.description = description;
+                port.Properties.description = description;
 
             BroadcastDataInputProperties(portName);
         }
 
-        protected void ShowToast(
-            string message,
-            Warudo.Core.Server.ToastSeverity severity = Warudo.Core.Server.ToastSeverity.Info
-        ) {
-            if (!IsDebugToastWanted) return;
-            Warudo.Core.Context.Service.Toast(severity, Name, message);
-        }
 
         abstract protected void Log(string msg);
+
+        public override void Deserialize(SerializedAsset serialized) {
+            int savedVersion = 0;
+            if (serialized?.dataInputs != null && serialized.dataInputs.TryGetValue(nameof(AssetVersion), out var versionPort)) {
+                if (!string.IsNullOrEmpty(versionPort?.value) && int.TryParse(versionPort.value, out int parsed)) {
+                    savedVersion = parsed;
+                }
+            }
+
+            if (savedVersion < CURRENT_ASSET_VERSION) {
+                try {
+                    OnPreMigrateAsset(savedVersion, CURRENT_ASSET_VERSION, serialized);
+                } catch (Exception ex) {
+                    Log($"Pre-migration exception from v{savedVersion} to v{CURRENT_ASSET_VERSION}: {ex}");
+                }
+            }
+
+            base.Deserialize(serialized);
+
+            if (savedVersion < CURRENT_ASSET_VERSION) {
+                try {
+                    OnPostMigrateAsset(savedVersion, CURRENT_ASSET_VERSION);
+                } catch (Exception ex) {
+                    Log($"Post-migration exception from v{savedVersion} to v{CURRENT_ASSET_VERSION}: {ex}");
+                }
+                AssetVersion = CURRENT_ASSET_VERSION;
+                BroadcastDataInput(nameof(AssetVersion));
+                Log($"Auto-migrated asset '{Name}' from v{savedVersion} to v{CURRENT_ASSET_VERSION}.");
+            }
+        }
+
+        protected virtual void OnPreMigrateAsset(int fromVersion, int toVersion, SerializedAsset rawSerialized) { }
+
+        protected virtual void OnPostMigrateAsset(int fromVersion, int toVersion) { }
+
+        protected bool MigrateRenamePort(SerializedAsset rawSerialized, string oldPortName, string newPortName) {
+            if (rawSerialized?.dataInputs == null) return false;
+            if (rawSerialized.dataInputs.TryGetValue(oldPortName, out var port)) {
+                rawSerialized.dataInputs.Remove(oldPortName);
+                port.key = newPortName;
+                rawSerialized.dataInputs[newPortName] = port;
+                return true;
+            }
+            return false;
+        }
+
+        protected bool MigrateRemovePort(SerializedAsset rawSerialized, string portName) {
+            if (rawSerialized?.dataInputs == null) return false;
+            return rawSerialized.dataInputs.Remove(portName);
+        }
 
     }
 }

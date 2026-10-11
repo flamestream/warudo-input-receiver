@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using Warudo.Core;
 using Warudo.Core.Attributes;
@@ -158,15 +159,22 @@ namespace FlameStream
         }
 
         void EnableLimb(bool isEnabled, LimbIKData limb, AnchorAsset anchor) {
-            if (isEnabled) {
+            if (limb == null) return;
+            if (isEnabled && anchor != null) {
                 limb.Enabled = true;
                 limb.IkTarget = anchor;
                 limb.PositionWeight = 1.0f;
                 limb.RotationWeight = 1.0f;
-            } else {
-                limb.Enabled = false;
+                limb.Broadcast();
+            } else if (!isEnabled) {
+                if (anchor != null && limb.IkTarget == anchor) {
+                    limb.Enabled = false;
+                    limb.IkTarget = null;
+                    limb.PositionWeight = 0f;
+                    limb.RotationWeight = 0f;
+                    limb.Broadcast();
+                }
             }
-            limb.Broadcast();
         }
 
         public void OnIdleFingerAnimationChange() {
@@ -185,20 +193,13 @@ namespace FlameStream
                 } else {
                     list.Add(idleLayer);
                 }
-                // Plugin Mode
-                Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}", list.ToArray(), true);
-                // Playground Mode
-                // Character.OverlappingAnimations =  list.ToArray();
-                // Character.BroadcastDataInput(nameof(Character.OverlappingAnimations));
+
+                Helper.SetCharacterOverlappingAnimations(Character, list.ToArray()).Forget();
 
             } else {
 
                 var idx = Array.IndexOf(Character.OverlappingAnimations, idleLayer);
-                // Plugin Mode
-                Character.DataInputPortCollection.SetValueAtPath($"{nameof(Character.OverlappingAnimations)}.{idx}.Animation", IdleFingerAnimation, true);
-                // Playground Mode
-                // Character.OverlappingAnimations[idx].Animation = IdleFingerAnimation;
-                // Character.BroadcastDataInput(nameof(Character.OverlappingAnimations));
+                Helper.SetCharacterOverlappingAnimationAt(Character, idx, IdleFingerAnimation);
             }
         }
 

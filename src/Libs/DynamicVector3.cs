@@ -1,31 +1,94 @@
+using System;
+using System.Globalization;
 using UnityEngine;
+using Warudo.Core;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
+using Warudo.Core.Localization;
+using Warudo.Plugins.Core.Assets;
+using Warudo.Plugins.Core.Assets.Utility;
 
 namespace FlameStream {
     public class DynamicVector3 : StructuredData {
 
-        [DataInput]
+        [DataInput(10)]
         [Label("ENABLE")]
         public bool Enabled;
-        [DataInput]
+
+        [DataInput(15)]
+        [Label("DYNAMIC_ROTATION_AUTO")]
+        [Description("DYNAMIC_ROTATION_AUTO_DESC")]
+        public bool Auto = true;
+
+        [DataInput(16)]
+        [Label("AUTO_ROTATION_SETTLE_FRAMES")]
+        [Description("AUTO_ROTATION_SETTLE_FRAMES_DESC")]
+        [IntegerSlider(0, 30)]
+        public int AutoSettleFrames = 16;
+
+        [DataInput(17)]
+        [Label("AUTO_ROTATION_MAX_SPEED")]
+        [Description("AUTO_ROTATION_MAX_SPEED_DESC")]
+        [FloatSlider(30f, 720f, 10f)]
+        public float AutoMaxSpeed = 360f;
+
+        public virtual bool HasAutoMode => false;
+        public Func<Vector3, Vector3> AutoRotationEvaluator;
+
+        [DataInput(20)]
         [Hidden]
         public DistanceInputMathExpression X;
-        [DataInput]
+        [DataInput(30)]
         [Hidden]
         public DistanceInputMathExpression Y;
-        [DataInput]
+        [DataInput(40)]
         [Hidden]
         public DistanceInputMathExpression Z;
 
+        [Trigger(50)]
+        [Label("ENTER_VISUAL_SETUP")]
+        public void EnterVisualSetupTrigger() {
+            EnterVisualSetup(true);
+        }
+
+        [Trigger(60)]
+        [Label("CANCEL_VISUAL_SETUP")]
+        [Hidden]
+        public void CancelVisualSetupTrigger() {
+            ExitVisualSetup(false);
+        }
+
+        [DataInput]
+        [Hidden]
+        public Vector3 SphereCenterOffset = Vector3.zero;
+
+        public bool InVisualSetupMode;
+        public VisualSetupAnchorAsset setupAnchor;
+        public string LocalizationKey;
+        public Func<Vector3> GetRestPosition;
+        public Func<GameObjectAsset> GetParentAnchor;
+        public Func<Vector3> GetDefaultPivotPosition;
+        public Func<bool> GetIsRightHanded;
+        public Action<DynamicVector3> OnEnterVisualSetup;
+        public Action<bool> OnExitVisualSetup;
+
+        // Visual guide objects
+        GameObject debugRestSphere;
+        Material debugRestSphereMat;
+
         public Vector3 Evaluate(Vector3 v) {
-            var result = Enabled
-                ? new Vector3(
-                    X.Evaluate(v),
-                    Y.Evaluate(v),
-                    Z.Evaluate(v)
-                )
-                : Vector3.zero;
+            Vector3 result = Vector3.zero;
+            if (Enabled) {
+                if (HasAutoMode && Auto && AutoRotationEvaluator != null) {
+                    result = AutoRotationEvaluator(v);
+                } else {
+                    result = new Vector3(
+                        X != null ? X.Evaluate(v) : 0f,
+                        Y != null ? Y.Evaluate(v) : 0f,
+                        Z != null ? Z.Evaluate(v) : 0f
+                    );
+                }
+            }
             if (debugMode) {
                 DebugMessage = $@"
 dx: {v.x:F3}
@@ -58,25 +121,245 @@ result: {result}
 
         protected override void OnCreate() {
             base.OnCreate();
+            if (X == null) X = StructuredData.Create<DistanceInputMathExpression>();
+            if (Y == null) Y = StructuredData.Create<DistanceInputMathExpression>();
+            if (Z == null) Z = StructuredData.Create<DistanceInputMathExpression>();
             Watch(nameof(Enabled), delegate { OnEnabledChanged(); });
+            Watch(nameof(Auto), delegate { OnEnabledChanged(); });
+            OnEnabledChanged();
         }
 
-        void OnEnabledChanged() {
-            GetDataInputPort(nameof(X)).Properties.hidden = !Enabled;
-            GetDataInputPort(nameof(Y)).Properties.hidden = !Enabled;
-            GetDataInputPort(nameof(Z)).Properties.hidden = !Enabled;
-            GetDataInputPort(nameof(DebugMessage)).Properties.hidden = !Enabled;
-            GetTriggerPort(nameof(ToggleDebugModeTrigger)).Properties.hidden = !Enabled;
+        protected override void OnDestroy() {
+            base.OnDestroy();
+            setupAnchor = null;
+            DestroyDebugVisuals();
+        }
 
+        public void EnterVisualSetup(bool isNavigationWanted) {
+            if (InVisualSetupMode) return;
+            InVisualSetupMode = true;
+            OnEnterVisualSetup?.Invoke(this);
+
+            var parentAnchor = GetParentAnchor?.Invoke();
+            Vector3 restPos = GetRestPosition != null ? GetRestPosition() : Vector3.zero;
+
+            Vector3 initialAnchorPos;
+            if (SphereCenterOffset != Vector3.zero) {
+                initialAnchorPos = restPos + SphereCenterOffset;
+            } else if (GetDefaultPivotPosition != null) {
+                initialAnchorPos = GetDefaultPivotPosition();
+            } else {
+                initialAnchorPos = restPos;
+            }
+
+            DestroyAnchor();
+            setupAnchor = Scene.AddAssetToGroup<VisualSetupAnchorAsset>("FS_ASSET_CATEGORY_INPUT".Localized());
+            setupAnchor.Parent = null;
+            var title = !string.IsNullOrEmpty(LocalizationKey) ? $"SETUP_ANCHOR_NAME_{LocalizationKey}".Localized() : "Dynamic Rotation Pivot";
+            setupAnchor.Name = $"⌛⚓-{title}";
+            setupAnchor.Instructions = $@"
+### Instructions
+
+{(!string.IsNullOrEmpty(LocalizationKey) ? $"SETUP_ANCHOR_INSTRUCTIONS_{LocalizationKey}".Localized() : "Position this anchor at the sphere center of rotation.")}
+";
+            if (parentAnchor != null) {
+                setupAnchor.Attachable.Parent = parentAnchor;
+            }
+
+            setupAnchor.Transform.Position = initialAnchorPos;
+            setupAnchor.Transform.Rotation = Vector3.zero;
+            setupAnchor.Transform.Scale = Vector3.one;
+            setupAnchor.SetHideScale(true);
+            setupAnchor.HideAnimation();
+            setupAnchor.HidePortIfExists(nameof(setupAnchor.ShowOrigin));
+            setupAnchor.HidePortIfExists(nameof(setupAnchor.AlwaysOnTop));
+            setupAnchor.HidePortIfExists(nameof(setupAnchor.OriginSphere));
+            setupAnchor.Transform.Broadcast();
+            Scene.UpdateNewAssetName(setupAnchor);
+
+            setupAnchor.ApplyTriggerAction = () => Apply(setupAnchor);
+            setupAnchor.CancelTriggerAction = () => ExitVisualSetup(false);
+            setupAnchor.ResetTriggerAction = () => ResetAnchorToOrigin();
+
+            Transform parentTr = parentAnchor != null && parentAnchor.GameObject != null ? parentAnchor.GameObject.transform : null;
+            CreateDebugVisuals(restPos, initialAnchorPos, parentTr);
+
+            if (isNavigationWanted) {
+                Context.Service.NavigateToAsset(setupAnchor.Id);
+                Context.Service.BroadcastOpenedScene();
+            }
+
+            GetTriggerPort(nameof(EnterVisualSetupTrigger)).Properties.hidden = true;
+            GetTriggerPort(nameof(CancelVisualSetupTrigger)).Properties.hidden = false;
+            GetTriggerPort(nameof(CancelVisualSetupTrigger)).Properties.description = $"Currently being set up by asset [{setupAnchor.Name}]";
+            BroadcastTriggerProperties(nameof(EnterVisualSetupTrigger));
+            BroadcastTriggerProperties(nameof(CancelVisualSetupTrigger));
+        }
+
+        public void ExitVisualSetup(bool isApplied) {
+            if (!InVisualSetupMode) return;
+            InVisualSetupMode = false;
+            DestroyAnchor();
+            DestroyDebugVisuals();
+
+            GetTriggerPort(nameof(EnterVisualSetupTrigger)).Properties.hidden = false;
+            GetTriggerPort(nameof(CancelVisualSetupTrigger)).Properties.hidden = true;
+            BroadcastTriggerProperties(nameof(EnterVisualSetupTrigger));
+            BroadcastTriggerProperties(nameof(CancelVisualSetupTrigger));
+
+            OnExitVisualSetup?.Invoke(isApplied);
+        }
+
+        public void ResetAnchorToOrigin() {
+            if (!InVisualSetupMode || setupAnchor == null) return;
+            Vector3 defaultPos = GetDefaultPivotPosition != null ? GetDefaultPivotPosition() : Vector3.zero;
+            setupAnchor.Transform.Position = defaultPos;
+            setupAnchor.Transform.Rotation = Vector3.zero;
+            setupAnchor.Transform.Scale = Vector3.one;
+            setupAnchor.Transform.Broadcast();
+            UpdateDebugVisuals();
+        }
+
+        public void DestroyAnchor() {
+            if (setupAnchor == null) return;
+            try {
+                Scene.RemoveAsset(setupAnchor.Id);
+            } catch {}
+            setupAnchor = null;
+        }
+
+        public void Apply(VisualSetupAnchorAsset a) {
+            Vector3 restPos = GetRestPosition != null ? GetRestPosition() : Vector3.zero;
+            Vector3 anchorPos = a.Transform.Position;
+
+            SphereCenterOffset = anchorPos - restPos;
+            BroadcastDataInput(nameof(SphereCenterOffset));
+
+            // P is vector from resting hand to pivot anchor on screen plane
+            Vector3 P = anchorPos - restPos;
+            if (P.sqrMagnitude < 0.0001f) {
+                P = new Vector3(0f, -0.3f, 0f);
+            }
+
+            string px = P.x.ToString("0.######", CultureInfo.InvariantCulture);
+            string negPy = (-P.y).ToString("0.######", CultureInfo.InvariantCulture);
+
+            if (X == null) X = StructuredData.Create<DistanceInputMathExpression>();
+            if (Y == null) Y = StructuredData.Create<DistanceInputMathExpression>();
+            if (Z == null) Z = StructuredData.Create<DistanceInputMathExpression>();
+
+            bool isRight = GetIsRightHanded != null ? GetIsRightHanded() : true;
+            string sign = isRight ? "-" : "";
+
+            // Planar Sweep (X): 360 degree rotation around pivot
+            // Vector from cursor to pivot is (Px + dx, Py + dy). Angle relative to (0, -1) is atan2(vx, -vy)
+            string pxTerm = P.x >= 0 ? $"{px} + dx" : $"dx - {Math.Abs(P.x).ToString("0.######", CultureInfo.InvariantCulture)}";
+            string pyTerm = (-P.y) >= 0 ? $"{negPy} - dy" : $"-{Math.Abs(-P.y).ToString("0.######", CultureInfo.InvariantCulture)} - dy";
+
+            X.Expression = $"{sign}(atan2({pxTerm}, {pyTerm}) * (180 / pi))";
+            X.OnExpressionChange();
+            X.BroadcastDataInput(nameof(X.Expression));
+
+            Y.Expression = "0";
+            Y.OnExpressionChange();
+            Y.BroadcastDataInput(nameof(Y.Expression));
+
+            Z.Expression = "0";
+            Z.OnExpressionChange();
+            Z.BroadcastDataInput(nameof(Z.Expression));
+
+            Auto = false;
+            BroadcastDataInput(nameof(Auto));
+            Enabled = true;
+            BroadcastDataInput(nameof(Enabled));
+            BroadcastDataInput(nameof(X));
+            BroadcastDataInput(nameof(Y));
+            BroadcastDataInput(nameof(Z));
+            OnEnabledChanged();
+
+            ExitVisualSetup(true);
+        }
+
+        void CreateDebugVisuals(Vector3 restPos, Vector3 anchorPos, Transform parentTransform) {
+            DestroyDebugVisuals();
+
+            // 1. 5cm red resting sphere at restPos
+            debugRestSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            debugRestSphere.name = "DynamicRotation_DebugRestSphere";
+            var col1 = debugRestSphere.GetComponent("Collider");
+            if (col1 != null) UnityEngine.Object.Destroy(col1);
+
+            if (parentTransform != null) {
+                debugRestSphere.transform.SetParent(parentTransform, false);
+            }
+            debugRestSphere.transform.localPosition = restPos;
+            debugRestSphere.transform.localScale = new Vector3(0.05f, 0.05f, 0.05f); // 5cm diameter
+
+            debugRestSphereMat = new Material(Shader.Find("Standard"));
+            debugRestSphereMat.color = new Color(1f, 0f, 0f, 0.9f);
+            debugRestSphereMat.EnableKeyword("_EMISSION");
+            debugRestSphereMat.SetColor("_EmissionColor", new Color(0.8f, 0f, 0f));
+            debugRestSphere.GetComponent<Renderer>().material = debugRestSphereMat;
+
+            UpdateDebugVisuals();
+        }
+
+        public void UpdateDebugVisuals() {
+            if (debugRestSphere == null) return;
+
+            Vector3 restPos = GetRestPosition != null ? GetRestPosition() : Vector3.zero;
+            debugRestSphere.transform.localPosition = restPos;
+        }
+
+        public void DestroyDebugVisuals() {
+            if (debugRestSphere != null) {
+                UnityEngine.Object.Destroy(debugRestSphere);
+                debugRestSphere = null;
+            }
+            if (debugRestSphereMat != null) {
+                UnityEngine.Object.Destroy(debugRestSphereMat);
+                debugRestSphereMat = null;
+            }
+        }
+
+        protected override void OnUpdate() {
+            base.OnUpdate();
+            if (InVisualSetupMode) {
+                UpdateDebugVisuals();
+            }
+        }
+
+        protected virtual void OnEnabledChanged() {
+            bool showAuto = Enabled && HasAutoMode;
+            GetDataInputPort(nameof(Auto)).Properties.hidden = !showAuto;
+
+            bool showAutoSettings = showAuto && Auto;
+            GetDataInputPort(nameof(AutoSettleFrames)).Properties.hidden = !showAutoSettings;
+            GetDataInputPort(nameof(AutoMaxSpeed)).Properties.hidden = !showAutoSettings;
+
+            bool showManual = Enabled && (!HasAutoMode || !Auto);
+            GetDataInputPort(nameof(X)).Properties.hidden = !showManual;
+            GetDataInputPort(nameof(Y)).Properties.hidden = !showManual;
+            GetDataInputPort(nameof(Z)).Properties.hidden = !showManual;
+            GetDataInputPort(nameof(DebugMessage)).Properties.hidden = !showManual;
+            GetTriggerPort(nameof(ToggleDebugModeTrigger)).Properties.hidden = !showManual;
+            GetTriggerPort(nameof(EnterVisualSetupTrigger)).Properties.hidden = !showManual;
+
+            BroadcastDataInputProperties(nameof(Auto));
+            BroadcastDataInputProperties(nameof(AutoMaxSpeed));
+            BroadcastDataInputProperties(nameof(AutoSettleFrames));
             BroadcastDataInputProperties(nameof(X));
             BroadcastDataInputProperties(nameof(Y));
             BroadcastDataInputProperties(nameof(Z));
             BroadcastDataInputProperties(nameof(DebugMessage));
             BroadcastTriggerProperties(nameof(ToggleDebugModeTrigger));
+            BroadcastTriggerProperties(nameof(EnterVisualSetupTrigger));
         }
     }
 
     public class HandRotationDynamicVector3 : DynamicVector3 {
+        public override bool HasAutoMode => true;
+
         public HandRotationDynamicVector3() {
             X = StructuredData.Create<DistanceInputMathExpression>((me) => {
                 me.Expression = "min(2 * abs(dx), 1) * (atan2(abs(dy), abs(dx)) * (180 / pi) - 90) * sign(dx)";

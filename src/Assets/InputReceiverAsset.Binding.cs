@@ -171,6 +171,11 @@ namespace FlameStream
                 )
                 .SetEase(transition.Ease);
 
+            var delay = (isEnabledWanted && transition != null) ? transition.Delay : 0f;
+            if (delay > 0f) {
+                IkTween.SetDelay(delay);
+            }
+
             if (onComplete != null) IkTween.OnComplete(onComplete);
         }
 
@@ -347,22 +352,29 @@ namespace FlameStream
             }
 
             TransitionIkLimbs(false, AdvancedOptions.LimbIkLeaveTransition, () => {
-                var leftIk = Character.LeftHandIK;
-                leftIk.Enabled = false;
-                leftIk.IkTarget = null;
+                var leftAnchor = LeftHandAnchor;
+                var rightAnchor = RightHandAnchor;
 
-                if (AdvancedOptions.BendGoalControlOptionsInstance.IsEnabled) {
-                    leftIk.BendGoalTarget = null;
+                var leftIk = Character.LeftHandIK;
+                if (leftIk != null && leftAnchor != null && leftIk.IkTarget == leftAnchor) {
+                    leftIk.Enabled = false;
+                    leftIk.IkTarget = null;
+
+                    if (AdvancedOptions.BendGoalControlOptionsInstance.IsEnabled) {
+                        leftIk.BendGoalTarget = null;
+                    }
+                    leftIk.Broadcast();
                 }
-                leftIk.Broadcast();
 
                 var rightIk = Character.RightHandIK;
-                rightIk.Enabled = false;
-                rightIk.IkTarget = null;
-                if (AdvancedOptions.BendGoalControlOptionsInstance.IsEnabled) {
-                    rightIk.BendGoalTarget = null;
+                if (rightIk != null && rightAnchor != null && rightIk.IkTarget == rightAnchor) {
+                    rightIk.Enabled = false;
+                    rightIk.IkTarget = null;
+                    if (AdvancedOptions.BendGoalControlOptionsInstance.IsEnabled) {
+                        rightIk.BendGoalTarget = null;
+                    }
+                    rightIk.Broadcast();
                 }
-                rightIk.Broadcast();
 
                 ClearAllSceneAssets();
 
@@ -392,9 +404,42 @@ namespace FlameStream
 
             protected override void OnCreate() {
                 base.OnCreate();
+                if (BendGoalControlOptionsInstance == null) {
+                    BendGoalControlOptionsInstance = StructuredData.Create<BendGoalControlOptions>();
+                    SetDataInput(nameof(BendGoalControlOptionsInstance), BendGoalControlOptionsInstance, true);
+                }
                 BendGoalControlOptionsInstance.Parent = Parent;
 
                 Watch(nameof(BendGoalControlOptionsInstance), HandleBendGoalControlOptionsChanged);
+
+                if (LimbIkEnterTransition == null) {
+                    LimbIkEnterTransition = StructuredData.Create<ActiveTransition>();
+                    SetDataInput(nameof(LimbIkEnterTransition), LimbIkEnterTransition, true);
+                } else {
+                    UnhideDelayPort(LimbIkEnterTransition);
+                }
+                Watch(nameof(LimbIkEnterTransition), delegate {
+                    UnhideDelayPort(LimbIkEnterTransition);
+                });
+
+                if (LimbIkLeaveTransition == null) {
+                    LimbIkLeaveTransition = StructuredData.Create<InactiveTransition>();
+                    SetDataInput(nameof(LimbIkLeaveTransition), LimbIkLeaveTransition, true);
+                } else {
+                    UnhideDelayPort(LimbIkLeaveTransition);
+                }
+                Watch(nameof(LimbIkLeaveTransition), delegate {
+                    UnhideDelayPort(LimbIkLeaveTransition);
+                });
+            }
+
+            void UnhideDelayPort(Transition transition) {
+                if (transition != null) {
+                    var delayPort = transition.GetDataInputPort(nameof(transition.Delay));
+                    if (delayPort?.Properties != null) {
+                        delayPort.Properties.hidden = false;
+                    }
+                }
             }
 
             [DataInput]

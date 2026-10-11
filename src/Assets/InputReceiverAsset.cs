@@ -49,16 +49,30 @@ namespace FlameStream
         protected Vector3 TranslationDownVeryStrong = new Vector3(0f, -2f, 0f);
         protected Vector3 TranslationUpVeryStrong = new Vector3(0f, 2f, 0f);
 
-        const int CURRENT_ASSET_VERSION = 1;
+        protected override int CURRENT_ASSET_VERSION => 2;
 
         protected override void OnCreate() {
             base.OnCreate();
+            if (AdvancedOptions == null) {
+                AdvancedOptions = StructuredData.Create<AdvancedBindings>();
+                SetDataInput(nameof(AdvancedOptions), AdvancedOptions, true);
+            }
             SignalDefinitionGenerationSectionInstance.Parent = this;
             OnCreateSignalDefinition();
             OnCreateAnimation();
 
             Watch(nameof(IsEnabled), HandleIsControlEnabledChanged);
             Watch(nameof(IsControlEnabled), HandleIsControlEnabledChanged);
+        }
+
+        protected override void OnPostMigrateAsset(int fromVersion, int toVersion) {
+            base.OnPostMigrateAsset(fromVersion, toVersion);
+            if (fromVersion < 2) {
+                if (AdvancedOptions?.LimbIkEnterTransition != null && AdvancedOptions.LimbIkEnterTransition.Delay == 0f) {
+                    AdvancedOptions.LimbIkEnterTransition.Delay = 0.1f;
+                    AdvancedOptions.BroadcastDataInput(nameof(AdvancedOptions.LimbIkEnterTransition));
+                }
+            }
         }
 
         public override void OnUpdate() {
@@ -75,10 +89,6 @@ namespace FlameStream
         protected override void Log(string msg) {
             Debug.Log($"[FlameStream.Asset.GameInputReceiver] {msg}");
         }
-
-        [Hidden]
-        [DataInput]
-        public int AssetVersion = CURRENT_ASSET_VERSION;
 
         /// <summary>
         /// BINDING
@@ -348,5 +358,18 @@ Go to your **Pose Tracking** blueprint and insert the **🔥🎮 Hand Tracker** 
         [HiddenIf(nameof(IsHandTrackerEnabled), Is.False)]
         [Label("UNTRACKED_RIGHT_HAND_MOTION")]
         public UntrackedHandMotionSet UntrackedRightHandMotion;
+
+        [Section("ADVANCED")]
+        [DataInput(1000)]
+        [Label("RECEIVER_ASSET_DEBUG_TOAST_WANTED")]
+        public bool IsDebugToastWanted;
+
+        public void ShowToast(
+            string message,
+            Warudo.Core.Server.ToastSeverity severity = Warudo.Core.Server.ToastSeverity.Info
+        ) {
+            if (!IsDebugToastWanted) return;
+            Warudo.Core.Context.Service?.Toast(severity, Name, message);
+        }
     }
 }

@@ -1,21 +1,25 @@
 using Warudo.Core.Attributes;
 using Warudo.Core.Plugins;
 
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("FSInputReceiver.Tests")]
+
 namespace FlameStream {
     [PluginType(
         Id = "FlameStream.PointerReceiver",
         Name = "PLUGIN_NAME",
         Description = "PLUGIN_DESCRIPTION",
         Author = "FlameStream",
-        Version = "5.3.0",
+        Version = "6.0.0",
         AssetTypes = new[] {
             typeof(DrawingScreenAsset),
             typeof(DirectInputReceiverAsset),
             typeof(GameInputReceiverAsset),
             typeof(GamepadReceiverAsset),
             typeof(KeyboardReceiverAsset),
+            typeof(MultiInputCoordinatorAsset),
             typeof(PointerReceiverAsset),
             typeof(VisualSetupAnchorAsset),
+            typeof(KeyBindingVisualSetupAnchorAsset),
             typeof(XInputReceiverAsset),
         },
         NodeTypes = new[] {
@@ -52,5 +56,17 @@ namespace FlameStream {
             typeof(KeyboardReceiverOnKeyDownNode),
             typeof(KeyboardReceiverOnKeyUpNode),
         })]
-    public class PointerReceiverPlugin : Plugin {}
+    public class PointerReceiverPlugin : Plugin {
+        public static PointerReceiverPlugin Instance { get; private set; }
+
+        protected override void OnCreate() {
+            base.OnCreate();
+            Instance = this;
+        }
+
+        protected override void OnDestroy() {
+            Instance = null;
+            base.OnDestroy();
+        }
+    }
 }

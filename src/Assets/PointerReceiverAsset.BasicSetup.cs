@@ -8,6 +8,8 @@ using Warudo.Plugins.Core.Assets.Utility;
 using uDesktopDuplication;
 using DG.Tweening;
 using Warudo.Core;
+using Warudo.Core.Data;
+using Warudo.Core.Localization;
 
 namespace FlameStream
 {
@@ -27,6 +29,7 @@ namespace FlameStream
         static Vector3 IK_BASIS_RIGHT_HANDED = new Vector3(0, 90f, 90f);
 
         Monitor monitor;
+        float lastMonitorLookupTime;
         DrawingScreenAsset screenAsset;
         AnchorAsset cursorAnchorAsset;
         Tween cursorMoveTween;
@@ -44,6 +47,9 @@ namespace FlameStream
         Material debugSphereCharacterTargetBasePositionMaterial;
 
         Vector3 cursorScreenPosition;
+        Vector3 cachedAutoHandRotation = Vector3.zero;
+        float cachedAutoHandRotX = float.NaN;
+        int autoHandSettleCountdown = 0;
 
         bool isReady;
         int onReadyCountdown = 3;
@@ -66,14 +72,21 @@ namespace FlameStream
             OnCreateMoveHand();
             OnCreateProp();
             OnCreateMoveBody();
+            OnCreateRestHand();
         }
 
         protected override void OnDestroy() {
             base.OnDestroy();
 
             DestroyDebugSpheres(true);
-            CleanDestroy(bodySetupRootAnchor);
+            bodySetupRootAnchor = null;
             GameObject.Destroy(calculator);
+            tweenLeftIK?.Kill();
+            tweenRightIK?.Kill();
+            tweenActivePole?.Kill();
+            activeHandPoleAnchor = null;
+            OnDestroyRestHand();
+            OnDestroyHand();
         }
 
         public override void OnUpdate() {
@@ -81,100 +94,267 @@ namespace FlameStream
 
             OnUpdateState();
 
-            if (Character == null) return;
-
             // OnReady: One-time execution before update events are sent
-            // Delay if a few tick is needed because things are for settled
+            // Delay if a few ticks are needed so scene references are fully settled
             if (onReadyCountdown > 0) {
                 --onReadyCountdown;
                 if (onReadyCountdown == 0) {
                     isReady = true;
-                    OnReadyHand();
-                    OnReadyBody();
-                    OnReadyProp();
-                };
+                    OnReadyBasicSetup();
+                    if (Character != null) {
+                        OnReadyHand();
+                        OnReadyBody();
+                        OnReadyProp();
+                        OnReadyRestHand();
+                    }
+                    OnBasicSettingChange();
+                }
             }
+
+            if (Character == null) return;
 
             OnUpdateBasicSetup();
             OnUpdateHand();
             OnUpdateProp();
             OnUpdateBody();
+            OnUpdateRestHand();
+        }
+
+        void OnReadyBasicSetup() {
+            SetupDrawingScreenTransform();
+            OnSurfaceSettingChange();
+            if (screenAsset == null) {
+                screenAsset = GetSurfaceScreen();
+            }
+            if (cursorAnchorAsset == null) {
+                cursorAnchorAsset = GetCursorAnchor();
+            }
+            if (cursorAnchorAsset != null && screenAsset != null) {
+                cursorAnchorAsset.Attachable.Parent = screenAsset;
+            }
         }
 
         void OnCreateBasicSetup() {
             calculator = new GameObject();
-            // Has to be before #OnBasicSettingChange
-            Watch(nameof(DisplayName), delegate { OnSurfaceSettingChange(); });
-            // OnSurfaceSettingChange(); // No need; will be called by #OnBasicSettingChange
+
+            if (ScreenSetup == null) {
+                ScreenSetup = StructuredData.Create<PointerDrawingScreenSetup>();
+                SetDataInput(nameof(ScreenSetup), ScreenSetup, true);
+            }
+            ScreenSetup.Parent = this;
+            if (ScreenSetup.AutoSetup != null) {
+                ScreenSetup.AutoSetup.Parent = this;
+                ScreenSetup.AutoSetup.UpdateDescription();
+            }
+
+            SetupDrawingScreenTransform();
+
+            // Compatibility: migrate older saved single-port screen transforms if present
+            if (HasSavedScreenTransform && !HasConfiguredScreenTransform && ScreenSetup?.Transform != null) {
+                ScreenSetup.Transform.Position = SavedScreenPosition;
+                ScreenSetup.Transform.Rotation = SavedScreenRotation;
+                ScreenSetup.Transform.Scale = SavedScreenScale;
+                ScreenSetup.Transform.SetDataInput(nameof(ScreenSetup.Transform.Position), SavedScreenPosition, true);
+                ScreenSetup.Transform.SetDataInput(nameof(ScreenSetup.Transform.Rotation), SavedScreenRotation, true);
+                ScreenSetup.Transform.SetDataInput(nameof(ScreenSetup.Transform.Scale), SavedScreenScale, true);
+                HasConfiguredScreenTransform = true;
+                SetDataInput(nameof(HasConfiguredScreenTransform), true, true);
+            }
+
+            if (CursorMode == null) {
+                CursorMode = StructuredData.Create<CursorMode>();
+                CursorMode.CursorSmoothness = CursorSmoothness;
+                SetDataInput(nameof(CursorMode), CursorMode, true);
+            }
+            if (CursorSmoothness != 0.05f && CursorMode.CursorSmoothness == 0.05f) {
+                CursorMode.CursorSmoothness = CursorSmoothness;
+            } else {
+                CursorSmoothness = CursorMode.CursorSmoothness;
+            }
+            CursorMode.Watch(nameof(CursorMode.CursorSmoothness), delegate {
+                CursorSmoothness = CursorMode.CursorSmoothness;
+            });
+            Watch(nameof(CursorSmoothness), delegate {
+                if (CursorMode != null && CursorMode.CursorSmoothness != CursorSmoothness) {
+                    CursorMode.CursorSmoothness = CursorSmoothness;
+                }
+            });
+
+            if (ActiveHand == null) {
+                ActiveHand = StructuredData.Create<PointerActiveHandSetup>();
+                ActiveHand.IsRightHanded = IsRightHanded;
+                ActiveHand.CollapsedSelf = false;
+                SetDataInput(nameof(ActiveHand), ActiveHand, true);
+            }
+            ActiveHand.Parent = this;
+            ActiveHand.CollapsedSelf = false;
+            ActiveHand.IsRightHanded = IsRightHanded;
+
+            if (ActiveTransition == null) {
+                ActiveTransition = StructuredData.Create<ActiveTransition>();
+                SetDataInput(nameof(ActiveTransition), ActiveTransition, true);
+            }
+            if (ActiveTransition != null) {
+                var delayPort = ActiveTransition.GetDataInputPort(nameof(ActiveTransition.Delay));
+                if (delayPort?.Properties != null) {
+                    delayPort.Properties.hidden = false;
+                }
+            }
+            Watch(nameof(ActiveTransition), delegate {
+                if (ActiveTransition != null) {
+                    var delayPort = ActiveTransition.GetDataInputPort(nameof(ActiveTransition.Delay));
+                    if (delayPort?.Properties != null) {
+                        delayPort.Properties.hidden = false;
+                    }
+                }
+            });
+            if (InactiveTransition == null) {
+                InactiveTransition = StructuredData.Create<InactiveTransition>();
+                SetDataInput(nameof(InactiveTransition), InactiveTransition, true);
+            }
+            Watch(nameof(ActiveHand), delegate {
+                if (ActiveHand != null) {
+                    ActiveHand.Parent = this;
+                }
+                SetupActiveHandPoleTransform();
+            });
+
+            Watch(nameof(DisplayName), delegate {
+                monitor = null;
+                lastMonitorLookupTime = 0f;
+                OnSurfaceSettingChange();
+                OnBasicSettingChange();
+            });
 
             Watch(nameof(IsEnabled), delegate { OnBasicSettingChange(); });
             Watch(nameof(IsHandEnabled), delegate { OnBasicSettingChange(); });
-            Watch(nameof(Character), delegate { OnBasicSettingChange(); });
-            Watch(nameof(DisplayName), delegate { OnBasicSettingChange(); });
+            Watch(nameof(Character), delegate {
+                if (isReady && Character != null) {
+                    OnReadyHand();
+                    OnReadyBody();
+                    OnReadyProp();
+                    OnReadyRestHand();
+                }
+                if (Character != null && !HasConfiguredScreenTransform && ScreenSetup?.Transform != null) {
+                    var preset = ScreenSetup.AutoSetup?.Preset ?? DrawingScreenAutoSetupPreset.StandingTilted;
+                    if (CalculateScreenPresetTransform(preset, out Vector3 pos, out Vector3 rot, out Vector3 scl)) {
+                        ScreenSetup.Transform.Position = pos;
+                        ScreenSetup.Transform.Rotation = rot;
+                        ScreenSetup.Transform.Scale = scl;
+                        ScreenSetup.Transform.SetDataInput(nameof(ScreenSetup.Transform.Position), pos, true);
+                        ScreenSetup.Transform.SetDataInput(nameof(ScreenSetup.Transform.Rotation), rot, true);
+                        ScreenSetup.Transform.SetDataInput(nameof(ScreenSetup.Transform.Scale), scl, true);
+                        ScreenSetup.Transform.Broadcast();
+                        SyncDrawingScreenTransform(screenAsset, force: true);
+                    }
+                }
+                ScreenSetup?.UpdateAutoSetupStatus();
+                BroadcastDataInput(nameof(ScreenSetup));
+                OnBasicSettingChange();
+            });
+            Watch(nameof(IsRightHanded), delegate {
+                ScreenSetup?.UpdateAutoSetupStatus();
+                BroadcastDataInput(nameof(ScreenSetup));
+            });
+            Watch(nameof(ScreenSetup), delegate {
+                SetupDrawingScreenTransform();
+                OnSurfaceSettingChange();
+            });
             OnBasicSettingChange();
 
-            Watch(nameof(IsScreenDisableBasedOnAssetStateWanted), delegate { OnSurfaceSettingChange(); });
-
             Watch(nameof(DebugSphereScaleFactor), delegate { ApplyDisplayPointerSphereScale(); });
+            Watch(nameof(RestHand), delegate { OnRestHandSettingChange(); });
         }
 
         void OnUpdateBasicSetup() {
-            if (!IsHandEnabled) return;
-            if (monitor == null) return;
-            if (cursorAnchorAsset == null) return;
+            UpdateUiStatus();
 
-            if (CursorMode.Mode == CursorMode.CursorModeValue.FixedDelta) {
-                adjustedX = 0;
-                adjustedY = 0;
-                if (X != lastX) {
-                    var midX = (monitor.left + monitor.right) / 2;
-                    if (X != midX) {
-                        adjustedX = (int)((X - midX) * CursorMode.DisplacementFactor);
+            if (ScreenSetup?.Transform != null && ScreenSetup.Transform.InVisualSetupMode && ScreenSetup.Transform.setupAnchor != null) {
+                var anchorTr = ScreenSetup.Transform.setupAnchor.Transform;
+                if (screenAsset != null) {
+                    screenAsset.Transform.Position = anchorTr.Position;
+                    screenAsset.Transform.Rotation = anchorTr.Rotation;
+                    screenAsset.Transform.Scale = anchorTr.Scale;
+                    screenAsset.Transform.Broadcast();
+                    if (screenAsset.GameObject != null) {
+                        screenAsset.GameObject.transform.position = anchorTr.Position;
+                        screenAsset.GameObject.transform.rotation = Quaternion.Euler(anchorTr.Rotation);
+                        screenAsset.GameObject.transform.localScale = anchorTr.Scale;
                     }
                 }
-                if (Y != lastY) {
-                    var midY = (monitor.top + monitor.bottom) / 2;
-                    if (Y != midY) {
-                        adjustedY = (int)((Y - midY) * CursorMode.DisplacementFactor);
-                    }
-                }
-                adjustedX += lastAdjustedX;
-                adjustedY += lastAdjustedY;
-            } else {
-                adjustedX = X;
-                adjustedY = Y;
             }
 
-            var inX = Mathf.Clamp(adjustedX, monitor.left - (int)CursorMode.BoundOffsets.x, monitor.right + (int)CursorMode.BoundOffsets.z);
-            var inY = Mathf.Clamp(adjustedY, monitor.top - (int)CursorMode.BoundOffsets.y, monitor.bottom + (int)CursorMode.BoundOffsets.w);
-            isOutOfBound = inX != X || inY != Y;
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            if (!isPuppeteered && (!IsEnabled || !IsHandEnabled)) return;
+            if (screenAsset == null) screenAsset = GetSurfaceScreen();
+            if (monitor == null && !string.IsNullOrEmpty(DisplayName)) {
+                if (Time.time - lastMonitorLookupTime >= 0.5f) {
+                    lastMonitorLookupTime = Time.time;
+                    monitor = Manager.monitors.FirstOrDefault((Monitor it) => it.name == DisplayName);
+                }
+            }
+            if (cursorAnchorAsset == null) cursorAnchorAsset = GetCursorAnchor();
+            if (cursorAnchorAsset != null && screenAsset != null && cursorAnchorAsset.Attachable.Parent != screenAsset) {
+                cursorAnchorAsset.Attachable.Parent = screenAsset;
+            }
+            if (cursorAnchorAsset == null) return;
+            bool isInVisualSetup = inSetupMode || IsInRestHandVisualSetup || IsInActiveHandPoleVisualSetup || IsInScreenVisualSetup;
+            if (monitor == null && !isInVisualSetup) return;
+
+            if (!isInVisualSetup) {
+                if (CursorMode.Mode == CursorModeValue.FixedDelta) {
+                    adjustedX = 0;
+                    adjustedY = 0;
+                    if (X != lastX) {
+                        var midX = (monitor.left + monitor.right) / 2;
+                        if (X != midX) {
+                            adjustedX = (int)((X - midX) * CursorMode.DisplacementFactor);
+                        }
+                    }
+                    if (Y != lastY) {
+                        var midY = (monitor.top + monitor.bottom) / 2;
+                        if (Y != midY) {
+                            adjustedY = (int)((Y - midY) * CursorMode.DisplacementFactor);
+                        }
+                    }
+                    adjustedX += lastAdjustedX;
+                    adjustedY += lastAdjustedY;
+                } else {
+                    adjustedX = X;
+                    adjustedY = Y;
+                }
+
+                var inX = Mathf.Clamp(adjustedX, monitor.left - (int)CursorMode.BoundOffsets.x, monitor.right + (int)CursorMode.BoundOffsets.z);
+                var inY = Mathf.Clamp(adjustedY, monitor.top - (int)CursorMode.BoundOffsets.y, monitor.bottom + (int)CursorMode.BoundOffsets.w);
+                isOutOfBound = inX != X || inY != Y;
 
 
-            if (CursorMode.Mode == CursorMode.CursorModeValue.FixedDelta) {
-                switch (CursorMode.OutOfBoundFixedDeltaHandling) {
-                    case CursorMode.OutOfBoundFixedDeltaHandlingValue.BackToCenter:
-                        if (adjustedX != inX) adjustedX = (monitor.left + monitor.right) / 2;
-                        if (adjustedY != inY) adjustedY = (monitor.top + monitor.bottom) / 2;
-                        break;
-                    case CursorMode.OutOfBoundFixedDeltaHandlingValue.Clamped:
-                    default:
+                if (CursorMode.Mode == CursorModeValue.FixedDelta) {
+                    switch (CursorMode.OutOfBoundFixedDeltaHandling) {
+                        case OutOfBoundFixedDeltaHandlingValue.BackToCenter:
+                            if (adjustedX != inX) adjustedX = (monitor.left + monitor.right) / 2;
+                            if (adjustedY != inY) adjustedY = (monitor.top + monitor.bottom) / 2;
+                            break;
+                        case OutOfBoundFixedDeltaHandlingValue.Clamped:
+                        default:
+                            adjustedX = inX;
+                            adjustedY = inY;
+                            break;
+                    }
+                } else {
+                    if (CursorMode.OutOfBoundRawTrackingHandling != OutOfBoundRawTrackingHandlingValue.Overflow) {
                         adjustedX = inX;
                         adjustedY = inY;
-                        break;
-                }
-            } else {
-                if (CursorMode.OutOfBoundRawTrackingHandling != CursorMode.OutOfBoundRawTrackingHandlingValue.Overflow) {
-                    adjustedX = inX;
-                    adjustedY = inY;
-                    if (CursorMode.OutOfBoundRawTrackingHandling == CursorMode.OutOfBoundRawTrackingHandlingValue.DisableHand) {
-                        if (isOutOfBound != lastIsOutOfBound) {
-                            isHandDisabledByOutOfBound = isOutOfBound;
-                            OnInputAffectingHandSetupChange();
-                        }
-                    } else if (CursorMode.OutOfBoundRawTrackingHandling == CursorMode.OutOfBoundRawTrackingHandlingValue.Freeze) {
-                        if (isOutOfBound) {
-                            adjustedX = lastAdjustedX;
-                            adjustedY = lastAdjustedY;
+                        if (CursorMode.OutOfBoundRawTrackingHandling == OutOfBoundRawTrackingHandlingValue.DisableHand) {
+                            if (isOutOfBound != lastIsOutOfBound) {
+                                isHandDisabledByOutOfBound = isOutOfBound;
+                                OnInputAffectingHandSetupChange();
+                            }
+                        } else if (CursorMode.OutOfBoundRawTrackingHandling == OutOfBoundRawTrackingHandlingValue.Freeze) {
+                            if (isOutOfBound) {
+                                adjustedX = lastAdjustedX;
+                                adjustedY = lastAdjustedY;
+                            }
                         }
                     }
                 }
@@ -185,36 +365,99 @@ namespace FlameStream
                 ? IK_BASIS_RIGHT_HANDED
                 : IK_BASIS_LEFT_HANDED;
 
-            if (inSetupMode) {
+            if (isInVisualSetup) {
                 anchorTransform.Position = NeutralHandPosition.setupAnchor?.Transform.Position ?? NeutralHandPosition.Position;
+                cursorScreenPosition = anchorTransform.Position;
+
+                if (HandDynamicRotation != null && HandDynamicRotation.Enabled && HandDynamicRotation.Auto) {
+                    if (HandDynamicRotation.AutoRotationEvaluator == null) {
+                        HandDynamicRotation.AutoRotationEvaluator = CalculateAutoHandRotation;
+                    }
+                    cachedAutoHandRotation = CalculateAutoHandRotation(Vector3.zero);
+                    cachedAutoHandRotX = cachedAutoHandRotation.x;
+                    autoHandSettleCountdown = 0;
+                    anchorTransform.Rotation += cachedAutoHandRotation;
+                }
             } else {
 
                 var targetPlanarPosition = screenAsset.GetChildCursorPosition(adjustedX, adjustedY) * PointerFactorCorrection;
 
-                cursorMoveTween?.Kill();
-                if (CursorSmoothness == 0) {
+                var smoothness = CursorMode != null ? CursorMode.CursorSmoothness : CursorSmoothness;
+
+                if (smoothness == 0) {
+                    cursorMoveTween?.Kill();
                     cursorScreenPosition = targetPlanarPosition;
-                } else {
+                } else if (adjustedX != lastAdjustedX || adjustedY != lastAdjustedY) {
+                    cursorMoveTween?.Kill();
                     cursorMoveTween = DOTween.To(
                         () => cursorScreenPosition,
                         delegate(Vector3 it) { cursorScreenPosition = it; },
                         targetPlanarPosition,
-                        CursorSmoothness
+                        smoothness
                     ).SetEase(Ease.Linear);
                 }
 
                 anchorTransform.Position = cursorScreenPosition;
 
-                // TODO: Improve this by using hand offset delta
-                Vector3 delta = IsBodyEnabled
-                    ? bodyDistanceFactor
-                    : NeutralHandPosition.Position - cursorAnchorAsset.Transform.Position;
-                anchorTransform.Rotation += HandDynamicRotation.Evaluate(delta);
+                Vector3 delta = NeutralHandPosition != null
+                    ? NeutralHandPosition.Position - cursorAnchorAsset.Transform.Position
+                    : -cursorAnchorAsset.Transform.Position;
+
+                if (HandDynamicRotation != null && HandDynamicRotation.Enabled) {
+                    if (HandDynamicRotation.AutoRotationEvaluator == null) {
+                        HandDynamicRotation.AutoRotationEvaluator = CalculateAutoHandRotation;
+                    }
+
+                    bool mouseMoved = (adjustedX != lastAdjustedX || adjustedY != lastAdjustedY);
+                    if (mouseMoved) {
+                        autoHandSettleCountdown = HandDynamicRotation.AutoSettleFrames;
+                    }
+
+                    if (HandDynamicRotation.Auto) {
+                        bool shouldEvaluate = mouseMoved
+                            || autoHandSettleCountdown > 0
+                            || float.IsNaN(cachedAutoHandRotX);
+
+                        if (shouldEvaluate) {
+                            if (!mouseMoved && autoHandSettleCountdown > 0) {
+                                autoHandSettleCountdown--;
+                            }
+
+                            Vector3 rawTarget = CalculateAutoHandRotation(delta);
+                            float targetRotX = rawTarget.x;
+
+                            if (float.IsNaN(cachedAutoHandRotX)) {
+                                cachedAutoHandRotX = targetRotX;
+                            } else {
+                                float maxSpeed = HandDynamicRotation.AutoMaxSpeed;
+                                float dt = Time.deltaTime > 0f ? Time.deltaTime : 0.016f;
+                                float maxDelta = maxSpeed * dt;
+                                cachedAutoHandRotX = Mathf.MoveTowardsAngle(cachedAutoHandRotX, targetRotX, maxDelta);
+
+                                if (!mouseMoved && Mathf.Abs(Mathf.DeltaAngle(cachedAutoHandRotX, targetRotX)) < 0.05f) {
+                                    autoHandSettleCountdown = 0;
+                                }
+                            }
+                            cachedAutoHandRotation = new Vector3(cachedAutoHandRotX, 0f, 0f);
+                        }
+                    } else {
+                        bool pointerMoved = mouseMoved || float.IsNaN(cachedAutoHandRotX);
+                        if (pointerMoved) {
+                            cachedAutoHandRotation = HandDynamicRotation.Evaluate(delta);
+                            cachedAutoHandRotX = cachedAutoHandRotation.x;
+                        }
+                    }
+                    anchorTransform.Rotation += cachedAutoHandRotation;
+                } else if (HandDynamicRotation != null && !HandDynamicRotation.Enabled) {
+                    cachedAutoHandRotation = Vector3.zero;
+                    cachedAutoHandRotX = float.NaN;
+                    autoHandSettleCountdown = 0;
+                }
             }
 
             if (debugSphereNeutralPosition != null) {
                 // Zero division protection
-                if (screenAsset.Transform.Scale.x > 0 && screenAsset.Transform.Scale.x > 0 && screenAsset.Transform.Scale.x > 0) {
+                if (screenAsset.Transform.Scale.x > 0 && screenAsset.Transform.Scale.y > 0 && screenAsset.Transform.Scale.z > 0) {
                     debugSphereNeutralPosition.gameObject.transform.localPosition = new Vector3(
                         NeutralHandPosition.Position.x / screenAsset.Transform.Scale.x,
                         NeutralHandPosition.Position.y / screenAsset.Transform.Scale.y,
@@ -231,55 +474,459 @@ namespace FlameStream
             lastIsOutOfBound = isOutOfBound;
         }
 
+        public Vector3 CalculateAutoHandRotation(Vector3 delta) {
+            if (Character == null || screenAsset == null) return Vector3.zero;
+
+            var charTr = Character.MainTransform ?? Character.GameObject?.transform;
+            if (charTr == null) return Vector3.zero;
+
+            bool isRight = IsRightHanded;
+            var anim = Character.Animator ?? Character.CloneAnimator;
+            var elbowBone = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightLowerArm : HumanBodyBones.LeftLowerArm) : null;
+            Vector3 elbowWorld = elbowBone != null ? elbowBone.position : GetNaturalRestingElbowWorldPosition(isRight);
+
+            Quaternion screenRot = screenAsset.GameObject != null ? screenAsset.GameObject.transform.rotation : Quaternion.Euler(screenAsset.Transform.Rotation);
+            Vector3 screenPos = screenAsset.GameObject != null ? screenAsset.GameObject.transform.position : screenAsset.Transform.Position;
+            Vector3 elbowScreen = Quaternion.Inverse(screenRot) * (elbowWorld - screenPos);
+            Vector2 elbowScreen2D = new Vector2(elbowScreen.x, elbowScreen.y);
+
+            Vector2 cursorScreen2D = new Vector2(cursorScreenPosition.x, cursorScreenPosition.y);
+            Vector2 toElbow = elbowScreen2D - cursorScreen2D;
+
+            if (toElbow.sqrMagnitude < 0.0001f) return Vector3.zero;
+
+            Vector2 baseLine = new Vector2(0f, -1f);
+            float sweepAngle = Vector2.SignedAngle(baseLine, toElbow);
+            float targetRotX = isRight ? -sweepAngle : sweepAngle;
+
+            return new Vector3(targetRotX, 0f, 0f);
+        }
+
+        public Vector3 GetNaturalRestingElbowWorldPosition() => GetNaturalRestingElbowWorldPosition(IsRightHanded);
+
+        public Vector3 GetNaturalRestingElbowWorldPosition(bool isRight) {
+            if (Character == null) return Vector3.zero;
+            var charTr = Character.MainTransform ?? Character.GameObject?.transform;
+            if (charTr == null) return Vector3.zero;
+
+            var anim = Character.Animator ?? Character.CloneAnimator;
+            var shoulder = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightUpperArm : HumanBodyBones.LeftUpperArm) : null;
+            var elbow = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightLowerArm : HumanBodyBones.LeftLowerArm) : null;
+            var chest = anim != null ? (anim.GetBoneTransform(HumanBodyBones.Chest) ?? anim.GetBoneTransform(HumanBodyBones.Spine)) : null;
+
+            float upperArmLength = (shoulder != null && elbow != null) ? Vector3.Distance(shoulder.position, elbow.position) : 0.28f;
+            Vector3 lateralDir = isRight ? charTr.right : -charTr.right;
+            Vector3 shoulderPos = shoulder != null ? shoulder.position : (chest != null ? chest.position + lateralDir * 0.18f : (charTr.position + charTr.up * 1.3f + lateralDir * 0.18f));
+
+            float cos20 = Mathf.Cos(20f * Mathf.Deg2Rad);
+            float sin20 = Mathf.Sin(20f * Mathf.Deg2Rad);
+            float sin10 = Mathf.Sin(10f * Mathf.Deg2Rad);
+
+            Vector3 deltaDrop = -charTr.up * (upperArmLength * cos20);
+            Vector3 deltaOut = lateralDir * (upperArmLength * sin20);
+            Vector3 deltaFwd = charTr.forward * (upperArmLength * sin10);
+            return shoulderPos + deltaDrop + deltaOut + deltaFwd;
+        }
+
+        public Vector3 GetDefaultElbowPoleWorldPosition(bool isRight) {
+            var charTr = Character?.MainTransform ?? Character?.GameObject?.transform;
+            Vector3 forward = charTr != null ? charTr.forward : Vector3.forward;
+            Vector3 right = charTr != null ? charTr.right : Vector3.right;
+
+            var anim = Character?.Animator ?? Character?.CloneAnimator;
+            var elbowBone = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightLowerArm : HumanBodyBones.LeftLowerArm) : null;
+            Vector3 baseElbowWorld = elbowBone != null ? elbowBone.position : GetNaturalRestingElbowWorldPosition(isRight);
+
+            return baseElbowWorld - forward * 0.25f + (isRight ? right : -right) * 0.05f;
+        }
+
         protected override void Log(string msg) {
             Debug.Log($"[FlameStream.Asset.PointerReceiver] {msg}");
         }
 
         void OnBasicSettingChange() {
-            SetDataInputPropertyAndBroadcast(nameof(Character), hidden: !IsHandEnabled);
-            SetDataInputPropertyAndBroadcast(nameof(IsRightHanded), hidden: !IsHandEnabled);
-            SetDataInputPropertyAndBroadcast(nameof(DisplayName), hidden: !IsHandEnabled);
-            SetDataInputPropertyAndBroadcast(nameof(CursorSmoothness), hidden: !IsHandEnabled);
-            SetDataInputPropertyAndBroadcast(nameof(CursorMode), hidden: !IsHandEnabled);
+            if (isDestroyed) return;
+            bool isMissingRequirements = Character == null || string.IsNullOrEmpty(DisplayName);
+            string enableDesc;
+            if (Character == null && string.IsNullOrEmpty(DisplayName)) {
+                enableDesc = "BASIC_SETUP_REQUIRED_CHAR_AND_DISPLAY_DESC".Localized();
+            } else if (Character == null) {
+                enableDesc = "BASIC_SETUP_REQUIRED_CHAR_DESC".Localized();
+            } else if (string.IsNullOrEmpty(DisplayName)) {
+                enableDesc = "BASIC_SETUP_REQUIRED_DISPLAY_DESC".Localized();
+            } else {
+                enableDesc = "POINTER_ENABLE_DESC".Localized();
+            }
 
-            isBasicSetupComplete = IsHandEnabled && Character != null && monitor != null;
-            SetDataInputPropertyAndBroadcast(nameof(NeutralHandPosition), hidden: !isBasicSetupComplete);
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled;
+            if (isReady && isMissingRequirements && IsHandEnabled && !isPuppeteered) {
+                IsHandEnabled = false;
+                SetDataInput(nameof(IsHandEnabled), false, true);
+                BroadcastDataInput(nameof(IsHandEnabled));
+            }
+
+            SetDataInputPropertyAndBroadcast(
+                nameof(IsHandEnabled),
+                disabled: isMissingRequirements || isPuppeteered,
+                description: isPuppeteered ? string.Format("IK_DELEGATED_TO".Localized(), "ENABLE".Localized(), activeCoordinator.Name) : enableDesc
+            );
+
+            // Basic Setup ports are NEVER hidden based on IsHandEnabled
+            SetDataInputPropertyAndBroadcast(nameof(Character), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(DisplayName), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(ScreenSetup), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(CursorMode), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(ActiveHand), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(CursorSmoothness), hidden: true);
+            SetDataInputPropertyAndBroadcast(nameof(RestHand), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(ActiveTransition), hidden: false);
+            SetDataInputPropertyAndBroadcast(nameof(InactiveTransition), hidden: false);
+            if (ActiveTransition != null) {
+                var delayPort = ActiveTransition.GetDataInputPort(nameof(ActiveTransition.Delay));
+                if (delayPort?.Properties != null) {
+                    delayPort.Properties.hidden = false;
+                }
+            }
+
+            OnSurfaceSettingChange();
+
+            isBasicSetupComplete = IsEnabled && IsHandEnabled && Character != null && monitor != null;
             SetDataInputPropertyAndBroadcast(nameof(HandMouseMode), hidden: !isBasicSetupComplete);
             SetDataInputPropertyAndBroadcast(nameof(HandPenMode), hidden: !isBasicSetupComplete);
             SetDataInputPropertyAndBroadcast(nameof(HandDynamicRotation), hidden: !isBasicSetupComplete);
             SetDataInputPropertyAndBroadcast(nameof(IsPropEnabled), hidden: !isBasicSetupComplete);
             SetDataInputPropertyAndBroadcast(nameof(IsBodyEnabled), hidden: !isBasicSetupComplete);
+            SetDataInputPropertyAndBroadcast(nameof(NeutralHandPosition), hidden: !isBasicSetupComplete);
             SetDataInputPropertyAndBroadcast(nameof(PointerFactorCorrection), hidden: !isBasicSetupComplete);
             SetDataInputPropertyAndBroadcast(nameof(DebugSphereScaleFactor), hidden: !isBasicSetupComplete);
 
-            OnSurfaceSettingChange();
             OnPropEnabledChanged();
             OnBodyEnabledChanged();
             OnDebugSettingChange();
+            ScreenSetup?.UpdateAutoSetupStatus();
+            UpdateDrawingScreenAppearance();
         }
 
         void OnSurfaceSettingChange() {
-
             // Scene check
-            if (Scene == null) return;
+            if (isDestroyed || Scene == null) return;
 
-            // Screen check
-            screenAsset = GetSurfaceScreen();
-            if (screenAsset == null) return;
-
-            bool isDisplayMustBeVisible = IsEnabled && IsHandEnabled;
-            if (isDisplayMustBeVisible || IsScreenDisableBasedOnAssetStateWanted) {
-                screenAsset.DataInputPortCollection.SetValueAtPath("Enabled", isDisplayMustBeVisible, true);
-                screenAsset.DataInputPortCollection.SetValueAtPath("DisplayName", DisplayName, true);
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled;
+            bool isHandPuppeteered = isPuppeteered && activeCoordinator.EnableHands;
+            bool shouldAutoCreate = IsEnabled && !isDestroyed;
+            bool isRemoveWanted = !IsEnabled && (ScreenSetup?.RemoveOnDisable ?? false);
+            if (isRemoveWanted) {
+                var dominantLimb = Character != null ? (IsRightHanded ? Character.RightHandIK : Character.LeftHandIK) : null;
+                bool isLimbActive = dominantLimb != null && (dominantLimb.PositionWeight > 0.001f || dominantLimb.Enabled);
+                bool isTweening = (tweenRightIK != null && tweenRightIK.IsActive()) || (tweenLeftIK != null && tweenLeftIK.IsActive());
+                if (!isLimbActive && !isTweening) {
+                    DestroySurfaceScreen();
+                    DestroyCursorAnchor();
+                    return;
+                }
             }
 
-            // Bind cursor anchor to screen
-            cursorAnchorAsset = GetCursorAnchor();
-            cursorAnchorAsset.Attachable.Parent = screenAsset;
+            // Screen check
+            screenAsset = GetSurfaceScreen(skipAutoCreate: !shouldAutoCreate || isRemoveWanted);
+            if (screenAsset == null) return;
+
+            SyncDrawingScreenTransform(screenAsset);
+
+            // Screen visibility depends on ShowOnEnable or if visual setup mode is active
+            bool isVisualSetup = ScreenSetup?.Transform != null && ScreenSetup.Transform.InVisualSetupMode;
+            bool showScreen = isVisualSetup || ((ScreenSetup?.ShowOnEnable ?? true) && IsEnabled);
+            screenAsset.DataInputPortCollection.SetValueAtPath("Enabled", showScreen, true);
+            screenAsset.DataInputPortCollection.SetValueAtPath("DisplayName", DisplayName, true);
+
+            UpdateDrawingScreenAppearance();
+
+            bool isDisplayMustBeVisible = IsEnabled && IsHandEnabled;
+            if (isDisplayMustBeVisible) {
+                // Bind cursor anchor to screen
+                cursorAnchorAsset = GetCursorAnchor(skipAutoCreate: !shouldAutoCreate);
+                if (cursorAnchorAsset != null && cursorAnchorAsset.Attachable.Parent != screenAsset) {
+                    cursorAnchorAsset.Attachable.Parent = screenAsset;
+                    cursorAnchorAsset.DataInputPortCollection?.SetValueAtPath("Attachable.Parent", screenAsset, true);
+                    cursorAnchorAsset.Broadcast();
+                }
+            }
+
+            if (screenAsset != null) {
+                if (RestHand != null && RestHand.ParentType == AnchorParentType.Screen) {
+                    var targetAnchor = GetRestHandAnchor(true);
+                    if (targetAnchor != null && targetAnchor.Attachable.Parent != screenAsset) {
+                        AttachAnchorToParent(targetAnchor, AnchorParentType.Screen, !IsRightHanded);
+                    }
+                }
+                if (RestHand?.ElbowPole != null && RestHand.ElbowPole.ParentType == AnchorParentType.Screen) {
+                    var poleAnchor = GetRestHandPoleAnchor(true);
+                    if (poleAnchor != null && poleAnchor.Attachable.Parent != screenAsset) {
+                        AttachAnchorToParent(poleAnchor, AnchorParentType.Screen, !IsRightHanded);
+                    }
+                }
+            }
 
             // Monitor data check
             monitor = Manager.monitors.FirstOrDefault((Monitor it) => it.name == DisplayName);
             if (monitor == null) return;
+        }
+
+        public void UpdateDrawingScreenAppearance() {
+            if (screenAsset == null) {
+                screenAsset = GetSurfaceScreen(skipAutoCreate: true);
+            }
+            if (screenAsset != null && ScreenSetup?.Appearance != null) {
+                screenAsset.UpdateAppearance(ScreenSetup.Appearance);
+            }
+        }
+
+        public void OnDrawingScreenSettingChange() {
+            OnSurfaceSettingChange();
+        }
+
+        public bool TryGetCharacterScreenTransform(out Vector3 position, out Vector3 rotation, out Vector3 scale) {
+            return CalculateScreenPresetTransform(DrawingScreenAutoSetupPreset.StandingTilted, out position, out rotation, out scale);
+        }
+
+        public bool CalculateScreenPresetTransform(DrawingScreenAutoSetupPreset preset, out Vector3 position, out Vector3 rotation, out Vector3 scale) {
+            scale = preset == DrawingScreenAutoSetupPreset.StandingTilted ? new Vector3(0.03f, 0.03f, 0.03f) : new Vector3(0.01f, 0.01f, 0.01f);
+            if (Character != null && Character.GameObject != null) {
+                var anim = Character.Animator ?? Character.CloneAnimator;
+                var charTr = Character.MainTransform ?? Character.GameObject.transform;
+                var forward = charTr.forward;
+                var up = charTr.up;
+                var right = charTr.right;
+                var charYaw = charTr.eulerAngles.y;
+
+                bool isRight = IsRightHanded;
+                var shoulder = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightUpperArm : HumanBodyBones.LeftUpperArm) : null;
+                var elbow = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightLowerArm : HumanBodyBones.LeftLowerArm) : null;
+                var wrist = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightHand : HumanBodyBones.LeftHand) : null;
+                var knuckle = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightMiddleProximal : HumanBodyBones.LeftMiddleProximal) : null;
+                var chest = anim != null ? (anim.GetBoneTransform(HumanBodyBones.Chest) ?? anim.GetBoneTransform(HumanBodyBones.Spine)) : null;
+
+                float upperArmLength = (shoulder != null && elbow != null) ? Vector3.Distance(shoulder.position, elbow.position) : 0.28f;
+                float forearmLength = (elbow != null && wrist != null) ? Vector3.Distance(elbow.position, wrist.position) : 0.25f;
+                float palmLength = (wrist != null && knuckle != null) ? Vector3.Distance(wrist.position, knuckle.position) : 0.08f;
+
+                if (preset == DrawingScreenAutoSetupPreset.StandingTilted) {
+                    var baseChestPos = chest != null ? chest.position : (charTr.position + up * 1.2f);
+                    float forwardReach = Mathf.Max(0.18f, forearmLength * 0.9f) * 1.5f;
+                    position = baseChestPos + forward * forwardReach;
+                    rotation = new Vector3(-60f, charYaw + 180f, 0f);
+                    scale = new Vector3(0.03f, 0.03f, 0.03f);
+                    return true;
+                } else {
+                    // Flat Surface (Mouse/Touchpad)
+                    Vector3 naturalElbow = GetNaturalRestingElbowWorldPosition();
+
+                    float forwardReach = forearmLength + 0.5f * palmLength;
+                    position = new Vector3(naturalElbow.x, naturalElbow.y - 0.02f, naturalElbow.z) + forward * forwardReach;
+                    rotation = new Vector3(-90f, charYaw + 180f, 0f);
+                    scale = new Vector3(0.01f, 0.01f, 0.01f);
+                    return true;
+                }
+            }
+
+            position = new Vector3(0, 0.6f, 1f);
+            rotation = new Vector3(-60f, 180f, 0);
+            scale = preset == DrawingScreenAutoSetupPreset.StandingTilted ? new Vector3(0.03f, 0.03f, 0.03f) : new Vector3(0.01f, 0.01f, 0.01f);
+            return false;
+        }
+
+        public void ApplyScreenAutoSetup(DrawingScreenAutoSetupPreset preset) {
+            if (CalculateScreenPresetTransform(preset, out Vector3 pos, out Vector3 rot, out Vector3 scl)) {
+                if (ScreenSetup?.Transform != null) {
+                    ScreenSetup.Transform.Position = pos;
+                    ScreenSetup.Transform.Rotation = rot;
+                    ScreenSetup.Transform.Scale = scl;
+                    ScreenSetup.Transform.SetDataInput(nameof(ScreenSetup.Transform.Position), pos, true);
+                    ScreenSetup.Transform.SetDataInput(nameof(ScreenSetup.Transform.Rotation), rot, true);
+                    ScreenSetup.Transform.SetDataInput(nameof(ScreenSetup.Transform.Scale), scl, true);
+                    ScreenSetup.Transform.Broadcast();
+                }
+
+                HasConfiguredScreenTransform = true;
+                SetDataInput(nameof(HasConfiguredScreenTransform), true, true);
+
+                var screen = screenAsset ?? (SurfaceScreenAssetId != Guid.Empty ? Scene?.GetAssets<DrawingScreenAsset>().FirstOrDefault(s => s.Id == SurfaceScreenAssetId) : null);
+                if (screen != null) {
+                    SyncDrawingScreenTransform(screen, force: true);
+                }
+
+                string presetName = preset == DrawingScreenAutoSetupPreset.StandingTilted
+                    ? "SCREEN_PRESET_STANDING_TILTED".Localized()
+                    : "SCREEN_PRESET_FLAT_SURFACE".Localized();
+                ShowToast(string.Format("SCREEN_AUTO_SETUP_APPLIED_TOAST".Localized(), presetName));
+            } else {
+                ShowToast("SCREEN_AUTO_SETUP_NO_CHARACTER_TOAST".Localized());
+            }
+        }
+
+
+        public void SetupDrawingScreenTransform() {
+            if (ScreenSetup == null) return;
+            if (ScreenSetup.Transform == null) {
+                ScreenSetup.Transform = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                Vector3 defaultPos = new Vector3(0, 0.6f, 1f);
+                Vector3 defaultRot = new Vector3(-60f, 180f, 0);
+                Vector3 defaultScl = new Vector3(0.07f, 0.07f, 0.07f);
+                var activePreset = ScreenSetup?.AutoSetup?.Preset ?? DrawingScreenAutoSetupPreset.StandingTilted;
+                if (CalculateScreenPresetTransform(activePreset, out Vector3 charPos, out Vector3 charRot, out Vector3 charScl)) {
+                    defaultPos = charPos;
+                    defaultRot = charRot;
+                    defaultScl = charScl;
+                }
+                ScreenSetup.Transform.Position = defaultPos;
+                ScreenSetup.Transform.Rotation = defaultRot;
+                ScreenSetup.Transform.Scale = defaultScl;
+                ScreenSetup.SetDataInput(nameof(ScreenSetup.Transform), ScreenSetup.Transform, true);
+            }
+
+            var tr = ScreenSetup.Transform;
+            tr.LocalizationKey = "SCREEN_TRANSFORM";
+            tr.CollapsedSelf = true;
+            tr.ShowOriginIndicator = false;
+
+            tr.OnEnterVisualSetup = (t) => {
+                if (screenAsset == null) {
+                    screenAsset = GetSurfaceScreen();
+                }
+                if (screenAsset != null) {
+                    screenAsset.DataInputPortCollection.SetValueAtPath("Enabled", true, true);
+                    UpdateDrawingScreenAppearance();
+                    t.Position = screenAsset.Transform.Position;
+                    t.Rotation = screenAsset.Transform.Rotation;
+                    t.Scale = screenAsset.Transform.Scale;
+                }
+            };
+
+            tr.OnCreateAnchor = (t, setupAnchor) => {
+                setupAnchor.Name = "⌛⚓-" + "SETUP_ANCHOR_NAME_SCREEN_SETUP".Localized();
+                setupAnchor.Instructions = "SETUP_ANCHOR_INSTRUCTIONS_SCREEN_SETUP".Localized();
+                setupAnchor.Transform.Position = t.Position;
+                setupAnchor.Transform.Rotation = t.Rotation;
+                setupAnchor.Transform.Scale = t.Scale;
+                setupAnchor.SetHideScale(false);
+                setupAnchor.Transform.Broadcast();
+            };
+
+            tr.OnResetAnchor = (t, setupAnchor) => {
+                var activePreset = ScreenSetup?.AutoSetup?.Preset ?? DrawingScreenAutoSetupPreset.StandingTilted;
+                if (CalculateScreenPresetTransform(activePreset, out Vector3 defaultPos, out Vector3 defaultRot, out Vector3 defaultScale)) {
+                    setupAnchor.Transform.Position = defaultPos;
+                    setupAnchor.Transform.Rotation = defaultRot;
+                    setupAnchor.Transform.Scale = defaultScale;
+                    setupAnchor.Transform.Broadcast();
+                }
+            };
+
+            tr.OnApplyAnchor = (t, setupAnchor) => {
+                t.Position = setupAnchor.Transform.Position;
+                t.Rotation = setupAnchor.Transform.Rotation;
+                t.Scale = setupAnchor.Transform.Scale;
+                t.SetDataInput(nameof(t.Position), t.Position, true);
+                t.SetDataInput(nameof(t.Rotation), t.Rotation, true);
+                t.SetDataInput(nameof(t.Scale), t.Scale, true);
+                HasConfiguredScreenTransform = true;
+                SetDataInput(nameof(HasConfiguredScreenTransform), true, true);
+                if (screenAsset != null) {
+                    screenAsset.Transform.Position = t.Position;
+                    screenAsset.Transform.Rotation = t.Rotation;
+                    screenAsset.Transform.Scale = t.Scale;
+                    screenAsset.Transform.Broadcast();
+                    if (screenAsset.GameObject != null) {
+                        screenAsset.GameObject.transform.position = t.Position;
+                        screenAsset.GameObject.transform.rotation = Quaternion.Euler(t.Rotation);
+                        screenAsset.GameObject.transform.localScale = t.Scale;
+                    }
+                }
+            };
+
+            tr.OnExitVisualSetup = (isApplied) => {
+                if (!isApplied && screenAsset != null) {
+                    screenAsset.Transform.Position = tr.Position;
+                    screenAsset.Transform.Rotation = tr.Rotation;
+                    screenAsset.Transform.Scale = tr.Scale;
+                    screenAsset.Transform.Broadcast();
+                    if (screenAsset.GameObject != null) {
+                        screenAsset.GameObject.transform.position = tr.Position;
+                        screenAsset.GameObject.transform.rotation = Quaternion.Euler(tr.Rotation);
+                        screenAsset.GameObject.transform.localScale = tr.Scale;
+                    }
+                }
+                if (screenAsset != null) {
+                    bool showScreen = ScreenSetup?.ShowOnEnable ?? true;
+                    screenAsset.DataInputPortCollection.SetValueAtPath("Enabled", showScreen, true);
+                }
+                Context.Service.NavigateToAsset(Id);
+                Context.Service.BroadcastOpenedScene();
+            };
+
+            tr.Watch(nameof(tr.Position), delegate { OnDrawingScreenTransformDirectEdit(); });
+            tr.Watch(nameof(tr.Rotation), delegate { OnDrawingScreenTransformDirectEdit(); });
+            tr.Watch(nameof(tr.Scale), delegate { OnDrawingScreenTransformDirectEdit(); });
+        }
+
+        public void SyncDrawingScreenTransform(DrawingScreenAsset screen = null, bool force = false) {
+            var targetScreen = screen ?? screenAsset ?? (SurfaceScreenAssetId != Guid.Empty ? Scene?.GetAssets<DrawingScreenAsset>().FirstOrDefault(s => s.Id == SurfaceScreenAssetId) : null);
+            if (targetScreen == null || ScreenSetup?.Transform == null) return;
+
+            bool isUninitialized = (targetScreen.Transform.Scale == Vector3.one && targetScreen.Transform.Position == Vector3.zero);
+            if (force || isUninitialized || !HasConfiguredScreenTransform) {
+                var tr = ScreenSetup.Transform;
+                targetScreen.Transform.Position = tr.Position;
+                targetScreen.Transform.Rotation = tr.Rotation;
+                targetScreen.Transform.Scale = tr.Scale;
+                targetScreen.Transform.SetDataInput(nameof(targetScreen.Transform.Position), tr.Position, true);
+                targetScreen.Transform.SetDataInput(nameof(targetScreen.Transform.Rotation), tr.Rotation, true);
+                targetScreen.Transform.SetDataInput(nameof(targetScreen.Transform.Scale), tr.Scale, true);
+                targetScreen.Transform.Broadcast();
+
+                if (targetScreen.GameObject != null) {
+                    targetScreen.GameObject.transform.position = tr.Position;
+                    targetScreen.GameObject.transform.rotation = Quaternion.Euler(tr.Rotation);
+                    targetScreen.GameObject.transform.localScale = tr.Scale;
+                }
+            }
+        }
+
+        public void OnDrawingScreenTransformDirectEdit() {
+            if (screenAsset != null && ScreenSetup?.Transform != null && !ScreenSetup.Transform.InVisualSetupMode) {
+                HasConfiguredScreenTransform = true;
+                SetDataInput(nameof(HasConfiguredScreenTransform), true, true);
+                screenAsset.Transform.Position = ScreenSetup.Transform.Position;
+                screenAsset.Transform.Rotation = ScreenSetup.Transform.Rotation;
+                screenAsset.Transform.Scale = ScreenSetup.Transform.Scale;
+                screenAsset.Transform.SetDataInput(nameof(screenAsset.Transform.Position), ScreenSetup.Transform.Position, true);
+                screenAsset.Transform.SetDataInput(nameof(screenAsset.Transform.Rotation), ScreenSetup.Transform.Rotation, true);
+                screenAsset.Transform.SetDataInput(nameof(screenAsset.Transform.Scale), ScreenSetup.Transform.Scale, true);
+                screenAsset.Transform.Broadcast();
+                if (screenAsset.GameObject != null) {
+                    screenAsset.GameObject.transform.position = ScreenSetup.Transform.Position;
+                    screenAsset.GameObject.transform.rotation = Quaternion.Euler(ScreenSetup.Transform.Rotation);
+                    screenAsset.GameObject.transform.localScale = ScreenSetup.Transform.Scale;
+                }
+            }
+        }
+
+        public void DestroySurfaceScreen() {
+            var screen = screenAsset ?? (SurfaceScreenAssetId != Guid.Empty ? Scene?.GetAssets<DrawingScreenAsset>().FirstOrDefault(s => s.Id == SurfaceScreenAssetId) : null);
+            if (screen != null) {
+                CleanDestroy(screen);
+            }
+            SurfaceScreenAssetId = Guid.Empty;
+            screenAsset = null;
+        }
+
+        public void DestroyCursorAnchor() {
+            cursorMoveTween?.Kill();
+            var anchor = cursorAnchorAsset ?? (CursorAnchorAssetId != Guid.Empty ? Scene?.GetAssets<AnchorAsset>().FirstOrDefault(a => a.Id == CursorAnchorAssetId) : null);
+            if (anchor != null) {
+                CleanDestroy(anchor);
+            }
+            CursorAnchorAssetId = Guid.Empty;
+            cursorAnchorAsset = null;
         }
 
         void OnDebugSettingChange() {
@@ -292,12 +939,20 @@ namespace FlameStream
         public void EnterSetupModeMinimal() {
             if (inSetupMode) return;
             inSetupMode = true;
+            cachedAutoHandRotation = Vector3.zero;
+            cachedAutoHandRotX = float.NaN;
+            autoHandSettleCountdown = 0;
             ResetCharacterPosition();
-            DisplayDebugSpheres();
+            if (isDebugModeForced) {
+                DisplayDebugSpheres();
+            }
         }
 
         public void TriggerOtherEnterSetupModes(int source, bool button1) {
-            NeutralHandPosition.EnterVisualSetup(false);
+            if (NeutralHandPosition != null) {
+                NeutralHandPosition.ShowOriginIndicator = (setupModeHandState == null && setupModeBodyState == null && setupModePropState == null);
+                NeutralHandPosition.EnterVisualSetup(false);
+            }
             if (setupModeHandState == null) {
                 GetHandState(source, button1)?.Transform.EnterVisualSetup(false);
             }
@@ -312,6 +967,9 @@ namespace FlameStream
         public void ExitSetupModeMinimal() {
             if (!inSetupMode) return;
             inSetupMode = false;
+            cachedAutoHandRotation = Vector3.zero;
+            cachedAutoHandRotX = float.NaN;
+            autoHandSettleCountdown = 0;
             DestroyDebugSpheres();
 
             Context.Service.NavigateToAsset(Id);
@@ -326,54 +984,80 @@ namespace FlameStream
         }
 
         DrawingScreenAsset GetSurfaceScreen(bool skipAutoCreate = false) {
-            var screen = GetAsset<DrawingScreenAsset>(ref SurfaceScreenAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"📦-{LAYER_NAME_PREFIX} Screen");
-            if (isNewlyCreated) {
-                Vector3 position;
-                Vector3 rotation;
-                var transform = screen.Transform;
-                if (Character == null) {
-                    position = new Vector3(0, 0.6f, 1f);
-                    rotation = new Vector3(-60f, 180f, 0);
-                } else {
-                    position = Character.CloneAnimator.GetBoneTransform(HumanBodyBones.Chest).position;
-                    position += Character.GameObject.transform.forward * 0.25f;
-                    rotation = Character.Transform.Rotation;
-                    rotation.y += 180f;
-                    rotation.x -= 60f;
-                }
-                transform.Position = position;
-                transform.Rotation = rotation;
-                transform.Scale = new Vector3(0.07f, 0.07f, 0.07f);
-                transform.Broadcast();
+            var screen = GetAsset<DrawingScreenAsset>(ref SurfaceScreenAssetId, out bool isNewlyCreated, skipAutoCreate, newAssetName: $"📦-{LayerPrefix} Screen", category: "FS_ASSET_CATEGORY_INPUT".Localized());
+            if (screen != null) {
+                SyncDrawingScreenTransform(screen, force: isNewlyCreated);
             }
             return screen;
         }
 
         AnchorAsset GetCursorAnchor(bool skipAutoCreate = false) {
-            return GetAsset<AnchorAsset>(ref CursorAnchorAssetId, skipAutoCreate, newAssetName: $"🔒⚓-{LAYER_NAME_PREFIX}🎯");
+            return GetAsset<AnchorAsset>(ref CursorAnchorAssetId, skipAutoCreate, newAssetName: $"🔒⚓-{LayerPrefix}🎯", category: "FS_ASSET_CATEGORY_INTERNAL".Localized());
         }
 
-        T GetAsset<T>(ref Guid assetId, out bool isNewlyCreated, bool skipAutoCreate = false, string newAssetName = null) where T : Asset  {
+        public void AssignAssetToCategory(Asset asset, string category) {
+            Helper.AssignAssetToCategory(Scene, asset, category);
+        }
+
+        bool IsAssetClaimedByOtherReceiver(Guid id) {
+            if (id == Guid.Empty || Scene == null) return false;
+            var others = Scene.GetAssets<PointerReceiverAsset>();
+            if (others == null) return false;
+            foreach (var r in others) {
+                if (r == this) continue;
+                if (r.SurfaceScreenAssetId == id ||
+                    r.CursorAnchorAssetId == id ||
+                    r.HandAnchorAssetId == id ||
+                    r.ActiveHandPoleAnchorAssetId == id ||
+                    r.RestHandAnchorAssetId == id ||
+                    r.RestHandPoleAnchorAssetId == id ||
+                    r.PenPropAssetId == id) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        T GetAsset<T>(ref Guid assetId, out bool isNewlyCreated, bool skipAutoCreate = false, string newAssetName = null, string category = null) where T : Asset  {
             isNewlyCreated = false;
 
-            // Return null if Scene is not ready yet (during creation)
-            if (Scene == null) {
+            // Return null if Scene is not ready yet or asset is destroyed
+            if (isDestroyed || Scene == null) {
                 return null;
+            }
+
+            if (string.IsNullOrEmpty(category)) {
+                bool isLocked = !string.IsNullOrEmpty(newAssetName) && newAssetName.StartsWith("🔒");
+                category = isLocked ? "FS_ASSET_CATEGORY_INTERNAL".Localized() : "FS_ASSET_CATEGORY_INPUT".Localized();
             }
 
             if (assetId != Guid.Empty) {
                 var id = assetId;
                 var fetchResult = Scene.GetAssets<T>().FirstOrDefault(p => p.Id == id);
                 if (fetchResult != null) {
+                    AssignAssetToCategory(fetchResult, category);
                     return fetchResult;
+                }
+            }
+
+            // Check if an existing asset matching the intended name is in the scene and not already claimed by another receiver
+            if (!string.IsNullOrEmpty(newAssetName)) {
+                var existing = Scene.GetAssets<T>().FirstOrDefault(p => 
+                    (p.Name == newAssetName || (p.Name != null && p.Name.Contains(newAssetName))) &&
+                    !IsAssetClaimedByOtherReceiver(p.Id));
+                if (existing != null) {
+                    assetId = existing.Id;
+                    AssignAssetToCategory(existing, category);
+                    return existing;
                 }
             }
 
             if (skipAutoCreate) return null;
 
-            var newAsset = Scene.AddAsset<T>();
-            newAsset.Name = newAssetName ?? $"📦-{LAYER_NAME_PREFIX} {nameof(T)}";
+            var newAsset = Scene.AddAssetToGroup<T>(category);
+            newAsset.Name = newAssetName ?? $"📦-{LayerPrefix} {nameof(T)}";
             Scene.UpdateNewAssetName(newAsset);
+            AssignAssetToCategory(newAsset, category);
             newAsset.Broadcast();
             assetId = newAsset.Id;
 
@@ -381,8 +1065,8 @@ namespace FlameStream
             return newAsset;
         }
 
-        T GetAsset<T>(ref Guid assetId, bool skipAutoCreate = false, string newAssetName = null) where T : Asset  {
-            return GetAsset<T>(ref assetId, out bool _isNewlyCreated, skipAutoCreate, newAssetName);
+        T GetAsset<T>(ref Guid assetId, bool skipAutoCreate = false, string newAssetName = null, string category = null) where T : Asset  {
+            return GetAsset<T>(ref assetId, out bool _isNewlyCreated, skipAutoCreate, newAssetName, category);
         }
 
         GameObject GetDebugSphereCursorPosition(bool skipAutoCreate = false) {
@@ -392,7 +1076,7 @@ namespace FlameStream
             var s = CreateDebugSphere(
                 ref debugSphereCursorScreenPosition,
                 ref debugSphereCursorScreenPositionMaterial,
-                new Color(1f, 0f, 0f, 0.8f)
+                new Color(1f, 0.55f, 0f, 0.9f)
             );
             s.transform.position = Vector3.zero;
             s.transform.SetParent(cursorAnchorAsset.GameObject.transform, false);

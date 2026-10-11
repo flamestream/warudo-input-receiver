@@ -1,0 +1,2310 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using DG.Tweening;
+using UnityEngine;
+using Warudo.Core;
+using Warudo.Core.Attributes;
+using Warudo.Core.Data;
+using Warudo.Core.Localization;
+using Warudo.Core.Scenes;
+using Warudo.Plugins.Core.Assets.Utility;
+
+namespace FlameStream
+{
+    public partial class KeyboardReceiverAsset : ReceiverAsset
+    {
+        [Section("FLOATING_KEYS")]
+
+        [DataInput(200)]
+        [Label("ENABLE_FLOATING_KEYS")]
+        [Description("ENABLE_FLOATING_KEYS_DESC")]
+        [DisabledIf(nameof(IsFloatingKeysDisabled))]
+        public bool EnableFloatingKeys = false;
+
+        public bool AreKeyDefinitionsEmpty() => VirtualKeys == null || VirtualKeys.Length == 0;
+        public bool IsFloatingKeysDisabled() => IsCharacterMissing() || AreKeyDefinitionsEmpty();
+
+        // Floating Key Layout (Collapsible StructuredData)
+        [DataInput(210)]
+        [Label("FLOATING_KEY_LAYOUT")]
+        public VirtualKeyCollection VirtualKeysCollection;
+
+        // Base Look & Feel
+        [DataInput(220)]
+        [Label("DEFAULT_KEY_APPEARANCE")]
+        public VirtualKeyAppearance DefaultAppearance;
+
+        public Vector2 BaseKeySize => DefaultAppearance?.Shape?.Normal?.Size ?? new Vector2(0.032f, 0.032f);
+
+        public IKeyListeningTarget ActiveKeyListeningTarget { get; private set; }
+
+        public void ToggleKeyListening(IKeyListeningTarget target) {
+            if (target == null) return;
+            if (ActiveKeyListeningTarget == target) {
+                CancelKeyListening();
+                return;
+            }
+            if (ActiveKeyListeningTarget != null) {
+                ActiveKeyListeningTarget.SetListeningForKey(false);
+            }
+            ActiveKeyListeningTarget = target;
+            ActiveKeyListeningTarget.SetListeningForKey(true);
+        }
+
+        public void CancelKeyListening() {
+            if (ActiveKeyListeningTarget != null) {
+                ActiveKeyListeningTarget.SetListeningForKey(false);
+                ActiveKeyListeningTarget = null;
+            }
+        }
+
+        // Key Origins (Collapsible StructuredData)
+        [DataInput(230)]
+        [Label("KEY_ORIGINS")]
+        public VirtualKeysetTransforms KeysetTransforms;
+
+        public CollapsibleVisualSetupTransform LeftKeysetTransform => KeysetTransforms?.Left;
+        public CollapsibleVisualSetupTransform RightKeysetTransform => KeysetTransforms?.Right;
+        public CollapsibleVisualSetupTransform RootKeysetTransform => KeysetTransforms?.Root;
+
+        public VirtualKeyDefinition[] VirtualKeys {
+            get => VirtualKeysCollection?.Keys ?? new VirtualKeyDefinition[0];
+            set {
+                if (VirtualKeysCollection == null) {
+                    VirtualKeysCollection = StructuredData.Create<VirtualKeyCollection>();
+                    VirtualKeysCollection.Parent = this;
+                }
+                VirtualKeysCollection.Keys = value;
+                VirtualKeysCollection.SetDataInput(nameof(VirtualKeysCollection.Keys), value, true);
+                UpdateInputEnableDescriptions();
+            }
+        }
+
+        public VirtualKeyLayoutPreset KeysLayoutPreset {
+            get => VirtualKeysCollection?.Preset ?? VirtualKeyLayoutPreset.FullSize100;
+            set {
+                if (VirtualKeysCollection != null) {
+                    VirtualKeysCollection.Preset = value;
+                }
+            }
+        }
+
+        public void TriggerApplyKeysLayoutPreset() {
+            ApplyVirtualKeyPreset(KeysLayoutPreset);
+        }
+
+        public void TriggerClearIdentifiedKey() {
+            ClearIdentifiedKey();
+        }
+
+        // Runtime objects
+        public VirtualKeyDefinition ActiveVirtualKeyInVisualSetup;
+        public VirtualKeyDefinition IdentifiedVirtualKey;
+
+        GameObject leftKeysGroupGo;
+        GameObject rightKeysGroupGo;
+        GameObject rootKeysGroupGo;
+
+        GameObject identifyPulseGo;
+        MeshFilter identifyPulseBodyMf;
+        MeshRenderer identifyPulseBodyMr;
+        Material identifyPulseBodyMat;
+        MeshFilter identifyPulseFrameMf;
+        MeshRenderer identifyPulseFrameMr;
+        Material identifyPulseFrameMat;
+        static MaterialPropertyBlock keyPropertyBlock;
+
+        void OnCreateVirtualKeys() {
+            if (VirtualKeysCollection == null) {
+                VirtualKeysCollection = StructuredData.Create<VirtualKeyCollection>();
+                VirtualKeysCollection.CollapsedSelf = true;
+                SetDataInput(nameof(VirtualKeysCollection), VirtualKeysCollection, true);
+            }
+            VirtualKeysCollection.Parent = this;
+            if (VirtualKeysCollection.LayoutPreset != null) {
+                VirtualKeysCollection.LayoutPreset.Parent = this;
+            }
+
+            if (KeysetTransforms == null) {
+                KeysetTransforms = StructuredData.Create<VirtualKeysetTransforms>();
+                KeysetTransforms.CollapsedSelf = true;
+            }
+            KeysetTransforms.Parent = this;
+            SetupKeysetTransforms();
+
+            if (DefaultAppearance == null) {
+                DefaultAppearance = VirtualKeyAppearance.CreateDefault();
+                SetDataInput(nameof(DefaultAppearance), DefaultAppearance, true);
+            }
+            DefaultAppearance.OnAppearanceChanged = () => {
+                RebuildAllVirtualKeyMeshes();
+            };
+
+            Watch(nameof(EnableFloatingKeys), delegate {
+                UpdateFloatingKeysState();
+                UpdateInputEnableDescriptions();
+            });
+            Watch(nameof(IsEnabled), delegate {
+                UpdateFloatingKeysState();
+                UpdateInputEnableDescriptions();
+            });
+            Watch(nameof(VirtualKeysCollection), delegate {
+                if (VirtualKeysCollection != null) {
+                    VirtualKeysCollection.Parent = this;
+                }
+                RefreshVirtualKeysParent();
+                RebuildAllVirtualKeyMeshes();
+                UpdateInputEnableDescriptions();
+            });
+            Watch(nameof(KeysetTransforms), delegate {
+                if (KeysetTransforms != null) {
+                    KeysetTransforms.Parent = this;
+                }
+                SetupKeysetTransforms();
+            });
+
+            Watch(nameof(DefaultAppearance), delegate {
+                if (DefaultAppearance != null) {
+                    DefaultAppearance.OnAppearanceChanged = () => { RebuildAllVirtualKeyMeshes(); };
+                }
+                RebuildAllVirtualKeyMeshes();
+            });
+
+            RefreshVirtualKeysParent();
+
+            if (IsKeysVisualActive) {
+                UpdateFloatingKeysState();
+            }
+        }
+
+        public void OnVirtualKeysChanged() {
+            RefreshVirtualKeysParent();
+            RebuildAllVirtualKeyMeshes();
+            UpdateInputEnableDescriptions();
+        }
+
+        void OnDestroyVirtualKeys() {
+            CancelKeyListening();
+            ActiveVirtualKeyInVisualSetup = null;
+            DestroyAllVirtualKeyVisuals();
+        }
+
+        public void SetupKeysetTransforms() {
+            if (KeysetTransforms == null) {
+                KeysetTransforms = StructuredData.Create<VirtualKeysetTransforms>();
+                KeysetTransforms.Parent = this;
+            }
+            KeysetTransforms.CollapsedSelf = true;
+            SetupLeftKeysetTransform();
+            SetupRightKeysetTransform();
+            SetupRootKeysetTransform();
+        }
+
+        public void SetupLeftKeysetTransform() {
+            var transforms = KeysetTransforms;
+            if (transforms == null) return;
+            transforms.CollapsedSelf = true;
+            if (transforms.Left == null) {
+                transforms.Left = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                transforms.Left.Position = Vector3.zero;
+                transforms.Left.Rotation = Vector3.zero;
+                transforms.Left.Scale = Vector3.one;
+            }
+            transforms.Left.CollapsedSelf = true;
+            LeftKeysetTransform.LocalizationKey = "LEFT_KEY_ORIGIN";
+            LeftKeysetTransform.OnEnterVisualSetup = (tr) => {
+                EnsureAnchors();
+                tr.OriginIndicatorOffset = LeftHandRestPosition;
+            };
+            LeftKeysetTransform.OnCreateAnchor = (tr, setupAnchor) => {
+                var parent = RootAnchor;
+                if (parent != null) {
+                    setupAnchor.Attachable.Parent = parent;
+                    if (parent.GameObject != null) {
+                        setupAnchor.GameObject.transform.SetParent(parent.GameObject.transform, false);
+                    }
+                }
+                var basePos = LeftHandRestPosition;
+                var baseRot = Quaternion.Euler(LeftHandRestRotation);
+                setupAnchor.Transform.Position = basePos + baseRot * tr.Position;
+                setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles((baseRot * Quaternion.Euler(tr.Rotation)).eulerAngles);
+                setupAnchor.Transform.Scale = tr.Scale;
+                setupAnchor.Name = "⌛⚓-Left Key Origin";
+                setupAnchor.Instructions = "Position, rotate, and scale the entire **Left Key Origin**, relative to the **Left Hand Rest Pose**.\nThe red sphere indicates the origin location (Left Hand Rest Pose).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Transform.Broadcast();
+            };
+            LeftKeysetTransform.OnApplyAnchor = (tr, setupAnchor) => {
+                var basePos = LeftHandRestPosition;
+                var baseRot = Quaternion.Euler(LeftHandRestRotation);
+                tr.Position = Quaternion.Inverse(baseRot) * (setupAnchor.Transform.Position - basePos);
+                tr.Rotation = Helper.NormalizeRotationAngles((Quaternion.Inverse(baseRot) * Quaternion.Euler(setupAnchor.Transform.Rotation)).eulerAngles);
+                tr.Scale = setupAnchor.Transform.Scale;
+                UpdateGroupTransforms();
+            };
+            LeftKeysetTransform.OnResetAnchor = (tr, setupAnchor) => {
+                var basePos = LeftHandRestPosition;
+                var baseRot = Quaternion.Euler(LeftHandRestRotation);
+                setupAnchor.Transform.Position = basePos;
+                setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles(baseRot.eulerAngles);
+                setupAnchor.Transform.Scale = Vector3.one;
+                setupAnchor.Transform.Broadcast();
+                UpdateGroupTransforms();
+            };
+            LeftKeysetTransform.OnReset = () => {
+                UpdateGroupTransforms();
+            };
+            LeftKeysetTransform.OnExitVisualSetup = (isApplied) => {
+                UpdateGroupTransforms();
+                Context.Service.NavigateToAsset(Id);
+                Context.Service.BroadcastOpenedScene();
+            };
+        }
+
+        public void SetupRightKeysetTransform() {
+            var transforms = KeysetTransforms;
+            if (transforms == null) return;
+            transforms.CollapsedSelf = true;
+            if (transforms.Right == null) {
+                transforms.Right = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                transforms.Right.Position = Vector3.zero;
+                transforms.Right.Rotation = Vector3.zero;
+                transforms.Right.Scale = Vector3.one;
+            }
+            transforms.Right.CollapsedSelf = true;
+            RightKeysetTransform.LocalizationKey = "RIGHT_KEY_ORIGIN";
+            RightKeysetTransform.OnEnterVisualSetup = (tr) => {
+                EnsureAnchors();
+                tr.OriginIndicatorOffset = RightHandRestPosition;
+            };
+            RightKeysetTransform.OnCreateAnchor = (tr, setupAnchor) => {
+                var parent = RootAnchor;
+                if (parent != null) {
+                    setupAnchor.Attachable.Parent = parent;
+                    if (parent.GameObject != null) {
+                        setupAnchor.GameObject.transform.SetParent(parent.GameObject.transform, false);
+                    }
+                }
+                var basePos = RightHandRestPosition;
+                var baseRot = Quaternion.Euler(RightHandRestRotation);
+                setupAnchor.Transform.Position = basePos + baseRot * tr.Position;
+                setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles((baseRot * Quaternion.Euler(tr.Rotation)).eulerAngles);
+                setupAnchor.Transform.Scale = tr.Scale;
+                setupAnchor.Name = "⌛⚓-Right Key Origin";
+                setupAnchor.Instructions = "Position, rotate, and scale the entire **Right Key Origin**, relative to the **Right Hand Rest Pose**.\nThe red sphere indicates the origin location (Right Hand Rest Pose).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Transform.Broadcast();
+            };
+            RightKeysetTransform.OnApplyAnchor = (tr, setupAnchor) => {
+                var basePos = RightHandRestPosition;
+                var baseRot = Quaternion.Euler(RightHandRestRotation);
+                tr.Position = Quaternion.Inverse(baseRot) * (setupAnchor.Transform.Position - basePos);
+                tr.Rotation = Helper.NormalizeRotationAngles((Quaternion.Inverse(baseRot) * Quaternion.Euler(setupAnchor.Transform.Rotation)).eulerAngles);
+                tr.Scale = setupAnchor.Transform.Scale;
+                UpdateGroupTransforms();
+            };
+            RightKeysetTransform.OnResetAnchor = (tr, setupAnchor) => {
+                var basePos = RightHandRestPosition;
+                var baseRot = Quaternion.Euler(RightHandRestRotation);
+                setupAnchor.Transform.Position = basePos;
+                setupAnchor.Transform.Rotation = Helper.NormalizeRotationAngles(baseRot.eulerAngles);
+                setupAnchor.Transform.Scale = Vector3.one;
+                setupAnchor.Transform.Broadcast();
+                UpdateGroupTransforms();
+            };
+            RightKeysetTransform.OnReset = () => {
+                UpdateGroupTransforms();
+            };
+            RightKeysetTransform.OnExitVisualSetup = (isApplied) => {
+                UpdateGroupTransforms();
+                Context.Service.NavigateToAsset(Id);
+                Context.Service.BroadcastOpenedScene();
+            };
+        }
+
+        public void SetupRootKeysetTransform() {
+            var transforms = KeysetTransforms;
+            if (transforms == null) return;
+            transforms.CollapsedSelf = true;
+            if (transforms.Root == null) {
+                transforms.Root = StructuredData.Create<CollapsibleVisualSetupTransform>();
+                transforms.Root.Position = Vector3.zero;
+                transforms.Root.Rotation = Vector3.zero;
+                transforms.Root.Scale = Vector3.one;
+            }
+            transforms.Root.CollapsedSelf = true;
+            RootKeysetTransform.LocalizationKey = "CENTER_KEY_ORIGIN";
+            RootKeysetTransform.OnEnterVisualSetup = (tr) => { EnsureAnchors(); };
+            RootKeysetTransform.OnCreateAnchor = (tr, setupAnchor) => {
+                var parent = RootAnchor;
+                if (parent != null) {
+                    setupAnchor.Attachable.Parent = parent;
+                    if (parent.GameObject != null) {
+                        setupAnchor.GameObject.transform.SetParent(parent.GameObject.transform, false);
+                    }
+                }
+                setupAnchor.Transform.Position = tr.Position;
+                setupAnchor.Transform.Rotation = tr.Rotation;
+                setupAnchor.Transform.Scale = tr.Scale;
+                setupAnchor.Name = "⌛⚓-Center Key Origin";
+                setupAnchor.Instructions = "Position, rotate, and scale the entire **Center Key Origin**, relative to the **Keyboard Rig Origin**.\nThe red sphere indicates the origin location (Keyboard Rig Origin).\nClick **[Apply Transform]** when finished.";
+                setupAnchor.Transform.Broadcast();
+            };
+            RootKeysetTransform.OnApplyAnchor = (tr, setupAnchor) => {
+                tr.Position = setupAnchor.Transform.Position;
+                tr.Rotation = setupAnchor.Transform.Rotation;
+                tr.Scale = setupAnchor.Transform.Scale;
+                UpdateGroupTransforms();
+            };
+            RootKeysetTransform.OnResetAnchor = (tr, setupAnchor) => {
+                setupAnchor.Transform.Position = Vector3.zero;
+                setupAnchor.Transform.Rotation = Vector3.zero;
+                setupAnchor.Transform.Scale = Vector3.one;
+                setupAnchor.Transform.Broadcast();
+                UpdateGroupTransforms();
+            };
+            RootKeysetTransform.OnReset = () => {
+                UpdateGroupTransforms();
+            };
+            RootKeysetTransform.OnExitVisualSetup = (isApplied) => {
+                UpdateGroupTransforms();
+                Context.Service.NavigateToAsset(Id);
+                Context.Service.BroadcastOpenedScene();
+            };
+        }
+
+        public KeyClusterTransform GetKeyClusterTransform(VirtualKeyAnchor anchor) {
+            KeyClusterTransform t = new KeyClusterTransform();
+            if (anchor == VirtualKeyAnchor.LeftHand) {
+                t.BasePivotRig = LeftHandRestPosition;
+                t.BaseRotRig = Quaternion.Euler(LeftHandRestRotation);
+                if (LeftKeysetTransform != null && LeftKeysetTransform.InVisualSetupMode && LeftKeysetTransform.setupAnchor != null) {
+                    t.OriginPos = Quaternion.Inverse(t.BaseRotRig) * (LeftKeysetTransform.setupAnchor.Transform.Position - t.BasePivotRig);
+                    t.OriginRot = Quaternion.Inverse(t.BaseRotRig) * Quaternion.Euler(LeftKeysetTransform.setupAnchor.Transform.Rotation);
+                    t.OriginScale = LeftKeysetTransform.setupAnchor.Transform.Scale;
+                } else {
+                    t.OriginPos = LeftKeysetTransform?.Position ?? Vector3.zero;
+                    t.OriginRot = Quaternion.Euler(LeftKeysetTransform?.Rotation ?? Vector3.zero);
+                    t.OriginScale = LeftKeysetTransform?.Scale ?? Vector3.one;
+                }
+            } else if (anchor == VirtualKeyAnchor.RightHand) {
+                t.BasePivotRig = RightHandRestPosition;
+                t.BaseRotRig = Quaternion.Euler(RightHandRestRotation);
+                if (RightKeysetTransform != null && RightKeysetTransform.InVisualSetupMode && RightKeysetTransform.setupAnchor != null) {
+                    t.OriginPos = Quaternion.Inverse(t.BaseRotRig) * (RightKeysetTransform.setupAnchor.Transform.Position - t.BasePivotRig);
+                    t.OriginRot = Quaternion.Inverse(t.BaseRotRig) * Quaternion.Euler(RightKeysetTransform.setupAnchor.Transform.Rotation);
+                    t.OriginScale = RightKeysetTransform.setupAnchor.Transform.Scale;
+                } else {
+                    t.OriginPos = RightKeysetTransform?.Position ?? Vector3.zero;
+                    t.OriginRot = Quaternion.Euler(RightKeysetTransform?.Rotation ?? Vector3.zero);
+                    t.OriginScale = RightKeysetTransform?.Scale ?? Vector3.one;
+                }
+            } else {
+                t.BasePivotRig = Vector3.zero;
+                t.BaseRotRig = Quaternion.identity;
+                if (RootKeysetTransform != null && RootKeysetTransform.InVisualSetupMode && RootKeysetTransform.setupAnchor != null) {
+                    t.OriginPos = RootKeysetTransform.setupAnchor.Transform.Position;
+                    t.OriginRot = Quaternion.Euler(RootKeysetTransform.setupAnchor.Transform.Rotation);
+                    t.OriginScale = RootKeysetTransform.setupAnchor.Transform.Scale;
+                } else {
+                    t.OriginPos = RootKeysetTransform?.Position ?? Vector3.zero;
+                    t.OriginRot = Quaternion.Euler(RootKeysetTransform?.Rotation ?? Vector3.zero);
+                    t.OriginScale = RootKeysetTransform?.Scale ?? Vector3.one;
+                }
+            }
+            return t;
+        }
+
+        public KeyClusterTransform GetKeyClusterTransform(KeyboardKeyBinding binding) {
+            if (binding == null) {
+                return new KeyClusterTransform {
+                    BasePivotRig = Vector3.zero,
+                    BaseRotRig = Quaternion.identity,
+                    OriginPos = Vector3.zero,
+                    OriginRot = Quaternion.identity,
+                    OriginScale = Vector3.one
+                };
+            }
+            VirtualKeyAnchor anchor = binding.Finger.IsLeftHand() ? VirtualKeyAnchor.LeftHand : VirtualKeyAnchor.RightHand;
+            if (VirtualKeysCollection?.Keys != null) {
+                var keyDef = VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == binding.Key && k.AssignedFinger == binding.Finger)
+                          ?? VirtualKeysCollection.Keys.FirstOrDefault(k => k != null && k.Key == binding.Key);
+                if (keyDef != null) {
+                    anchor = keyDef.AttachmentAnchor;
+                }
+            }
+            return GetKeyClusterTransform(anchor);
+        }
+
+        public void RefreshVirtualKeysParent() {
+            if (VirtualKeysCollection != null) {
+                VirtualKeysCollection.Parent = this;
+                if (VirtualKeysCollection.LayoutPreset != null) {
+                    VirtualKeysCollection.LayoutPreset.Parent = this;
+                }
+            }
+            if (VirtualKeys == null) return;
+            for (int i = 0; i < VirtualKeys.Length; i++) {
+                if (VirtualKeys[i] != null) {
+                    VirtualKeys[i].Parent = this;
+                    VirtualKeys[i].SetupTransformCallbacks();
+                }
+            }
+        }
+
+        public void ToggleLocateVirtualKey(VirtualKeyDefinition keyDef) => ToggleIdentifyVirtualKey(keyDef);
+
+        public void ToggleIdentifyVirtualKey(VirtualKeyDefinition keyDef) {
+            if (keyDef == null) return;
+            if (IdentifiedVirtualKey == keyDef) {
+                ClearIdentifiedKey();
+            } else {
+                SetIdentifiedVirtualKey(keyDef);
+            }
+        }
+
+        public void SetIdentifiedVirtualKey(VirtualKeyDefinition keyDef) {
+            var previous = IdentifiedVirtualKey;
+            IdentifiedVirtualKey = keyDef;
+            if (previous != null && previous != keyDef) {
+                previous.UpdateLocateButtonLabel(false);
+                UpdateVirtualKeyColors(previous);
+            }
+            if (keyDef != null) {
+                keyDef.UpdateLocateButtonLabel(true);
+            }
+            UpdateIdentifyVisuals();
+            if (keyDef != null) {
+                var label = string.IsNullOrEmpty(keyDef.DisplayLabel) ? keyDef.Key.ToString() : keyDef.DisplayLabel;
+                Context.Service?.Toast(
+                    Warudo.Core.Server.ToastSeverity.Info,
+                    Name,
+                    $"Identifying Virtual Key: [{label}] ({keyDef.AttachmentAnchor})"
+                );
+            }
+        }
+
+        public void ClearIdentifiedKey() {
+            var previous = IdentifiedVirtualKey;
+            IdentifiedVirtualKey = null;
+            if (identifyPulseGo != null) {
+                identifyPulseGo.SetActive(false);
+            }
+            if (previous != null) {
+                previous.UpdateLocateButtonLabel(false);
+                UpdateVirtualKeyColors(previous);
+            }
+        }
+
+        public void DetachIdentifyPulseIfParentedTo(VirtualKeyDefinition keyDef) {
+            if (identifyPulseGo != null && keyDef != null && keyDef.KeyGameObject != null) {
+                if (identifyPulseGo.transform.parent == keyDef.KeyGameObject.transform) {
+                    identifyPulseGo.transform.SetParent(null, false);
+                    identifyPulseGo.SetActive(false);
+                }
+            }
+        }
+
+        void EnsureIdentifyPulseObjects() {
+            if (identifyPulseGo != null) return;
+
+            identifyPulseGo = new GameObject("IdentifyPulse");
+
+            var bodyGo = new GameObject("PulseBody");
+            bodyGo.transform.SetParent(identifyPulseGo.transform, false);
+            bodyGo.transform.localPosition = new Vector3(0f, 0.0012f, 0f);
+            identifyPulseBodyMf = bodyGo.AddComponent<MeshFilter>();
+            identifyPulseBodyMr = bodyGo.AddComponent<MeshRenderer>();
+            identifyPulseBodyMat = CreateKeyMaterial();
+            identifyPulseBodyMat.renderQueue = 3050;
+            identifyPulseBodyMr.sharedMaterial = identifyPulseBodyMat;
+
+            var frameGo = new GameObject("PulseFrame");
+            frameGo.transform.SetParent(identifyPulseGo.transform, false);
+            frameGo.transform.localPosition = new Vector3(0f, 0.0015f, 0f);
+            identifyPulseFrameMf = frameGo.AddComponent<MeshFilter>();
+            identifyPulseFrameMr = frameGo.AddComponent<MeshRenderer>();
+            identifyPulseFrameMat = CreateKeyMaterial();
+            identifyPulseFrameMat.renderQueue = 3051;
+            identifyPulseFrameMr.sharedMaterial = identifyPulseFrameMat;
+        }
+
+        public void UpdateIdentifyVisuals() {
+            if (IdentifiedVirtualKey == null || IdentifiedVirtualKey.KeyGameObject == null || !IsKeysVisualActive) {
+                if (identifyPulseGo != null) {
+                    identifyPulseGo.SetActive(false);
+                }
+                return;
+            }
+
+            EnsureIdentifyPulseObjects();
+            identifyPulseGo.transform.SetParent(IdentifiedVirtualKey.KeyGameObject.transform, false);
+            identifyPulseGo.transform.localPosition = Vector3.zero;
+            identifyPulseGo.transform.localRotation = Quaternion.identity;
+            identifyPulseGo.transform.localScale = Vector3.one;
+
+            identifyPulseBodyMf.sharedMesh = IdentifiedVirtualKey.BodyMesh;
+            identifyPulseFrameMf.sharedMesh = IdentifiedVirtualKey.FrameMesh;
+
+            identifyPulseGo.SetActive(true);
+        }
+
+        void UpdateIdentifyPulseAnimation() {
+            if (IdentifiedVirtualKey == null || IdentifiedVirtualKey.KeyGameObject == null) {
+                if (identifyPulseGo != null && identifyPulseGo.activeSelf) {
+                    identifyPulseGo.SetActive(false);
+                }
+                return;
+            }
+
+            if (identifyPulseGo == null || !identifyPulseGo.activeSelf) {
+                UpdateIdentifyVisuals();
+                if (identifyPulseGo == null || !identifyPulseGo.activeSelf) return;
+            }
+
+            // Sync shared meshes in case the identified key's shape changed/morphed
+            if (identifyPulseBodyMf != null && identifyPulseBodyMf.sharedMesh != IdentifiedVirtualKey.BodyMesh) {
+                identifyPulseBodyMf.sharedMesh = IdentifiedVirtualKey.BodyMesh;
+            }
+            if (identifyPulseFrameMf != null && identifyPulseFrameMf.sharedMesh != IdentifiedVirtualKey.FrameMesh) {
+                identifyPulseFrameMf.sharedMesh = IdentifiedVirtualKey.FrameMesh;
+            }
+
+            // Pulse cycle: 0.85 seconds
+            float cycle = 0.85f;
+            float t = (Time.time % cycle) / cycle;
+
+            // Ease out expansion for shockwave effect (scale from 1.0x to 1.85x on X and Z)
+            float easedT = DOVirtual.EasedValue(0f, 1f, t, Ease.OutQuad);
+            float scale = Mathf.Lerp(1.0f, 1.85f, easedT);
+            identifyPulseGo.transform.localScale = new Vector3(scale, 1.0f, scale);
+
+            // Ease in fade out (fades smoothly to transparent)
+            float alphaProgress = DOVirtual.EasedValue(0f, 1f, t, Ease.InQuad);
+            float alpha = Mathf.Lerp(0.9f, 0.0f, alphaProgress);
+
+            // Electric cyan/blue coloring ensures extreme contrast on pure white, dark, or colored keys
+            Color cyanFrame = new Color(0f, 0.85f, 1.0f, alpha);
+            Color cyanFrameEmission = new Color(0f, 0.85f, 1.0f) * (alpha * 3.5f);
+
+            Color cyanBody = new Color(0.1f, 0.75f, 1.0f, alpha * 0.35f);
+            Color cyanBodyEmission = new Color(0.1f, 0.75f, 1.0f) * (alpha * 0.35f * 1.5f);
+
+            if (identifyPulseFrameMat != null) {
+                identifyPulseFrameMat.color = cyanFrame;
+                identifyPulseFrameMat.SetColor("_EmissionColor", cyanFrameEmission);
+            }
+            if (identifyPulseFrameMr != null) {
+                if (keyPropertyBlock == null) keyPropertyBlock = new MaterialPropertyBlock();
+                identifyPulseFrameMr.GetPropertyBlock(keyPropertyBlock);
+                keyPropertyBlock.SetColor("_Color", cyanFrame);
+                keyPropertyBlock.SetColor("_EmissionColor", cyanFrameEmission);
+                identifyPulseFrameMr.SetPropertyBlock(keyPropertyBlock);
+            }
+            if (identifyPulseBodyMat != null) {
+                identifyPulseBodyMat.color = cyanBody;
+                identifyPulseBodyMat.SetColor("_EmissionColor", cyanBodyEmission);
+            }
+            if (identifyPulseBodyMr != null) {
+                if (keyPropertyBlock == null) keyPropertyBlock = new MaterialPropertyBlock();
+                identifyPulseBodyMr.GetPropertyBlock(keyPropertyBlock);
+                keyPropertyBlock.SetColor("_Color", cyanBody);
+                keyPropertyBlock.SetColor("_EmissionColor", cyanBodyEmission);
+                identifyPulseBodyMr.SetPropertyBlock(keyPropertyBlock);
+            }
+        }
+
+        public AnchorAsset GetAnchorForVirtualKey(VirtualKeyAnchor anchorType) {
+            switch (anchorType) {
+                case VirtualKeyAnchor.LeftHand: return LeftHandAnchor;
+                case VirtualKeyAnchor.RightHand: return RightHandAnchor;
+                case VirtualKeyAnchor.KeyboardRoot: return RootAnchor;
+                default: return RootAnchor;
+            }
+        }
+
+        public GameObject GetGroupGameObject(VirtualKeyAnchor anchorType) {
+            switch (anchorType) {
+                case VirtualKeyAnchor.LeftHand:
+                    if (leftKeysGroupGo == null) {
+                        leftKeysGroupGo = new GameObject("KeysetGroup_LeftHand");
+                    }
+                    return leftKeysGroupGo;
+
+                case VirtualKeyAnchor.RightHand:
+                    if (rightKeysGroupGo == null) {
+                        rightKeysGroupGo = new GameObject("KeysetGroup_RightHand");
+                    }
+                    return rightKeysGroupGo;
+
+                case VirtualKeyAnchor.KeyboardRoot:
+                default:
+                    if (rootKeysGroupGo == null) {
+                        rootKeysGroupGo = new GameObject("KeysetGroup_Root");
+                    }
+                    return rootKeysGroupGo;
+            }
+        }
+
+        void UpdateGroupTransforms() {
+            if (!IsKeysVisualActive) return;
+
+            // 1. Left Group
+            if (leftKeysGroupGo != null) {
+                var anchor = RootAnchor;
+                if (anchor != null && anchor.GameObject != null) {
+                    if (leftKeysGroupGo.transform.parent != anchor.GameObject.transform) {
+                        leftKeysGroupGo.transform.SetParent(anchor.GameObject.transform, false);
+                    }
+                }
+                if (LeftKeysetTransform != null && LeftKeysetTransform.InVisualSetupMode && LeftKeysetTransform.setupAnchor != null) {
+                    leftKeysGroupGo.transform.localPosition = LeftKeysetTransform.setupAnchor.Transform.Position;
+                    leftKeysGroupGo.transform.localRotation = Quaternion.Euler(LeftKeysetTransform.setupAnchor.Transform.Rotation);
+                    leftKeysGroupGo.transform.localScale = LeftKeysetTransform.setupAnchor.Transform.Scale;
+                } else {
+                    var basePos = LeftHandRestPosition;
+                    var baseRot = Quaternion.Euler(LeftHandRestRotation);
+                    var pos = LeftKeysetTransform?.Position ?? Vector3.zero;
+                    var rot = LeftKeysetTransform?.Rotation ?? Vector3.zero;
+                    var scale = LeftKeysetTransform?.Scale ?? Vector3.one;
+                    leftKeysGroupGo.transform.localPosition = basePos + baseRot * pos;
+                    leftKeysGroupGo.transform.localRotation = baseRot * Quaternion.Euler(rot);
+                    leftKeysGroupGo.transform.localScale = scale;
+                }
+            }
+
+            // 2. Right Group
+            if (rightKeysGroupGo != null) {
+                var anchor = RootAnchor;
+                if (anchor != null && anchor.GameObject != null) {
+                    if (rightKeysGroupGo.transform.parent != anchor.GameObject.transform) {
+                        rightKeysGroupGo.transform.SetParent(anchor.GameObject.transform, false);
+                    }
+                }
+                if (RightKeysetTransform != null && RightKeysetTransform.InVisualSetupMode && RightKeysetTransform.setupAnchor != null) {
+                    rightKeysGroupGo.transform.localPosition = RightKeysetTransform.setupAnchor.Transform.Position;
+                    rightKeysGroupGo.transform.localRotation = Quaternion.Euler(RightKeysetTransform.setupAnchor.Transform.Rotation);
+                    rightKeysGroupGo.transform.localScale = RightKeysetTransform.setupAnchor.Transform.Scale;
+                } else {
+                    var basePos = RightHandRestPosition;
+                    var baseRot = Quaternion.Euler(RightHandRestRotation);
+                    var pos = RightKeysetTransform?.Position ?? Vector3.zero;
+                    var rot = RightKeysetTransform?.Rotation ?? Vector3.zero;
+                    var scale = RightKeysetTransform?.Scale ?? Vector3.one;
+                    rightKeysGroupGo.transform.localPosition = basePos + baseRot * pos;
+                    rightKeysGroupGo.transform.localRotation = baseRot * Quaternion.Euler(rot);
+                    rightKeysGroupGo.transform.localScale = scale;
+                }
+            }
+
+            // 3. Root Group
+            if (rootKeysGroupGo != null) {
+                var anchor = RootAnchor;
+                if (anchor != null && anchor.GameObject != null) {
+                    if (rootKeysGroupGo.transform.parent != anchor.GameObject.transform) {
+                        rootKeysGroupGo.transform.SetParent(anchor.GameObject.transform, false);
+                    }
+                }
+                var pos = RootKeysetTransform?.Position ?? Vector3.zero;
+                var rot = RootKeysetTransform?.Rotation ?? Vector3.zero;
+                var scale = RootKeysetTransform?.Scale ?? Vector3.one;
+                if (RootKeysetTransform != null && RootKeysetTransform.InVisualSetupMode && RootKeysetTransform.setupAnchor != null) {
+                    pos = RootKeysetTransform.setupAnchor.Transform.Position;
+                    rot = RootKeysetTransform.setupAnchor.Transform.Rotation;
+                    scale = RootKeysetTransform.setupAnchor.Transform.Scale;
+                }
+                rootKeysGroupGo.transform.localPosition = pos;
+                rootKeysGroupGo.transform.localRotation = Quaternion.Euler(rot);
+                rootKeysGroupGo.transform.localScale = scale;
+            }
+        }
+
+        public bool IsKeysVisualActive => EnableFloatingKeys && (IsEnabled || (activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands));
+
+        public void UpdateFloatingKeysState() {
+            if (IsKeysVisualActive && Character != null) {
+                EnsureAnchors();
+                UpdateGroupTransforms();
+                RebuildAllVirtualKeyMeshes();
+            } else {
+                DestroyAllVirtualKeyVisuals();
+            }
+        }
+
+        void OnUpdateVirtualKeys() {
+            if (!IsKeysVisualActive) return;
+
+            // Auto-restore meshes if hot-reloaded and visuals haven't been built yet
+            if (VirtualKeys != null && VirtualKeys.Length > 0 && VirtualKeys[0] != null && VirtualKeys[0].KeyGameObject == null) {
+                UpdateFloatingKeysState();
+            }
+
+            // Ensure parent references
+            if (VirtualKeys != null && VirtualKeys.Length > 0 && VirtualKeys[0] != null && VirtualKeys[0].Parent == null) {
+                RefreshVirtualKeysParent();
+            }
+
+            UpdateGroupTransforms();
+
+            if (VirtualKeys == null) return;
+
+            float dt = Time.deltaTime;
+
+            for (int i = 0; i < VirtualKeys.Length; i++) {
+                var keyDef = VirtualKeys[i];
+                if (keyDef == null) continue;
+
+                // Check visual setup synchronization
+                if (ActiveVirtualKeyInVisualSetup == keyDef && keyDef.Transform?.setupAnchor != null && keyDef.KeyGameObject != null) {
+                    keyDef.KeyGameObject.transform.localPosition = keyDef.Transform.setupAnchor.Transform.Position;
+                    keyDef.KeyGameObject.transform.localRotation = Quaternion.Euler(keyDef.Transform.setupAnchor.Transform.Rotation);
+                    keyDef.KeyGameObject.transform.localScale = keyDef.Transform.setupAnchor.Transform.Scale;
+                }
+
+                // Input evaluation & glow (suppressed during any visual setup mode)
+                bool isDown = IsInAnyVisualSetup ? false : Down((int)keyDef.Key);
+
+                ApplyKeyGlowState(keyDef, isDown, dt);
+
+            }
+
+            UpdateIdentifyPulseAnimation();
+        }
+
+        void ApplyKeyGlowState(VirtualKeyDefinition keyDef, bool isDown, float dt = 0f) {
+            if (keyDef.BorderMaterial == null || keyDef.BodyMaterial == null) return;
+
+            bool isIdentifying = (IdentifiedVirtualKey != null && (keyDef == IdentifiedVirtualKey || keyDef.Key == IdentifiedVirtualKey.Key));
+
+            // Early exit if the key is already at rest
+            if (!isDown && !isIdentifying && keyDef.CurrentPressProgress <= 0.0001f) {
+                if (keyDef.IsGlowResting) return;
+            }
+
+            var customApp = (keyDef.UseCustomAppearance && keyDef.CustomAppearance != null) ? keyDef.CustomAppearance : null;
+            var baseApp = DefaultAppearance;
+
+            // 1. Resolve Shape Normal and Pressed styles
+            bool customShapeEnabled = (customApp?.Shape != null && customApp.Shape.Enabled);
+            var shapeNormal = (customShapeEnabled && customApp.Shape.Normal != null && customApp.Shape.Normal.Enabled)
+                ? customApp.Shape.Normal
+                : baseApp?.Shape?.Normal;
+
+            VirtualKeyShapeStateStyle shapePressed = null;
+            if (customShapeEnabled) {
+                if (customApp.Shape.EnablePressedState && customApp.Shape.Pressed != null && customApp.Shape.Pressed.Enabled) {
+                    shapePressed = customApp.Shape.Pressed;
+                } else if (!customApp.Shape.EnablePressedState) {
+                    shapePressed = shapeNormal; // User explicitly disabled press squish for this key
+                } else if (baseApp?.Shape != null && baseApp.Shape.EnablePressedState && baseApp.Shape.Pressed != null && baseApp.Shape.Pressed.Enabled) {
+                    shapePressed = baseApp.Shape.Pressed;
+                } else {
+                    shapePressed = shapeNormal;
+                }
+            } else {
+                bool baseHasPressed = (baseApp?.Shape != null && baseApp.Shape.EnablePressedState && baseApp.Shape.Pressed != null && baseApp.Shape.Pressed.Enabled);
+                shapePressed = baseHasPressed ? baseApp.Shape.Pressed : shapeNormal;
+            }
+
+            // 2. Resolve Body Normal and Pressed styles
+            // Note: During Identify, bypass EnablePressedState = false so body color/glow always pulses.
+            bool customBodyEnabled = (customApp?.Body != null && customApp.Body.Enabled);
+            var bodyNormal = (customBodyEnabled && customApp.Body.Normal != null && customApp.Body.Normal.Enabled)
+                ? customApp.Body.Normal
+                : baseApp?.Body?.Normal;
+
+            VirtualKeyMaterialStateStyle bodyPressed = null;
+            if (customBodyEnabled) {
+                if ((customApp.Body.EnablePressedState || isIdentifying) && customApp.Body.Pressed != null && customApp.Body.Pressed.Enabled) {
+                    bodyPressed = customApp.Body.Pressed;
+                } else if (!customApp.Body.EnablePressedState && !isIdentifying) {
+                    bodyPressed = bodyNormal; // User explicitly disabled press state for this key
+                } else if (baseApp?.Body != null && (baseApp.Body.EnablePressedState || isIdentifying) && baseApp.Body.Pressed != null && baseApp.Body.Pressed.Enabled) {
+                    bodyPressed = baseApp.Body.Pressed;
+                } else {
+                    bodyPressed = bodyNormal;
+                }
+            } else {
+                bool baseHasPressed = (baseApp?.Body != null && (baseApp.Body.EnablePressedState || isIdentifying) && baseApp.Body.Pressed != null && baseApp.Body.Pressed.Enabled);
+                bodyPressed = baseHasPressed ? baseApp.Body.Pressed : bodyNormal;
+            }
+
+            // 3. Resolve Border Normal and Pressed styles
+            // Note: During Identify, bypass EnablePressedState = false so border color/glow always pulses.
+            bool customBorderEnabled = (customApp?.Border != null && customApp.Border.Enabled);
+            var borderNormal = (customBorderEnabled && customApp.Border.Normal != null && customApp.Border.Normal.Enabled)
+                ? customApp.Border.Normal
+                : baseApp?.Border?.Normal;
+
+            VirtualKeyMaterialStateStyle borderPressed = null;
+            if (customBorderEnabled) {
+                if ((customApp.Border.EnablePressedState || isIdentifying) && customApp.Border.Pressed != null && customApp.Border.Pressed.Enabled) {
+                    borderPressed = customApp.Border.Pressed;
+                } else if (!customApp.Border.EnablePressedState && !isIdentifying) {
+                    borderPressed = borderNormal; // User explicitly disabled press state for this key
+                } else if (baseApp?.Border != null && (baseApp.Border.EnablePressedState || isIdentifying) && baseApp.Border.Pressed != null && baseApp.Border.Pressed.Enabled) {
+                    borderPressed = baseApp.Border.Pressed;
+                } else {
+                    borderPressed = borderNormal;
+                }
+            } else {
+                bool baseHasPressed = (baseApp?.Border != null && (baseApp.Border.EnablePressedState || isIdentifying) && baseApp.Border.Pressed != null && baseApp.Border.Pressed.Enabled) ;
+                borderPressed = baseHasPressed ? baseApp.Border.Pressed : borderNormal;
+            }
+
+            // Resolve transitions (onPress / onRelease)
+            var pressIn = customApp?.PressInTransition ?? baseApp?.PressInTransition;
+            float pressInTime = pressIn?.Time ?? 0.02f;
+            Ease pressInEase = pressIn?.Ease ?? Ease.Linear;
+
+            var pressOut = customApp?.PressOutTransition ?? baseApp?.PressOutTransition;
+            float pressOutTime = pressOut?.Time ?? 0.12f;
+            Ease pressOutEase = pressOut?.Ease ?? Ease.OutCubic;
+
+            // Physical press progress interpolation
+            if (isDown) {
+                if (pressInTime <= 0.001f || dt <= 0f) {
+                    keyDef.CurrentPressProgress = 1.0f;
+                } else {
+                    keyDef.CurrentPressProgress = Mathf.MoveTowards(keyDef.CurrentPressProgress, 1.0f, dt / pressInTime);
+                }
+            } else {
+                if (pressOutTime <= 0.001f || dt <= 0f) {
+                    keyDef.CurrentPressProgress = 0.0f;
+                } else {
+                    keyDef.CurrentPressProgress = Mathf.MoveTowards(keyDef.CurrentPressProgress, 0.0f, dt / pressOutTime);
+                }
+            }
+
+            float pressFactor = isDown
+                ? DOVirtual.EasedValue(0f, 1f, keyDef.CurrentPressProgress, pressInEase)
+                : DOVirtual.EasedValue(0f, 1f, keyDef.CurrentPressProgress, pressOutEase);
+
+            // Shape factor: Only driven by physical key press, NEVER morphed by Identify
+            float shapeFactor = pressFactor;
+
+            // Glow factor: Pulses during Identify, otherwise follows physical key press
+            float glowFactor = isIdentifying ? Mathf.PingPong(Time.time * 6f, 1f) : pressFactor;
+
+            // Calculate animated dimensions (driven purely by shapeFactor)
+            Vector2 normalSize = shapeNormal != null ? shapeNormal.Size : BaseKeySize;
+            Vector2 pressedSize = shapePressed != null ? shapePressed.Size : normalSize;
+            Vector2 currentSize = Vector2.Lerp(normalSize, pressedSize, shapeFactor);
+
+            Vector4 normalCorners = shapeNormal != null ? shapeNormal.GetCornerRadii() : BorderVector4Extensions.Uniform(0.25f);
+            Vector4 pressedCorners = shapePressed != null ? shapePressed.GetCornerRadii() : normalCorners;
+            Vector4 currentCorners = Vector4.Lerp(normalCorners, pressedCorners, shapeFactor);
+
+            Vector4 normalBorders = shapeNormal != null ? shapeNormal.GetBorderWidths() : BorderVector4Extensions.Uniform(0.0025f);
+            Vector4 pressedBorders = shapePressed != null ? shapePressed.GetBorderWidths() : normalBorders;
+            Vector4 currentBorders = Vector4.Lerp(normalBorders, pressedBorders, shapeFactor);
+
+            float maxRadius = Mathf.Min(currentSize.x, currentSize.y) * 0.5f;
+            Vector4 absoluteCorners = currentCorners * maxRadius;
+
+            // In-place mesh vertex morphing during press transitions
+            if (Vector2.Distance(keyDef.CurrentSize, currentSize) > 0.0001f ||
+                Vector4.Distance(keyDef.CurrentBorderWidths, currentBorders) > 0.00001f ||
+                Vector4.Distance(keyDef.CurrentCornerRadii, currentCorners) > 0.0001f) {
+
+                keyDef.CurrentSize = currentSize;
+                keyDef.CurrentBorderWidths = currentBorders;
+                keyDef.CurrentCornerRadii = currentCorners;
+
+                if (keyDef.BodyMesh != null) {
+                    VirtualKeyMeshBuilder.UpdateRoundedRectVertices(keyDef.BodyMesh, currentSize.x, currentSize.y, absoluteCorners);
+                }
+                if (keyDef.FrameMesh != null) {
+                    VirtualKeyMeshBuilder.UpdateRoundedRectFrameVertices(keyDef.FrameMesh, currentSize.x, currentSize.y, absoluteCorners, currentBorders);
+                }
+            }
+
+            // Apply Body (Color & Glow)
+            if (bodyNormal != null) {
+                var targetPressed = bodyPressed ?? bodyNormal;
+                Color targetBodyColor = targetPressed.Color;
+                float targetBodySelfIllum = targetPressed.SelfIllumination;
+                Color targetBodyGlowColor = targetPressed.GlowColor;
+                float targetBodyGlowIntensity = targetPressed.GlowIntensity;
+
+                if (isIdentifying) {
+                    // Guaranteed prominent pulse during Identify even if press state has 0 glow
+                    if (targetBodyGlowIntensity <= 0.2f) {
+                        targetBodyGlowIntensity = Mathf.Max(bodyNormal.GlowIntensity + 2.0f, 2.0f);
+                    }
+                    if (targetBodyGlowColor == Color.clear || targetBodyGlowColor.a <= 0.01f) {
+                        targetBodyGlowColor = Color.white;
+                    }
+                }
+
+                Color bodyColor = Color.Lerp(bodyNormal.Color, targetBodyColor, glowFactor);
+                float bodySelfIllum = Mathf.Clamp01(Mathf.Lerp(bodyNormal.SelfIllumination, targetBodySelfIllum, glowFactor));
+                Color bodyGlowColor = Color.Lerp(bodyNormal.GlowColor, targetBodyGlowColor, glowFactor);
+                float bodyGlowIntensity = Mathf.Lerp(bodyNormal.GlowIntensity, targetBodyGlowIntensity, glowFactor);
+
+                Color albedo = new Color(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a);
+                Color emission = (bodyColor * bodySelfIllum) + (bodyGlowColor * bodyGlowIntensity);
+
+                keyDef.BodyMaterial.color = albedo;
+                keyDef.BodyMaterial.SetColor("_EmissionColor", emission);
+                keyDef.BodyMaterial.EnableKeyword("_EMISSION");
+
+                if (keyDef.BodyRenderer != null) {
+                    if (keyPropertyBlock == null) keyPropertyBlock = new MaterialPropertyBlock();
+                    keyDef.BodyRenderer.GetPropertyBlock(keyPropertyBlock);
+                    keyPropertyBlock.SetColor("_Color", albedo);
+                    keyPropertyBlock.SetColor("_EmissionColor", emission);
+                    keyDef.BodyRenderer.SetPropertyBlock(keyPropertyBlock);
+                }
+            }
+
+            // Apply Border (Color & Glow)
+            if (borderNormal != null) {
+                var targetPressed = borderPressed ?? borderNormal;
+                Color targetBorderColor = targetPressed.Color;
+                float targetBorderSelfIllum = targetPressed.SelfIllumination;
+                Color targetBorderGlowColor = targetPressed.GlowColor;
+                float targetBorderGlowIntensity = targetPressed.GlowIntensity;
+
+                if (isIdentifying) {
+                    // Guaranteed prominent pulse during Identify even if press state has 0 glow
+                    if (targetBorderGlowIntensity <= 0.2f) {
+                        targetBorderGlowIntensity = Mathf.Max(borderNormal.GlowIntensity + 2.5f, 2.5f);
+                    }
+                    if (targetBorderGlowColor == Color.clear || targetBorderGlowColor.a <= 0.01f) {
+                        targetBorderGlowColor = Color.white;
+                    }
+                }
+
+                Color borderColor = Color.Lerp(borderNormal.Color, targetBorderColor, glowFactor);
+                float borderSelfIllum = Mathf.Clamp01(Mathf.Lerp(borderNormal.SelfIllumination, targetBorderSelfIllum, glowFactor));
+                Color borderGlowColor = Color.Lerp(borderNormal.GlowColor, targetBorderGlowColor, glowFactor);
+                float borderGlowIntensity = Mathf.Lerp(borderNormal.GlowIntensity, targetBorderGlowIntensity, glowFactor);
+
+                Color albedo = new Color(borderColor.r, borderColor.g, borderColor.b, borderColor.a);
+                Color emission = (borderColor * borderSelfIllum) + (borderGlowColor * borderGlowIntensity);
+
+                keyDef.BorderMaterial.color = albedo;
+                keyDef.BorderMaterial.SetColor("_EmissionColor", emission);
+                keyDef.BorderMaterial.EnableKeyword("_EMISSION");
+
+                if (keyDef.FrameRenderer != null) {
+                    if (keyPropertyBlock == null) keyPropertyBlock = new MaterialPropertyBlock();
+                    keyDef.FrameRenderer.GetPropertyBlock(keyPropertyBlock);
+                    keyPropertyBlock.SetColor("_Color", albedo);
+                    keyPropertyBlock.SetColor("_EmissionColor", emission);
+                    keyDef.FrameRenderer.SetPropertyBlock(keyPropertyBlock);
+                }
+            }
+
+            if (!isDown && !isIdentifying && keyDef.CurrentPressProgress <= 0.0001f) {
+                keyDef.CurrentPressProgress = 0f;
+                keyDef.IsGlowResting = true;
+            } else {
+                keyDef.IsGlowResting = false;
+            }
+        }
+
+        public void UpdateVirtualKeyParenting(VirtualKeyDefinition keyDef) {
+            if (keyDef == null || keyDef.KeyGameObject == null) return;
+            var group = GetGroupGameObject(keyDef.AttachmentAnchor);
+            if (group != null) {
+                keyDef.KeyGameObject.transform.SetParent(group.transform, false);
+                var pos = keyDef.Transform?.Position ?? Vector3.zero;
+                var rot = keyDef.Transform?.Rotation ?? Vector3.zero;
+                var scale = keyDef.Transform?.Scale ?? Vector3.one;
+                keyDef.KeyGameObject.transform.localPosition = pos;
+                keyDef.KeyGameObject.transform.localRotation = Quaternion.Euler(rot);
+                keyDef.KeyGameObject.transform.localScale = scale;
+            }
+        }
+
+        public bool TryGetKeyCenterAndNormal(VirtualKeyDefinition k, out Vector3 keyCenterWorld, out Vector3 keyNormalWorld) {
+            keyCenterWorld = Vector3.zero;
+            keyNormalWorld = Vector3.up;
+            if (k == null) return false;
+
+            if (k.KeyGameObject != null) {
+                keyCenterWorld = k.KeyGameObject.transform.position;
+                keyNormalWorld = k.KeyGameObject.transform.rotation * Vector3.up;
+                return true;
+            }
+
+            Transform rootTr = RootAnchor?.GameObject != null ? RootAnchor.GameObject.transform : null;
+            Vector3 groupPos;
+            Quaternion groupRot;
+            Vector3 groupScale = Vector3.one;
+
+            if (k.AttachmentAnchor == VirtualKeyAnchor.LeftHand) {
+                var basePos = LeftHandRestPosition;
+                var baseRot = Quaternion.Euler(LeftHandRestRotation);
+                var pos = LeftKeysetTransform?.Position ?? Vector3.zero;
+                var rot = LeftKeysetTransform?.Rotation ?? Vector3.zero;
+                groupScale = LeftKeysetTransform?.Scale ?? Vector3.one;
+                groupPos = basePos + baseRot * pos;
+                groupRot = baseRot * Quaternion.Euler(rot);
+            } else if (k.AttachmentAnchor == VirtualKeyAnchor.RightHand) {
+                var basePos = RightHandRestPosition;
+                var baseRot = Quaternion.Euler(RightHandRestRotation);
+                var pos = RightKeysetTransform?.Position ?? Vector3.zero;
+                var rot = RightKeysetTransform?.Rotation ?? Vector3.zero;
+                groupScale = RightKeysetTransform?.Scale ?? Vector3.one;
+                groupPos = basePos + baseRot * pos;
+                groupRot = baseRot * Quaternion.Euler(rot);
+            } else {
+                var pos = RootKeysetTransform?.Position ?? Vector3.zero;
+                var rot = RootKeysetTransform?.Rotation ?? Vector3.zero;
+                groupScale = RootKeysetTransform?.Scale ?? Vector3.one;
+                groupPos = pos;
+                groupRot = Quaternion.Euler(rot);
+            }
+
+            Vector3 scaledKeyLocalPos = Vector3.Scale(k.Transform != null ? k.Transform.Position : Vector3.zero, groupScale);
+            Vector3 keyPosRig = groupPos + groupRot * scaledKeyLocalPos;
+            Quaternion keyRotRig = groupRot * Quaternion.Euler(k.Transform != null ? k.Transform.Rotation : Vector3.zero);
+
+            keyCenterWorld = rootTr != null ? rootTr.TransformPoint(keyPosRig) : keyPosRig;
+            keyNormalWorld = rootTr != null ? (rootTr.rotation * keyRotRig * Vector3.up) : (keyRotRig * Vector3.up);
+            return true;
+        }
+
+        public void RebuildVirtualKeyMesh(VirtualKeyDefinition keyDef) {
+            if (keyDef == null || !IsKeysVisualActive) return;
+
+            keyDef.DestroyVisuals();
+
+            var group = GetGroupGameObject(keyDef.AttachmentAnchor);
+
+            var keyGo = new GameObject($"VKey_{keyDef.Key}_{keyDef.DisplayLabel}");
+            if (group != null) {
+                keyGo.transform.SetParent(group.transform, false);
+            }
+            var pos = keyDef.Transform?.Position ?? Vector3.zero;
+            var rot = keyDef.Transform?.Rotation ?? Vector3.zero;
+            var scale = keyDef.Transform?.Scale ?? Vector3.one;
+            keyGo.transform.localPosition = pos;
+            keyGo.transform.localRotation = Quaternion.Euler(rot);
+            keyGo.transform.localScale = scale;
+
+            // Calculate dimensions
+            var customApp = (keyDef.UseCustomAppearance && keyDef.CustomAppearance != null) ? keyDef.CustomAppearance : null;
+            var baseApp = DefaultAppearance;
+
+            bool customShapeEnabled = (customApp?.Shape != null && customApp.Shape.Enabled && customApp.Shape.Normal != null && customApp.Shape.Normal.Enabled);
+            var shapeNormal = customShapeEnabled
+                ? customApp.Shape.Normal
+                : baseApp?.Shape?.Normal;
+
+            Vector2 initialSize = shapeNormal != null ? shapeNormal.Size : BaseKeySize;
+            Vector4 initialBorders = shapeNormal != null ? shapeNormal.GetBorderWidths() : BorderVector4Extensions.Uniform(0.0025f);
+            Vector4 initialCorners = shapeNormal != null ? shapeNormal.GetCornerRadii() : BorderVector4Extensions.Uniform(0.25f);
+
+            float maxRadius = Mathf.Min(initialSize.x, initialSize.y) * 0.5f;
+            Vector4 absoluteCorners = initialCorners * maxRadius;
+
+            // 1. Inner Body Mesh & Material
+            var bodyMesh = VirtualKeyMeshBuilder.CreateRoundedRectMesh(initialSize.x, initialSize.y, absoluteCorners);
+            bodyMesh.MarkDynamic();
+            var bodyGo = new GameObject("Body");
+            bodyGo.transform.SetParent(keyGo.transform, false);
+            bodyGo.transform.localPosition = new Vector3(0f, 0.0001f, 0f); // Slight elevation above base
+
+            var bodyMf = bodyGo.AddComponent<MeshFilter>();
+            bodyMf.sharedMesh = bodyMesh;
+            var bodyMr = bodyGo.AddComponent<MeshRenderer>();
+
+            var bodyMat = CreateKeyMaterial();
+            bodyMat.renderQueue = 3000;
+            bodyMr.sharedMaterial = bodyMat;
+
+            // 2. Hollow Border Frame Mesh & Material
+            var frameMesh = VirtualKeyMeshBuilder.CreateRoundedRectFrameMesh(initialSize.x, initialSize.y, absoluteCorners, initialBorders);
+            frameMesh.MarkDynamic();
+            var frameGo = new GameObject("Border");
+            frameGo.transform.SetParent(keyGo.transform, false);
+            frameGo.transform.localPosition = new Vector3(0f, 0.0006f, 0f); // Cleanly above body
+
+            var frameMf = frameGo.AddComponent<MeshFilter>();
+            frameMf.sharedMesh = frameMesh;
+            var frameMr = frameGo.AddComponent<MeshRenderer>();
+
+            var borderMat = CreateKeyMaterial();
+            borderMat.renderQueue = 3001;
+            frameMr.sharedMaterial = borderMat;
+
+            // Cache on definition
+            keyDef.KeyGameObject = keyGo;
+            keyDef.BodyMesh = bodyMesh;
+            keyDef.FrameMesh = frameMesh;
+            keyDef.BodyRenderer = bodyMr;
+            keyDef.FrameRenderer = frameMr;
+            keyDef.BodyMaterial = bodyMat;
+            keyDef.BorderMaterial = borderMat;
+
+            if (keyDef == IdentifiedVirtualKey || (IdentifiedVirtualKey != null && keyDef.Key == IdentifiedVirtualKey.Key)) {
+                UpdateIdentifyVisuals();
+            }
+
+            keyDef.IsGlowResting = false;
+            bool isDown = Down((int)keyDef.Key);
+            ApplyKeyGlowState(keyDef, isDown, 0f);
+        }
+
+        Material CreateKeyMaterial() {
+            var shader = Shader.Find("Standard");
+            var mat = new Material(shader);
+
+            // Setup transparent rendering
+            mat.SetFloat("_Mode", 3);
+            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetInt("_ZWrite", 0);
+            mat.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+            mat.DisableKeyword("_ALPHATEST_ON");
+            mat.EnableKeyword("_ALPHABLEND_ON");
+            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            mat.renderQueue = 3000;
+
+            mat.SetFloat("_Glossiness", 0.2f);
+            mat.SetFloat("_Metallic", 0.0f);
+
+            // Always enable emission keyword on both Body & Border materials
+            mat.EnableKeyword("_EMISSION");
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            mat.SetColor("_EmissionColor", Color.black);
+
+            return mat;
+        }
+
+        public void RebuildAllVirtualKeyMeshes() {
+            if (!IsKeysVisualActive || VirtualKeys == null) return;
+            for (int i = 0; i < VirtualKeys.Length; i++) {
+                if (VirtualKeys[i] != null) {
+                    RebuildVirtualKeyMesh(VirtualKeys[i]);
+                }
+            }
+        }
+
+        public void UpdateVirtualKeyColors(VirtualKeyDefinition keyDef) {
+            if (keyDef == null) return;
+            keyDef.IsGlowResting = false;
+            ApplyKeyGlowState(keyDef, false, 0f);
+        }
+
+        public void UpdateAllVirtualKeyColors() {
+            if (VirtualKeys == null) return;
+            for (int i = 0; i < VirtualKeys.Length; i++) {
+                if (VirtualKeys[i] != null) {
+                    UpdateVirtualKeyColors(VirtualKeys[i]);
+                }
+            }
+        }
+
+        public void DestroyAllVirtualKeyVisuals() {
+            if (identifyPulseGo != null) {
+                UnityEngine.Object.Destroy(identifyPulseGo);
+                identifyPulseGo = null;
+                identifyPulseBodyMf = null;
+                identifyPulseBodyMr = null;
+                identifyPulseBodyMat = null;
+                identifyPulseFrameMf = null;
+                identifyPulseFrameMr = null;
+                identifyPulseFrameMat = null;
+            }
+
+            if (VirtualKeys != null) {
+                for (int i = 0; i < VirtualKeys.Length; i++) {
+                    VirtualKeys[i]?.DestroyVisuals();
+                }
+            }
+
+            if (leftKeysGroupGo != null) {
+                UnityEngine.Object.Destroy(leftKeysGroupGo);
+                leftKeysGroupGo = null;
+            }
+            if (rightKeysGroupGo != null) {
+                UnityEngine.Object.Destroy(rightKeysGroupGo);
+                rightKeysGroupGo = null;
+            }
+            if (rootKeysGroupGo != null) {
+                UnityEngine.Object.Destroy(rootKeysGroupGo);
+                rootKeysGroupGo = null;
+            }
+        }
+
+        public void ApplyVirtualKeyPreset(VirtualKeyLayoutPreset preset, bool showToast = true) {
+            ClearIdentifiedKey();
+            var list = new List<VirtualKeyDefinition>();
+
+            float pitch = 0.036f; // Standard key spacing (32mm key + 4mm gap)
+
+            KeyboardFinger GetDefaultTouchTypingFinger(VKCode k, VirtualKeyAnchor a, float posX) {
+                bool isLeft = a == VirtualKeyAnchor.LeftHand || (a == VirtualKeyAnchor.KeyboardRoot && posX < 0f);
+                if (isLeft) {
+                    switch (k) {
+                        case VKCode.SPACE:
+                        case VKCode.LMENU:
+                        case VKCode.LWIN:
+                            return KeyboardFinger.LeftThumb;
+                        case VKCode.KEY_4:
+                        case VKCode.KEY_5:
+                        case VKCode.R:
+                        case VKCode.T:
+                        case VKCode.F:
+                        case VKCode.G:
+                        case VKCode.V:
+                        case VKCode.B:
+                        case VKCode.F4:
+                        case VKCode.F5:
+                            return KeyboardFinger.LeftIndex;
+                        case VKCode.KEY_3:
+                        case VKCode.E:
+                        case VKCode.D:
+                        case VKCode.C:
+                        case VKCode.F3:
+                            return KeyboardFinger.LeftMiddle;
+                        case VKCode.KEY_2:
+                        case VKCode.W:
+                        case VKCode.S:
+                        case VKCode.X:
+                        case VKCode.F2:
+                            return KeyboardFinger.LeftRing;
+                        default:
+                            return KeyboardFinger.LeftPinky;
+                    }
+                } else {
+                    switch (k) {
+                        case VKCode.SPACE:
+                        case VKCode.RMENU:
+                        case VKCode.RWIN:
+                            return KeyboardFinger.RightThumb;
+                        case VKCode.KEY_6:
+                        case VKCode.KEY_7:
+                        case VKCode.Y:
+                        case VKCode.U:
+                        case VKCode.H:
+                        case VKCode.J:
+                        case VKCode.N:
+                        case VKCode.M:
+                        case VKCode.F6:
+                        case VKCode.F7:
+                            return KeyboardFinger.RightIndex;
+                        case VKCode.KEY_8:
+                        case VKCode.I:
+                        case VKCode.K:
+                        case VKCode.OEM_COMMA:
+                        case VKCode.F8:
+                            return KeyboardFinger.RightMiddle;
+                        case VKCode.KEY_9:
+                        case VKCode.O:
+                        case VKCode.L:
+                        case VKCode.OEM_PERIOD:
+                        case VKCode.F9:
+                            return KeyboardFinger.RightRing;
+                        default:
+                            return KeyboardFinger.RightPinky;
+                    }
+                }
+            }
+
+            void AddKey(VKCode key, string label, VirtualKeyAnchor anchor, float posX, float posZ, float unitWidth = 1f, float unitHeight = 1f, float rotY = 0f, bool isCircle = false, KeyboardFinger? finger = null) {
+                KeyboardFinger assignedFinger = finger ?? GetDefaultTouchTypingFinger(key, anchor, posX);
+                var def = StructuredData.Create<VirtualKeyDefinition>(d => {
+                    d.Parent = this;
+                    d.Key = key;
+                    d.DisplayLabel = label;
+                    d.AttachmentAnchor = anchor;
+                    d.AssignedFinger = assignedFinger;
+                    d.Transform.Position = new Vector3(posX, 0f, posZ);
+                    d.Transform.Rotation = new Vector3(0f, rotY, 0f);
+                    d.Transform.Scale = Vector3.one;
+                    if (unitWidth != 1f || unitHeight != 1f || isCircle) {
+                        d.UseCustomAppearance = true;
+                        d.CustomAppearance = VirtualKeyAppearance.CreateForOverride();
+                        d.CustomAppearance.Shape.Enabled = true;
+                        d.CustomAppearance.Shape.Normal.Enabled = true;
+                        float baseW = BaseKeySize.x;
+                        float baseH = BaseKeySize.y;
+                        float w = (unitWidth * pitch) - (pitch - baseW);
+                        float h = (unitHeight * pitch) - (pitch - baseH);
+                        d.CustomAppearance.Shape.Normal.Size = new Vector2(w, h);
+                        if (isCircle) {
+                            d.CustomAppearance.Shape.Normal.Corners.Radius = 1f;
+                        }
+                        d.CustomAppearance.Shape.EnablePressedState = true;
+                        d.CustomAppearance.Shape.Pressed.Enabled = true;
+                        d.CustomAppearance.Shape.Pressed.Size = new Vector2(w, h);
+                        if (isCircle) {
+                            d.CustomAppearance.Shape.Pressed.Corners.Radius = 1f;
+                        }
+                    }
+                    d.SetupTransformCallbacks();
+                });
+                list.Add(def);
+            }
+
+            switch (preset) {
+                case VirtualKeyLayoutPreset.FullSize100: {
+                    var anchor = VirtualKeyAnchor.KeyboardRoot;
+                    float startX = -6.75f * pitch;
+
+                    // ===== 1. FUNCTION ROW (Row 5, Z = 3.25u) =====
+                    float zFunc = 3.25f * pitch;
+                    AddKey(VKCode.ESCAPE, "Esc", anchor, startX + 0.5f * pitch, zFunc, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F1, "F1", anchor, startX + 2.5f * pitch, zFunc, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F2, "F2", anchor, startX + 3.5f * pitch, zFunc, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.F3, "F3", anchor, startX + 4.5f * pitch, zFunc, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.F4, "F4", anchor, startX + 5.5f * pitch, zFunc, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.F5, "F5", anchor, startX + 7.0f * pitch, zFunc, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.F6, "F6", anchor, startX + 8.0f * pitch, zFunc, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.F7, "F7", anchor, startX + 9.0f * pitch, zFunc, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.F8, "F8", anchor, startX + 10.0f * pitch, zFunc, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.F9, "F9", anchor, startX + 11.5f * pitch, zFunc, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.F10, "F10", anchor, startX + 12.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.F11, "F11", anchor, startX + 13.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.F12, "F12", anchor, startX + 14.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.SNAPSHOT, "PrtSc", anchor, startX + 16.0f * pitch, zFunc, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.SCROLL, "Scroll", anchor, startX + 17.0f * pitch, zFunc, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.PAUSE, "Pause", anchor, startX + 18.0f * pitch, zFunc, finger: KeyboardFinger.RightRing);
+
+                    // ===== 2. NUMBER ROW (Row 4, Z = 2u) =====
+                    float zNum = 2f * pitch;
+                    AddKey(VKCode.OEM_3, "`", anchor, startX + 0.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_1, "1", anchor, startX + 1.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_2, "2", anchor, startX + 2.5f * pitch, zNum, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.KEY_3, "3", anchor, startX + 3.5f * pitch, zNum, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.KEY_4, "4", anchor, startX + 4.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_5, "5", anchor, startX + 5.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_6, "6", anchor, startX + 6.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_7, "7", anchor, startX + 7.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_8, "8", anchor, startX + 8.5f * pitch, zNum, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.KEY_9, "9", anchor, startX + 9.5f * pitch, zNum, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.KEY_0, "0", anchor, startX + 10.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_MINUS, "-", anchor, startX + 11.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_PLUS, "=", anchor, startX + 12.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.BACK, "Backspace", anchor, startX + 14.0f * pitch, zNum, 2.0f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.INSERT, "Ins", anchor, startX + 16.0f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.HOME, "Home", anchor, startX + 17.0f * pitch, zNum, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.PRIOR, "PgUp", anchor, startX + 18.0f * pitch, zNum, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.NUMLOCK, "Num", anchor, startX + 19.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.DIVIDE, "/", anchor, startX + 20.5f * pitch, zNum, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.MULTIPLY, "*", anchor, startX + 21.5f * pitch, zNum, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.SUBTRACT, "-", anchor, startX + 22.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 3. QWERTY / TAB ROW (Row 3, Z = 1u) =====
+                    float zTab = 1f * pitch;
+                    AddKey(VKCode.TAB, "Tab", anchor, startX + 0.75f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Q, "Q", anchor, startX + 2.0f * pitch, zTab, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.W, "W", anchor, startX + 3.0f * pitch, zTab, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.E, "E", anchor, startX + 4.0f * pitch, zTab, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.R, "R", anchor, startX + 5.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.T, "T", anchor, startX + 6.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.Y, "Y", anchor, startX + 7.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.U, "U", anchor, startX + 8.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.I, "I", anchor, startX + 9.0f * pitch, zTab, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.O, "O", anchor, startX + 10.0f * pitch, zTab, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.P, "P", anchor, startX + 11.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_4, "[", anchor, startX + 12.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_6, "]", anchor, startX + 13.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_5, "\\", anchor, startX + 14.25f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.DELETE, "Del", anchor, startX + 16.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.END, "End", anchor, startX + 17.0f * pitch, zTab, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.NEXT, "PgDn", anchor, startX + 18.0f * pitch, zTab, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.NUMPAD7, "7", anchor, startX + 19.5f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.NUMPAD8, "8", anchor, startX + 20.5f * pitch, zTab, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.NUMPAD9, "9", anchor, startX + 21.5f * pitch, zTab, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.ADD, "+", anchor, startX + 22.5f * pitch, 0.5f * pitch, 1.0f, 2.0f, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 4. HOME / CAPS ROW (Row 2, Z = 0u) =====
+                    float zHome = 0f;
+                    AddKey(VKCode.CAPITAL, "Caps", anchor, startX + 0.875f * pitch, zHome, 1.75f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.A, "A", anchor, startX + 2.25f * pitch, zHome, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.S, "S", anchor, startX + 3.25f * pitch, zHome, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.D, "D", anchor, startX + 4.25f * pitch, zHome, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.F, "F", anchor, startX + 5.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.G, "G", anchor, startX + 6.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.H, "H", anchor, startX + 7.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.J, "J", anchor, startX + 8.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.K, "K", anchor, startX + 9.25f * pitch, zHome, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.L, "L", anchor, startX + 10.25f * pitch, zHome, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_1, ";", anchor, startX + 11.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_7, "'", anchor, startX + 12.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RETURN, "Enter", anchor, startX + 13.875f * pitch, zHome, 2.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.NUMPAD4, "4", anchor, startX + 19.5f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.NUMPAD5, "5", anchor, startX + 20.5f * pitch, zHome, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.NUMPAD6, "6", anchor, startX + 21.5f * pitch, zHome, finger: KeyboardFinger.RightRing);
+
+                    // ===== 5. SHIFT ROW (Row 1, Z = -1u) =====
+                    float zShift = -1f * pitch;
+                    AddKey(VKCode.LSHIFT, "Shift", anchor, startX + 1.125f * pitch, zShift, 2.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Z, "Z", anchor, startX + 2.75f * pitch, zShift, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.X, "X", anchor, startX + 3.75f * pitch, zShift, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.C, "C", anchor, startX + 4.75f * pitch, zShift, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.V, "V", anchor, startX + 5.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.B, "B", anchor, startX + 6.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.N, "N", anchor, startX + 7.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.M, "M", anchor, startX + 8.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.OEM_COMMA, ",", anchor, startX + 9.75f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.OEM_PERIOD, ".", anchor, startX + 10.75f * pitch, zShift, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_2, "/", anchor, startX + 11.75f * pitch, zShift, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RSHIFT, "Shift", anchor, startX + 13.625f * pitch, zShift, 2.75f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.UP, "↑", anchor, startX + 17.0f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.NUMPAD1, "1", anchor, startX + 19.5f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.NUMPAD2, "2", anchor, startX + 20.5f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.NUMPAD3, "3", anchor, startX + 21.5f * pitch, zShift, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.NUMPAD_RETURN, "Enter", anchor, startX + 22.5f * pitch, -1.5f * pitch, 1.0f, 2.0f, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 6. BOTTOM / MODIFIER ROW (Row 0, Z = -2u) =====
+                    float zBottom = -2f * pitch;
+                    AddKey(VKCode.LCONTROL, "Ctrl", anchor, startX + 0.625f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LWIN, "Win", anchor, startX + 1.875f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LMENU, "Alt", anchor, startX + 3.125f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftThumb);
+                    AddKey(VKCode.SPACE, "Space", anchor, startX + 6.875f * pitch, zBottom, 6.25f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RMENU, "Alt", anchor, startX + 10.625f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RWIN, "Win", anchor, startX + 11.875f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.APPS, "App", anchor, startX + 13.125f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RCONTROL, "Ctrl", anchor, startX + 14.375f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.LEFT, "←", anchor, startX + 16.0f * pitch, zBottom, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.DOWN, "↓", anchor, startX + 17.0f * pitch, zBottom, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.RIGHT, "→", anchor, startX + 18.0f * pitch, zBottom, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.NUMPAD0, "0", anchor, startX + 20.0f * pitch, zBottom, 2.0f, 1.0f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.DECIMAL, ".", anchor, startX + 21.5f * pitch, zBottom, finger: KeyboardFinger.RightRing);
+                    break;
+                }
+
+                case VirtualKeyLayoutPreset.CompactFullSize96: {
+                    var anchor = VirtualKeyAnchor.KeyboardRoot;
+                    float startX = -6.75f * pitch;
+
+                    // ===== 1. FUNCTION / TOP ROW (Row 5, Z = 3.1u) =====
+                    float zFunc = 3.1f * pitch;
+                    AddKey(VKCode.ESCAPE, "Esc", anchor, startX + 0.5f * pitch, zFunc, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F1, "F1", anchor, startX + 1.5f * pitch, zFunc, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F2, "F2", anchor, startX + 2.5f * pitch, zFunc, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.F3, "F3", anchor, startX + 3.5f * pitch, zFunc, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.F4, "F4", anchor, startX + 4.5f * pitch, zFunc, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.F5, "F5", anchor, startX + 5.5f * pitch, zFunc, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.F6, "F6", anchor, startX + 6.5f * pitch, zFunc, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.F7, "F7", anchor, startX + 7.5f * pitch, zFunc, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.F8, "F8", anchor, startX + 8.5f * pitch, zFunc, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.F9, "F9", anchor, startX + 9.5f * pitch, zFunc, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.F10, "F10", anchor, startX + 10.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.F11, "F11", anchor, startX + 11.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.F12, "F12", anchor, startX + 12.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.DELETE, "Del", anchor, startX + 13.5f * pitch, zFunc, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.SNAPSHOT, "PrtSc", anchor, startX + 14.5f * pitch, zFunc, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.PRIOR, "PgUp", anchor, startX + 15.5f * pitch, zFunc, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.NEXT, "PgDn", anchor, startX + 16.5f * pitch, zFunc, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.END, "End", anchor, startX + 17.5f * pitch, zFunc, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.PAUSE, "Pause", anchor, startX + 18.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 2. NUMBER ROW (Row 4, Z = 2u) =====
+                    float zNum = 2f * pitch;
+                    AddKey(VKCode.OEM_3, "`", anchor, startX + 0.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_1, "1", anchor, startX + 1.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_2, "2", anchor, startX + 2.5f * pitch, zNum, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.KEY_3, "3", anchor, startX + 3.5f * pitch, zNum, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.KEY_4, "4", anchor, startX + 4.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_5, "5", anchor, startX + 5.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_6, "6", anchor, startX + 6.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_7, "7", anchor, startX + 7.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_8, "8", anchor, startX + 8.5f * pitch, zNum, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.KEY_9, "9", anchor, startX + 9.5f * pitch, zNum, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.KEY_0, "0", anchor, startX + 10.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_MINUS, "-", anchor, startX + 11.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_PLUS, "=", anchor, startX + 12.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.BACK, "Backspace", anchor, startX + 14.0f * pitch, zNum, 2.0f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.NUMLOCK, "Num", anchor, startX + 15.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.DIVIDE, "/", anchor, startX + 16.5f * pitch, zNum, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.MULTIPLY, "*", anchor, startX + 17.5f * pitch, zNum, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.SUBTRACT, "-", anchor, startX + 18.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 3. QWERTY / TAB ROW (Row 3, Z = 1u) =====
+                    float zTab = 1f * pitch;
+                    AddKey(VKCode.TAB, "Tab", anchor, startX + 0.75f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Q, "Q", anchor, startX + 2.0f * pitch, zTab, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.W, "W", anchor, startX + 3.0f * pitch, zTab, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.E, "E", anchor, startX + 4.0f * pitch, zTab, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.R, "R", anchor, startX + 5.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.T, "T", anchor, startX + 6.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.Y, "Y", anchor, startX + 7.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.U, "U", anchor, startX + 8.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.I, "I", anchor, startX + 9.0f * pitch, zTab, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.O, "O", anchor, startX + 10.0f * pitch, zTab, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.P, "P", anchor, startX + 11.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_4, "[", anchor, startX + 12.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_6, "]", anchor, startX + 13.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_5, "\\", anchor, startX + 14.25f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.NUMPAD7, "7", anchor, startX + 15.5f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.NUMPAD8, "8", anchor, startX + 16.5f * pitch, zTab, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.NUMPAD9, "9", anchor, startX + 17.5f * pitch, zTab, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.ADD, "+", anchor, startX + 18.5f * pitch, 0.5f * pitch, 1.0f, 2.0f, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 4. HOME / CAPS ROW (Row 2, Z = 0u) =====
+                    float zHome = 0f;
+                    AddKey(VKCode.CAPITAL, "Caps", anchor, startX + 0.875f * pitch, zHome, 1.75f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.A, "A", anchor, startX + 2.25f * pitch, zHome, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.S, "S", anchor, startX + 3.25f * pitch, zHome, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.D, "D", anchor, startX + 4.25f * pitch, zHome, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.F, "F", anchor, startX + 5.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.G, "G", anchor, startX + 6.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.H, "H", anchor, startX + 7.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.J, "J", anchor, startX + 8.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.K, "K", anchor, startX + 9.25f * pitch, zHome, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.L, "L", anchor, startX + 10.25f * pitch, zHome, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_1, ";", anchor, startX + 11.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_7, "'", anchor, startX + 12.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RETURN, "Enter", anchor, startX + 13.875f * pitch, zHome, 2.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.NUMPAD4, "4", anchor, startX + 15.5f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.NUMPAD5, "5", anchor, startX + 16.5f * pitch, zHome, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.NUMPAD6, "6", anchor, startX + 17.5f * pitch, zHome, finger: KeyboardFinger.RightRing);
+
+                    // ===== 5. SHIFT ROW (Row 1, Z = -1u) =====
+                    float zShift = -1f * pitch;
+                    AddKey(VKCode.LSHIFT, "Shift", anchor, startX + 1.125f * pitch, zShift, 2.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Z, "Z", anchor, startX + 2.75f * pitch, zShift, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.X, "X", anchor, startX + 3.75f * pitch, zShift, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.C, "C", anchor, startX + 4.75f * pitch, zShift, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.V, "V", anchor, startX + 5.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.B, "B", anchor, startX + 6.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.N, "N", anchor, startX + 7.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.M, "M", anchor, startX + 8.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.OEM_COMMA, ",", anchor, startX + 9.75f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.OEM_PERIOD, ".", anchor, startX + 10.75f * pitch, zShift, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_2, "/", anchor, startX + 11.75f * pitch, zShift, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RSHIFT, "Shift", anchor, startX + 13.125f * pitch, zShift, 1.75f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.UP, "↑", anchor, startX + 14.5f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.NUMPAD1, "1", anchor, startX + 15.5f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.NUMPAD2, "2", anchor, startX + 16.5f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.NUMPAD3, "3", anchor, startX + 17.5f * pitch, zShift, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.NUMPAD_RETURN, "Enter", anchor, startX + 18.5f * pitch, -1.5f * pitch, 1.0f, 2.0f, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 6. BOTTOM / MODIFIER ROW (Row 0, Z = -2u) =====
+                    float zBottom = -2f * pitch;
+                    AddKey(VKCode.LCONTROL, "Ctrl", anchor, startX + 0.625f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LWIN, "Win", anchor, startX + 1.875f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LMENU, "Alt", anchor, startX + 3.125f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftThumb);
+                    AddKey(VKCode.SPACE, "Space", anchor, startX + 6.875f * pitch, zBottom, 6.25f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RMENU, "Alt", anchor, startX + 10.5f * pitch, zBottom, 1.0f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RWIN, "Fn", anchor, startX + 11.5f * pitch, zBottom, 1.0f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RCONTROL, "Ctrl", anchor, startX + 12.5f * pitch, zBottom, 1.0f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.LEFT, "←", anchor, startX + 13.5f * pitch, zBottom, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.DOWN, "↓", anchor, startX + 14.5f * pitch, zBottom, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.RIGHT, "→", anchor, startX + 15.5f * pitch, zBottom, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.NUMPAD0, "0", anchor, startX + 16.5f * pitch, zBottom, 1.0f, 1f, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.DECIMAL, ".", anchor, startX + 17.5f * pitch, zBottom, 1.0f, 1f, finger: KeyboardFinger.RightRing);
+                    break;
+                }
+
+                case VirtualKeyLayoutPreset.Tenkeyless80: {
+                    var anchor = VirtualKeyAnchor.KeyboardRoot;
+                    float startX = -6.75f * pitch;
+
+                    // ===== 1. FUNCTION / TOP ROW (Row 5, Z = 3.25u) =====
+                    float zFunc = 3.25f * pitch;
+                    AddKey(VKCode.ESCAPE, "Esc", anchor, startX + 0.5f * pitch, zFunc, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F1, "F1", anchor, startX + 2.5f * pitch, zFunc, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F2, "F2", anchor, startX + 3.5f * pitch, zFunc, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.F3, "F3", anchor, startX + 4.5f * pitch, zFunc, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.F4, "F4", anchor, startX + 5.5f * pitch, zFunc, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.F5, "F5", anchor, startX + 7.0f * pitch, zFunc, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.F6, "F6", anchor, startX + 8.0f * pitch, zFunc, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.F7, "F7", anchor, startX + 9.0f * pitch, zFunc, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.F8, "F8", anchor, startX + 10.0f * pitch, zFunc, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.F9, "F9", anchor, startX + 11.5f * pitch, zFunc, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.F10, "F10", anchor, startX + 12.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.F11, "F11", anchor, startX + 13.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.F12, "F12", anchor, startX + 14.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.SNAPSHOT, "PrtSc", anchor, startX + 16.0f * pitch, zFunc, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.SCROLL, "Scroll", anchor, startX + 17.0f * pitch, zFunc, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.PAUSE, "Pause", anchor, startX + 18.0f * pitch, zFunc, finger: KeyboardFinger.RightRing);
+
+                    // ===== 2. NUMBER / NUMERIC ROW (Row 4, Z = 2u) =====
+                    float zNum = 2f * pitch;
+                    AddKey(VKCode.OEM_3, "`", anchor, startX + 0.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_1, "1", anchor, startX + 1.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_2, "2", anchor, startX + 2.5f * pitch, zNum, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.KEY_3, "3", anchor, startX + 3.5f * pitch, zNum, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.KEY_4, "4", anchor, startX + 4.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_5, "5", anchor, startX + 5.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_6, "6", anchor, startX + 6.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_7, "7", anchor, startX + 7.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_8, "8", anchor, startX + 8.5f * pitch, zNum, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.KEY_9, "9", anchor, startX + 9.5f * pitch, zNum, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.KEY_0, "0", anchor, startX + 10.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_MINUS, "-", anchor, startX + 11.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_PLUS, "=", anchor, startX + 12.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.BACK, "Backspace", anchor, startX + 14.0f * pitch, zNum, 2.0f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.INSERT, "Ins", anchor, startX + 16.0f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.HOME, "Home", anchor, startX + 17.0f * pitch, zNum, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.PRIOR, "PgUp", anchor, startX + 18.0f * pitch, zNum, finger: KeyboardFinger.RightRing);
+
+                    // ===== 3. QWERTY / TAB ROW (Row 3, Z = 1u) =====
+                    float zTab = 1f * pitch;
+                    AddKey(VKCode.TAB, "Tab", anchor, startX + 0.75f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Q, "Q", anchor, startX + 2.0f * pitch, zTab, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.W, "W", anchor, startX + 3.0f * pitch, zTab, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.E, "E", anchor, startX + 4.0f * pitch, zTab, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.R, "R", anchor, startX + 5.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.T, "T", anchor, startX + 6.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.Y, "Y", anchor, startX + 7.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.U, "U", anchor, startX + 8.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.I, "I", anchor, startX + 9.0f * pitch, zTab, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.O, "O", anchor, startX + 10.0f * pitch, zTab, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.P, "P", anchor, startX + 11.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_4, "[", anchor, startX + 12.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_6, "]", anchor, startX + 13.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_5, "\\", anchor, startX + 14.25f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.DELETE, "Del", anchor, startX + 16.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.END, "End", anchor, startX + 17.0f * pitch, zTab, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.NEXT, "PgDn", anchor, startX + 18.0f * pitch, zTab, finger: KeyboardFinger.RightRing);
+
+                    // ===== 4. HOME / CAPS ROW (Row 2, Z = 0u) =====
+                    float zHome = 0f;
+                    AddKey(VKCode.CAPITAL, "Caps", anchor, startX + 0.875f * pitch, zHome, 1.75f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.A, "A", anchor, startX + 2.25f * pitch, zHome, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.S, "S", anchor, startX + 3.25f * pitch, zHome, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.D, "D", anchor, startX + 4.25f * pitch, zHome, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.F, "F", anchor, startX + 5.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.G, "G", anchor, startX + 6.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.H, "H", anchor, startX + 7.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.J, "J", anchor, startX + 8.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.K, "K", anchor, startX + 9.25f * pitch, zHome, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.L, "L", anchor, startX + 10.25f * pitch, zHome, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_1, ";", anchor, startX + 11.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_7, "'", anchor, startX + 12.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RETURN, "Enter", anchor, startX + 13.875f * pitch, zHome, 2.25f, 1f, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 5. SHIFT ROW (Row 1, Z = -1u) =====
+                    float zShift = -1f * pitch;
+                    AddKey(VKCode.LSHIFT, "Shift", anchor, startX + 1.125f * pitch, zShift, 2.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Z, "Z", anchor, startX + 2.75f * pitch, zShift, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.X, "X", anchor, startX + 3.75f * pitch, zShift, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.C, "C", anchor, startX + 4.75f * pitch, zShift, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.V, "V", anchor, startX + 5.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.B, "B", anchor, startX + 6.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.N, "N", anchor, startX + 7.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.M, "M", anchor, startX + 8.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.OEM_COMMA, ",", anchor, startX + 9.75f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.OEM_PERIOD, ".", anchor, startX + 10.75f * pitch, zShift, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_2, "/", anchor, startX + 11.75f * pitch, zShift, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RSHIFT, "Shift", anchor, startX + 13.625f * pitch, zShift, 2.75f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.UP, "↑", anchor, startX + 17.0f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+
+                    // ===== 6. BOTTOM / MODIFIER ROW (Row 0, Z = -2u) =====
+                    float zBottom = -2f * pitch;
+                    AddKey(VKCode.LCONTROL, "Ctrl", anchor, startX + 0.625f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LWIN, "Win", anchor, startX + 1.875f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LMENU, "Alt", anchor, startX + 3.125f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftThumb);
+                    AddKey(VKCode.SPACE, "Space", anchor, startX + 6.875f * pitch, zBottom, 6.25f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RMENU, "Alt", anchor, startX + 10.625f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RWIN, "Win", anchor, startX + 11.875f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.APPS, "App", anchor, startX + 13.125f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RCONTROL, "Ctrl", anchor, startX + 14.375f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.LEFT, "←", anchor, startX + 16.0f * pitch, zBottom, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.DOWN, "↓", anchor, startX + 17.0f * pitch, zBottom, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.RIGHT, "→", anchor, startX + 18.0f * pitch, zBottom, finger: KeyboardFinger.RightRing);
+                    break;
+                }
+
+                case VirtualKeyLayoutPreset.Compact75: {
+                    var anchor = VirtualKeyAnchor.KeyboardRoot;
+                    float startX = -6.75f * pitch;
+
+                    // ===== 1. FUNCTION / TOP ROW (Row 5, Z = 3.1u) =====
+                    float zFunc = 3.1f * pitch;
+                    AddKey(VKCode.ESCAPE, "Esc", anchor, startX + 0.5f * pitch, zFunc, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F1, "F1", anchor, startX + 1.5f * pitch, zFunc, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F2, "F2", anchor, startX + 2.5f * pitch, zFunc, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.F3, "F3", anchor, startX + 3.5f * pitch, zFunc, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.F4, "F4", anchor, startX + 4.5f * pitch, zFunc, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.F5, "F5", anchor, startX + 5.5f * pitch, zFunc, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.F6, "F6", anchor, startX + 6.5f * pitch, zFunc, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.F7, "F7", anchor, startX + 7.5f * pitch, zFunc, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.F8, "F8", anchor, startX + 8.5f * pitch, zFunc, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.F9, "F9", anchor, startX + 9.5f * pitch, zFunc, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.F10, "F10", anchor, startX + 10.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.F11, "F11", anchor, startX + 11.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.F12, "F12", anchor, startX + 12.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.SNAPSHOT, "PrtSc", anchor, startX + 13.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.PAUSE, "Pause", anchor, startX + 14.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.DELETE, "Del", anchor, startX + 15.5f * pitch, zFunc, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 2. NUMBER ROW (Row 4, Z = 2u) =====
+                    float zNum = 2f * pitch;
+                    AddKey(VKCode.OEM_3, "`", anchor, startX + 0.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_1, "1", anchor, startX + 1.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_2, "2", anchor, startX + 2.5f * pitch, zNum, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.KEY_3, "3", anchor, startX + 3.5f * pitch, zNum, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.KEY_4, "4", anchor, startX + 4.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_5, "5", anchor, startX + 5.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_6, "6", anchor, startX + 6.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_7, "7", anchor, startX + 7.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_8, "8", anchor, startX + 8.5f * pitch, zNum, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.KEY_9, "9", anchor, startX + 9.5f * pitch, zNum, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.KEY_0, "0", anchor, startX + 10.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_MINUS, "-", anchor, startX + 11.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_PLUS, "=", anchor, startX + 12.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.BACK, "Backspace", anchor, startX + 14.0f * pitch, zNum, 2.0f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.HOME, "Home", anchor, startX + 15.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 3. QWERTY / TAB ROW (Row 3, Z = 1u) =====
+                    float zTab = 1f * pitch;
+                    AddKey(VKCode.TAB, "Tab", anchor, startX + 0.75f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Q, "Q", anchor, startX + 2.0f * pitch, zTab, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.W, "W", anchor, startX + 3.0f * pitch, zTab, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.E, "E", anchor, startX + 4.0f * pitch, zTab, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.R, "R", anchor, startX + 5.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.T, "T", anchor, startX + 6.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.Y, "Y", anchor, startX + 7.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.U, "U", anchor, startX + 8.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.I, "I", anchor, startX + 9.0f * pitch, zTab, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.O, "O", anchor, startX + 10.0f * pitch, zTab, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.P, "P", anchor, startX + 11.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_4, "[", anchor, startX + 12.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_6, "]", anchor, startX + 13.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_5, "\\", anchor, startX + 14.25f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.PRIOR, "PgUp", anchor, startX + 15.5f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 4. HOME / CAPS ROW (Row 2, Z = 0u) =====
+                    float zHome = 0f;
+                    AddKey(VKCode.CAPITAL, "Caps", anchor, startX + 0.875f * pitch, zHome, 1.75f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.A, "A", anchor, startX + 2.25f * pitch, zHome, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.S, "S", anchor, startX + 3.25f * pitch, zHome, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.D, "D", anchor, startX + 4.25f * pitch, zHome, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.F, "F", anchor, startX + 5.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.G, "G", anchor, startX + 6.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.H, "H", anchor, startX + 7.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.J, "J", anchor, startX + 8.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.K, "K", anchor, startX + 9.25f * pitch, zHome, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.L, "L", anchor, startX + 10.25f * pitch, zHome, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_1, ";", anchor, startX + 11.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_7, "'", anchor, startX + 12.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RETURN, "Enter", anchor, startX + 13.875f * pitch, zHome, 2.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.NEXT, "PgDn", anchor, startX + 15.5f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 5. SHIFT ROW (Row 1, Z = -1u) =====
+                    float zShift = -1f * pitch;
+                    AddKey(VKCode.LSHIFT, "Shift", anchor, startX + 1.125f * pitch, zShift, 2.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Z, "Z", anchor, startX + 2.75f * pitch, zShift, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.X, "X", anchor, startX + 3.75f * pitch, zShift, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.C, "C", anchor, startX + 4.75f * pitch, zShift, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.V, "V", anchor, startX + 5.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.B, "B", anchor, startX + 6.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.N, "N", anchor, startX + 7.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.M, "M", anchor, startX + 8.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.OEM_COMMA, ",", anchor, startX + 9.75f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.OEM_PERIOD, ".", anchor, startX + 10.75f * pitch, zShift, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_2, "/", anchor, startX + 11.75f * pitch, zShift, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RSHIFT, "Shift", anchor, startX + 13.125f * pitch, zShift, 1.75f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.UP, "↑", anchor, startX + 14.5f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.END, "End", anchor, startX + 15.5f * pitch, zShift, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 6. BOTTOM / MODIFIER ROW (Row 0, Z = -2u) =====
+                    float zBottom = -2f * pitch;
+                    AddKey(VKCode.LCONTROL, "Ctrl", anchor, startX + 0.625f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LWIN, "Win", anchor, startX + 1.875f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LMENU, "Alt", anchor, startX + 3.125f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftThumb);
+                    AddKey(VKCode.SPACE, "Space", anchor, startX + 6.875f * pitch, zBottom, 6.25f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RMENU, "Alt", anchor, startX + 10.5f * pitch, zBottom, 1.0f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RWIN, "Fn", anchor, startX + 11.5f * pitch, zBottom, 1.0f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RCONTROL, "Ctrl", anchor, startX + 12.5f * pitch, zBottom, 1.0f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.LEFT, "←", anchor, startX + 13.5f * pitch, zBottom, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.DOWN, "↓", anchor, startX + 14.5f * pitch, zBottom, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.RIGHT, "→", anchor, startX + 15.5f * pitch, zBottom, finger: KeyboardFinger.RightRing);
+                    break;
+                }
+
+                case VirtualKeyLayoutPreset.Compact65: {
+                    var anchor = VirtualKeyAnchor.KeyboardRoot;
+                    float startX = -6.75f * pitch;
+
+                    // ===== 1. NUMBER ROW (Row 4, Z = 2u) =====
+                    float zNum = 2f * pitch;
+                    AddKey(VKCode.ESCAPE, "Esc", anchor, startX + 0.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_1, "1", anchor, startX + 1.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_2, "2", anchor, startX + 2.5f * pitch, zNum, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.KEY_3, "3", anchor, startX + 3.5f * pitch, zNum, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.KEY_4, "4", anchor, startX + 4.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_5, "5", anchor, startX + 5.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_6, "6", anchor, startX + 6.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_7, "7", anchor, startX + 7.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_8, "8", anchor, startX + 8.5f * pitch, zNum, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.KEY_9, "9", anchor, startX + 9.5f * pitch, zNum, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.KEY_0, "0", anchor, startX + 10.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_MINUS, "-", anchor, startX + 11.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_PLUS, "=", anchor, startX + 12.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.BACK, "Backspace", anchor, startX + 14.0f * pitch, zNum, 2.0f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.DELETE, "Del", anchor, startX + 15.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 2. QWERTY / TAB ROW (Row 3, Z = 1u) =====
+                    float zTab = 1f * pitch;
+                    AddKey(VKCode.TAB, "Tab", anchor, startX + 0.75f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Q, "Q", anchor, startX + 2.0f * pitch, zTab, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.W, "W", anchor, startX + 3.0f * pitch, zTab, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.E, "E", anchor, startX + 4.0f * pitch, zTab, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.R, "R", anchor, startX + 5.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.T, "T", anchor, startX + 6.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.Y, "Y", anchor, startX + 7.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.U, "U", anchor, startX + 8.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.I, "I", anchor, startX + 9.0f * pitch, zTab, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.O, "O", anchor, startX + 10.0f * pitch, zTab, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.P, "P", anchor, startX + 11.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_4, "[", anchor, startX + 12.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_6, "]", anchor, startX + 13.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_5, "\\", anchor, startX + 14.25f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.PRIOR, "PgUp", anchor, startX + 15.5f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 3. HOME / CAPS ROW (Row 2, Z = 0u) =====
+                    float zHome = 0f;
+                    AddKey(VKCode.CAPITAL, "Caps", anchor, startX + 0.875f * pitch, zHome, 1.75f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.A, "A", anchor, startX + 2.25f * pitch, zHome, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.S, "S", anchor, startX + 3.25f * pitch, zHome, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.D, "D", anchor, startX + 4.25f * pitch, zHome, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.F, "F", anchor, startX + 5.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.G, "G", anchor, startX + 6.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.H, "H", anchor, startX + 7.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.J, "J", anchor, startX + 8.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.K, "K", anchor, startX + 9.25f * pitch, zHome, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.L, "L", anchor, startX + 10.25f * pitch, zHome, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_1, ";", anchor, startX + 11.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_7, "'", anchor, startX + 12.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RETURN, "Enter", anchor, startX + 13.875f * pitch, zHome, 2.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.NEXT, "PgDn", anchor, startX + 15.5f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 4. SHIFT ROW (Row 1, Z = -1u) =====
+                    float zShift = -1f * pitch;
+                    AddKey(VKCode.LSHIFT, "Shift", anchor, startX + 1.125f * pitch, zShift, 2.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Z, "Z", anchor, startX + 2.75f * pitch, zShift, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.X, "X", anchor, startX + 3.75f * pitch, zShift, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.C, "C", anchor, startX + 4.75f * pitch, zShift, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.V, "V", anchor, startX + 5.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.B, "B", anchor, startX + 6.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.N, "N", anchor, startX + 7.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.M, "M", anchor, startX + 8.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.OEM_COMMA, ",", anchor, startX + 9.75f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.OEM_PERIOD, ".", anchor, startX + 10.75f * pitch, zShift, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_2, "/", anchor, startX + 11.75f * pitch, zShift, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RSHIFT, "Shift", anchor, startX + 13.125f * pitch, zShift, 1.75f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.UP, "↑", anchor, startX + 14.5f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.END, "End", anchor, startX + 15.5f * pitch, zShift, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 5. BOTTOM / MODIFIER ROW (Row 0, Z = -2u) =====
+                    float zBottom = -2f * pitch;
+                    AddKey(VKCode.LCONTROL, "Ctrl", anchor, startX + 0.625f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LWIN, "Win", anchor, startX + 1.875f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LMENU, "Alt", anchor, startX + 3.125f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftThumb);
+                    AddKey(VKCode.SPACE, "Space", anchor, startX + 6.875f * pitch, zBottom, 6.25f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RMENU, "Alt", anchor, startX + 10.5f * pitch, zBottom, 1.0f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RWIN, "Fn", anchor, startX + 11.5f * pitch, zBottom, 1.0f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RCONTROL, "Ctrl", anchor, startX + 12.5f * pitch, zBottom, 1.0f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.LEFT, "←", anchor, startX + 13.5f * pitch, zBottom, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.DOWN, "↓", anchor, startX + 14.5f * pitch, zBottom, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.RIGHT, "→", anchor, startX + 15.5f * pitch, zBottom, finger: KeyboardFinger.RightRing);
+                    break;
+                }
+
+                case VirtualKeyLayoutPreset.Compact60: {
+                    var anchor = VirtualKeyAnchor.KeyboardRoot;
+                    float startX = -6.75f * pitch;
+
+                    // ===== 1. NUMBER ROW (Row 4, Z = 2u) =====
+                    float zNum = 2f * pitch;
+                    AddKey(VKCode.ESCAPE, "Esc", anchor, startX + 0.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_1, "1", anchor, startX + 1.5f * pitch, zNum, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_2, "2", anchor, startX + 2.5f * pitch, zNum, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.KEY_3, "3", anchor, startX + 3.5f * pitch, zNum, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.KEY_4, "4", anchor, startX + 4.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_5, "5", anchor, startX + 5.5f * pitch, zNum, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_6, "6", anchor, startX + 6.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_7, "7", anchor, startX + 7.5f * pitch, zNum, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_8, "8", anchor, startX + 8.5f * pitch, zNum, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.KEY_9, "9", anchor, startX + 9.5f * pitch, zNum, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.KEY_0, "0", anchor, startX + 10.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_MINUS, "-", anchor, startX + 11.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_PLUS, "=", anchor, startX + 12.5f * pitch, zNum, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.BACK, "Backspace", anchor, startX + 14.0f * pitch, zNum, 2.0f, 1f, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 2. QWERTY / TAB ROW (Row 3, Z = 1u) =====
+                    float zTab = 1f * pitch;
+                    AddKey(VKCode.TAB, "Tab", anchor, startX + 0.75f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Q, "Q", anchor, startX + 2.0f * pitch, zTab, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.W, "W", anchor, startX + 3.0f * pitch, zTab, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.E, "E", anchor, startX + 4.0f * pitch, zTab, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.R, "R", anchor, startX + 5.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.T, "T", anchor, startX + 6.0f * pitch, zTab, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.Y, "Y", anchor, startX + 7.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.U, "U", anchor, startX + 8.0f * pitch, zTab, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.I, "I", anchor, startX + 9.0f * pitch, zTab, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.O, "O", anchor, startX + 10.0f * pitch, zTab, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.P, "P", anchor, startX + 11.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_4, "[", anchor, startX + 12.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_6, "]", anchor, startX + 13.0f * pitch, zTab, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_5, "\\", anchor, startX + 14.25f * pitch, zTab, 1.5f, 1f, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 3. HOME / CAPS ROW (Row 2, Z = 0u) =====
+                    float zHome = 0f;
+                    AddKey(VKCode.CAPITAL, "Caps", anchor, startX + 0.875f * pitch, zHome, 1.75f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.A, "A", anchor, startX + 2.25f * pitch, zHome, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.S, "S", anchor, startX + 3.25f * pitch, zHome, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.D, "D", anchor, startX + 4.25f * pitch, zHome, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.F, "F", anchor, startX + 5.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.G, "G", anchor, startX + 6.25f * pitch, zHome, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.H, "H", anchor, startX + 7.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.J, "J", anchor, startX + 8.25f * pitch, zHome, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.K, "K", anchor, startX + 9.25f * pitch, zHome, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.L, "L", anchor, startX + 10.25f * pitch, zHome, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_1, ";", anchor, startX + 11.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_7, "'", anchor, startX + 12.25f * pitch, zHome, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RETURN, "Enter", anchor, startX + 13.875f * pitch, zHome, 2.25f, 1f, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 4. SHIFT ROW (Row 1, Z = -1u) =====
+                    float zShift = -1f * pitch;
+                    AddKey(VKCode.LSHIFT, "Shift", anchor, startX + 1.125f * pitch, zShift, 2.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Z, "Z", anchor, startX + 2.75f * pitch, zShift, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.X, "X", anchor, startX + 3.75f * pitch, zShift, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.C, "C", anchor, startX + 4.75f * pitch, zShift, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.V, "V", anchor, startX + 5.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.B, "B", anchor, startX + 6.75f * pitch, zShift, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.N, "N", anchor, startX + 7.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.M, "M", anchor, startX + 8.75f * pitch, zShift, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.OEM_COMMA, ",", anchor, startX + 9.75f * pitch, zShift, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.OEM_PERIOD, ".", anchor, startX + 10.75f * pitch, zShift, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_2, "/", anchor, startX + 11.75f * pitch, zShift, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RSHIFT, "Shift", anchor, startX + 13.625f * pitch, zShift, 2.75f, 1f, finger: KeyboardFinger.RightPinky);
+
+                    // ===== 5. BOTTOM / MODIFIER ROW (Row 0, Z = -2u) =====
+                    float zBottom = -2f * pitch;
+                    AddKey(VKCode.LCONTROL, "Ctrl", anchor, startX + 0.625f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LWIN, "Win", anchor, startX + 1.875f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LMENU, "Alt", anchor, startX + 3.125f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.LeftThumb);
+                    AddKey(VKCode.SPACE, "Space", anchor, startX + 6.875f * pitch, zBottom, 6.25f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RMENU, "Alt", anchor, startX + 10.625f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RWIN, "Win", anchor, startX + 11.875f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.APPS, "Fn", anchor, startX + 13.125f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RCONTROL, "Ctrl", anchor, startX + 14.375f * pitch, zBottom, 1.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    break;
+                }
+
+                case VirtualKeyLayoutPreset.KeychronQ11: {
+                    var L = VirtualKeyAnchor.LeftHand;
+                    var R = VirtualKeyAnchor.RightHand;
+
+                    // ===== LEFT HALF (45 keys + 1 knob) =====
+                    // Macro Column (far left, X = -5.00 * pitch, 0.25u exploded gap)
+                    AddKey(VKCode.VOLUME_MUTE, "Knob 1", L, -5.00f * pitch, 3.25f * pitch, 1f, 1f, 0f, true, finger: KeyboardFinger.LeftIndex); // Rotary Encoder
+                    AddKey(VKCode.F13, "M1", L, -5.00f * pitch, 2.00f * pitch, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F14, "M2", L, -5.00f * pitch, 1.00f * pitch, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F15, "M3", L, -5.00f * pitch, 0.00f * pitch, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F16, "M4", L, -5.00f * pitch, -1.00f * pitch, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F17, "M5", L, -5.00f * pitch, -2.00f * pitch, finger: KeyboardFinger.LeftPinky);
+
+                    // Row 5 (Function Row, Z = 3.25u)
+                    AddKey(VKCode.ESCAPE, "Esc", L, -3.75f * pitch, 3.25f * pitch, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F1, "F1", L, -2.75f * pitch, 3.25f * pitch, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.F2, "F2", L, -1.75f * pitch, 3.25f * pitch, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.F3, "F3", L, -0.75f * pitch, 3.25f * pitch, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.F4, "F4", L, 0.25f * pitch, 3.25f * pitch, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.F5, "F5", L, 1.25f * pitch, 3.25f * pitch, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.F6, "F6", L, 2.25f * pitch, 3.25f * pitch, finger: KeyboardFinger.LeftIndex);
+
+                    // Row 4 (Number Row, Z = 2.0u)
+                    AddKey(VKCode.OEM_3, "`", L, -3.75f * pitch, 2.00f * pitch, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_1, "1", L, -2.75f * pitch, 2.00f * pitch, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.KEY_2, "2", L, -1.75f * pitch, 2.00f * pitch, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.KEY_3, "3", L, -0.75f * pitch, 2.00f * pitch, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.KEY_4, "4", L, 0.25f * pitch, 2.00f * pitch, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_5, "5", L, 1.25f * pitch, 2.00f * pitch, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.KEY_6, "6", L, 2.25f * pitch, 2.00f * pitch, finger: KeyboardFinger.LeftIndex);
+
+                    // Row 3 (Q Row, Z = 1.0u)
+                    AddKey(VKCode.TAB, "Tab", L, -3.50f * pitch, 1.00f * pitch, 1.5f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Q, "Q", L, -2.25f * pitch, 1.00f * pitch, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.W, "W", L, -1.25f * pitch, 1.00f * pitch, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.E, "E", L, -0.25f * pitch, 1.00f * pitch, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.R, "R", L, 0.75f * pitch, 1.00f * pitch, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.T, "T", L, 1.75f * pitch, 1.00f * pitch, finger: KeyboardFinger.LeftIndex);
+
+                    // Row 2 (Home Row, Z = 0.0u)
+                    AddKey(VKCode.CAPITAL, "Caps", L, -3.375f * pitch, 0.00f * pitch, 1.75f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.A, "A", L, -2.00f * pitch, 0.00f * pitch, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.S, "S", L, -1.00f * pitch, 0.00f * pitch, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.D, "D", L, 0.00f * pitch, 0.00f * pitch, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.F, "F", L, 1.00f * pitch, 0.00f * pitch, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.G, "G", L, 2.00f * pitch, 0.00f * pitch, finger: KeyboardFinger.LeftIndex);
+
+                    // Row 1 (Shift Row, Z = -1.0u)
+                    AddKey(VKCode.LSHIFT, "Shift", L, -3.125f * pitch, -1.00f * pitch, 2.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.Z, "Z", L, -1.50f * pitch, -1.00f * pitch, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.X, "X", L, -0.50f * pitch, -1.00f * pitch, finger: KeyboardFinger.LeftRing);
+                    AddKey(VKCode.C, "C", L, 0.50f * pitch, -1.00f * pitch, finger: KeyboardFinger.LeftMiddle);
+                    AddKey(VKCode.V, "V", L, 1.50f * pitch, -1.00f * pitch, finger: KeyboardFinger.LeftIndex);
+                    AddKey(VKCode.B, "B", L, 2.50f * pitch, -1.00f * pitch, finger: KeyboardFinger.LeftIndex);
+
+                    // Row 0 (Bottom Row, Z = -2.0u)
+                    AddKey(VKCode.LCONTROL, "Ctrl", L, -3.625f * pitch, -2.00f * pitch, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LWIN, "Win", L, -2.375f * pitch, -2.00f * pitch, 1.25f, 1f, finger: KeyboardFinger.LeftPinky);
+                    AddKey(VKCode.LMENU, "Alt", L, -1.125f * pitch, -2.00f * pitch, 1.25f, 1f, finger: KeyboardFinger.LeftThumb);
+                    AddKey(VKCode.APPS, "Fn", L, 0.00f * pitch, -2.00f * pitch, 1.0f, 1f, finger: KeyboardFinger.LeftThumb);
+                    AddKey(VKCode.SPACE, "Space", L, 1.625f * pitch, -2.00f * pitch, 2.25f, 1f, finger: KeyboardFinger.LeftThumb);
+
+                    // ===== RIGHT HALF (44 keys + 1 knob) =====
+                    // Row 5 (Function Row, Z = 3.25u)
+                    AddKey(VKCode.F7, "F7", R, -1.75f * pitch, 3.25f * pitch, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.F8, "F8", R, -0.75f * pitch, 3.25f * pitch, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.F9, "F9", R, 0.25f * pitch, 3.25f * pitch, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.F10, "F10", R, 1.25f * pitch, 3.25f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.F11, "F11", R, 2.25f * pitch, 3.25f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.F12, "F12", R, 3.25f * pitch, 3.25f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.INSERT, "Ins", R, 4.25f * pitch, 3.25f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.DELETE, "Del", R, 5.25f * pitch, 3.25f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.MEDIA_PLAY_PAUSE, "Knob 2", R, 6.50f * pitch, 3.25f * pitch, 1f, 1f, 0f, true, finger: KeyboardFinger.RightIndex); // Rotary Encoder
+
+                    // Row 4 (Number Row, Z = 2.0u)
+                    AddKey(VKCode.KEY_7, "7", R, -1.75f * pitch, 2.00f * pitch, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.KEY_8, "8", R, -0.75f * pitch, 2.00f * pitch, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.KEY_9, "9", R, 0.25f * pitch, 2.00f * pitch, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.KEY_0, "0", R, 1.25f * pitch, 2.00f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_MINUS, "-", R, 2.25f * pitch, 2.00f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_PLUS, "=", R, 3.25f * pitch, 2.00f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.BACK, "Backspace", R, 4.75f * pitch, 2.00f * pitch, 2f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.PRIOR, "PgUp", R, 6.50f * pitch, 2.00f * pitch, finger: KeyboardFinger.RightPinky);
+
+                    // Row 3 (Q Row, Z = 1.0u)
+                    AddKey(VKCode.Y, "Y", R, -2.25f * pitch, 1.00f * pitch, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.U, "U", R, -1.25f * pitch, 1.00f * pitch, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.I, "I", R, -0.25f * pitch, 1.00f * pitch, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.O, "O", R, 0.75f * pitch, 1.00f * pitch, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.P, "P", R, 1.75f * pitch, 1.00f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_4, "[", R, 2.75f * pitch, 1.00f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_6, "]", R, 3.75f * pitch, 1.00f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_5, "\\", R, 5.00f * pitch, 1.00f * pitch, 1.5f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.NEXT, "PgDn", R, 6.50f * pitch, 1.00f * pitch, finger: KeyboardFinger.RightPinky);
+
+                    // Row 2 (Home Row, Z = 0.0u)
+                    AddKey(VKCode.H, "H", R, -2.00f * pitch, 0.00f * pitch, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.J, "J", R, -1.00f * pitch, 0.00f * pitch, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.K, "K", R, 0.00f * pitch, 0.00f * pitch, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.L, "L", R, 1.00f * pitch, 0.00f * pitch, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_1, ";", R, 2.00f * pitch, 0.00f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.OEM_7, "'", R, 3.00f * pitch, 0.00f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RETURN, "Enter", R, 4.625f * pitch, 0.00f * pitch, 2.25f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.HOME, "Home", R, 6.50f * pitch, 0.00f * pitch, finger: KeyboardFinger.RightPinky);
+
+                    // Row 1 (Shift Row, Z = -1.0u)
+                    AddKey(VKCode.N, "N", R, -1.50f * pitch, -1.00f * pitch, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.M, "M", R, -0.50f * pitch, -1.00f * pitch, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.OEM_COMMA, ",", R, 0.50f * pitch, -1.00f * pitch, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.OEM_PERIOD, ".", R, 1.50f * pitch, -1.00f * pitch, finger: KeyboardFinger.RightRing);
+                    AddKey(VKCode.OEM_2, "/", R, 2.50f * pitch, -1.00f * pitch, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.RSHIFT, "Shift", R, 3.875f * pitch, -1.00f * pitch, 1.75f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.UP, "Up", R, 5.50f * pitch, -1.00f * pitch, finger: KeyboardFinger.RightMiddle);
+
+                    // Row 0 (Bottom Row, Z = -2.0u)
+                    AddKey(VKCode.SPACE, "Space", R, -0.625f * pitch, -2.00f * pitch, 2.75f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RWIN, "Win", R, 1.25f * pitch, -2.00f * pitch, 1f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.APPS, "Fn", R, 2.25f * pitch, -2.00f * pitch, 1f, 1f, finger: KeyboardFinger.RightThumb);
+                    AddKey(VKCode.RCONTROL, "Ctrl", R, 3.25f * pitch, -2.00f * pitch, 1f, 1f, finger: KeyboardFinger.RightPinky);
+                    AddKey(VKCode.LEFT, "Left", R, 4.50f * pitch, -2.00f * pitch, finger: KeyboardFinger.RightIndex);
+                    AddKey(VKCode.DOWN, "Down", R, 5.50f * pitch, -2.00f * pitch, finger: KeyboardFinger.RightMiddle);
+                    AddKey(VKCode.RIGHT, "Right", R, 6.50f * pitch, -2.00f * pitch, finger: KeyboardFinger.RightRing);
+                    break;
+                }
+
+                case VirtualKeyLayoutPreset.FannedSouthpaw96: {
+                    var anchor = VirtualKeyAnchor.KeyboardRoot;
+                    float degPerU = 3.05f;
+                    float rHome = 21f * pitch;
+
+                    void AddFannedKey(VKCode key, string label, float rowU, float colU, float unitWidth = 1f, float unitHeight = 1f, bool isCircle = false, KeyboardFinger? finger = null) {
+                        float thetaDeg = colU * degPerU;
+                        float thetaRad = thetaDeg * Mathf.Deg2Rad;
+                        float r = rHome + (rowU * pitch);
+                        float posX = r * Mathf.Sin(thetaRad);
+                        float posZ = -rHome + (r * Mathf.Cos(thetaRad));
+                        // Pass exact unit dimensions directly so standard 1u keys do not receive custom size overrides
+                        AddKey(key, label, anchor, posX, posZ, unitWidth, unitHeight, thetaDeg, isCircle, finger);
+                    }
+
+                    // Derived unitWidth for flush-aligned boundary keys:
+                    // unitWidth = (targetPhysicalWidth + (pitch - BaseKeySize.x)) / pitch
+                    float backspaceUnitWidth = (0.075f + (pitch - BaseKeySize.x)) / pitch; // 0.075m (~2.1944u)
+                    float tabUnitWidth       = (0.071f + (pitch - BaseKeySize.x)) / pitch; // 0.071m (~2.0833u)
+                    float capsUnitWidth      = (0.069f + (pitch - BaseKeySize.x)) / pitch; // 0.069m (~2.0278u)
+                    float enterUnitWidth     = (0.071f + (pitch - BaseKeySize.x)) / pitch; // 0.071m (~2.0833u)
+
+                    // ===== 1. SOUTHPAW NUMPAD (Left Flank, snug 0.4u gap to Alphas) =====
+                    // Row 4 (Number row level: 2.0u)
+                    AddFannedKey(VKCode.NUMLOCK, "Num", 2.0f, -10.9f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.DIVIDE, "/", 2.0f, -9.9f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.MULTIPLY, "*", 2.0f, -8.9f, finger: KeyboardFinger.LeftMiddle);
+                    AddFannedKey(VKCode.SUBTRACT, "-", 2.0f, -7.9f, finger: KeyboardFinger.LeftIndex);
+
+                    // Row 3 (QWERTY level: 1.0u)
+                    AddFannedKey(VKCode.NUMPAD7, "7", 1.0f, -10.9f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.NUMPAD8, "8", 1.0f, -9.9f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.NUMPAD9, "9", 1.0f, -8.9f, finger: KeyboardFinger.LeftMiddle);
+
+                    // Row 2 (Home level: 0.0u)
+                    AddFannedKey(VKCode.NUMPAD4, "4", 0.0f, -10.9f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.NUMPAD5, "5", 0.0f, -9.9f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.NUMPAD6, "6", 0.0f, -8.9f, finger: KeyboardFinger.LeftMiddle);
+                    // 2u tall + on Col 4 (spanning Row 2 and Row 3, centered at 0.5u - zero overlap with -)
+                    AddFannedKey(VKCode.ADD, "+", 0.5f, -7.9f, unitWidth: 1.0f, unitHeight: 2.0f, finger: KeyboardFinger.LeftIndex);
+
+                    // Row 1 (Shift level: -1.0u)
+                    AddFannedKey(VKCode.NUMPAD1, "1", -1.0f, -10.9f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.NUMPAD2, "2", -1.0f, -9.9f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.NUMPAD3, "3", -1.0f, -8.9f, finger: KeyboardFinger.LeftMiddle);
+
+                    // Row 0 (Bottom level: -2.0u)
+                    AddFannedKey(VKCode.NUMPAD0, "0", -2.0f, -10.4f, unitWidth: 2.0f, unitHeight: 1.0f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.DECIMAL, ".", -2.0f, -8.9f, finger: KeyboardFinger.LeftMiddle);
+                    // 2u tall Enter on Col 4 (spanning Row 0 and Row 1, centered at -1.5u - zero overlap with +)
+                    AddFannedKey(VKCode.NUMPAD_RETURN, "Ent", -1.5f, -7.9f, unitWidth: 1.0f, unitHeight: 2.0f, finger: KeyboardFinger.LeftThumb);
+
+                    // ===== 2. ALPHANUMERIC CLUSTER & FUNCTION ROW =====
+                    // --- Row 5 (Function Row: 3.25u, Exploded Gap) ---
+                    AddFannedKey(VKCode.ESCAPE, "Esc", 3.25f, -6.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.F1, "F1", 3.25f, -5.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.F2, "F2", 3.25f, -4.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.F3, "F3", 3.25f, -3.5f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.F4, "F4", 3.25f, -2.5f, finger: KeyboardFinger.LeftMiddle);
+                    AddFannedKey(VKCode.F5, "F5", 3.25f, -1.5f, finger: KeyboardFinger.LeftIndex);
+                    AddFannedKey(VKCode.F6, "F6", 3.25f, -0.5f, finger: KeyboardFinger.LeftIndex);
+                    // Forward Dividing Line at 0.0u separates F6 and F7
+                    AddFannedKey(VKCode.F7, "F7", 3.25f, 0.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.F8, "F8", 3.25f, 1.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.F9, "F9", 3.25f, 2.5f, finger: KeyboardFinger.RightMiddle);
+                    AddFannedKey(VKCode.F10, "F10", 3.25f, 3.5f, finger: KeyboardFinger.RightRing);
+                    AddFannedKey(VKCode.F11, "F11", 3.25f, 4.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.F12, "F12", 3.25f, 5.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.INSERT, "Ins", 3.25f, 6.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.DELETE, "Del", 3.25f, 7.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.VOLUME_MUTE, "Mute", 3.25f, 9.1f, 1.0f, 1.0f, isCircle: true, finger: KeyboardFinger.RightIndex);
+
+                    // --- Row 4 (Number Row: 2.0u) ---
+                    AddFannedKey(VKCode.OEM_3, "`", 2.0f, -6.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.KEY_1, "1", 2.0f, -5.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.KEY_2, "2", 2.0f, -4.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.KEY_3, "3", 2.0f, -3.5f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.KEY_4, "4", 2.0f, -2.5f, finger: KeyboardFinger.LeftMiddle);
+                    AddFannedKey(VKCode.KEY_5, "5", 2.0f, -1.5f, finger: KeyboardFinger.LeftIndex);
+                    AddFannedKey(VKCode.KEY_6, "6", 2.0f, -0.5f, finger: KeyboardFinger.LeftIndex);
+                    // Forward Dividing Line at 0.0u separates 6 and 7
+                    AddFannedKey(VKCode.KEY_7, "7", 2.0f, 0.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.KEY_8, "8", 2.0f, 1.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.KEY_9, "9", 2.0f, 2.5f, finger: KeyboardFinger.RightMiddle);
+                    AddFannedKey(VKCode.KEY_0, "0", 2.0f, 3.5f, finger: KeyboardFinger.RightRing);
+                    AddFannedKey(VKCode.OEM_MINUS, "-", 2.0f, 4.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.OEM_PLUS, "=", 2.0f, 5.5f, finger: KeyboardFinger.RightPinky);
+                    // Backspace: 0.075m wide (~2.1944u)
+                    AddFannedKey(VKCode.BACK, "Backspace", 2.0f, 7.0f, unitWidth: backspaceUnitWidth, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.PRIOR, "PgUp", 2.0f, 9.1f, finger: KeyboardFinger.RightPinky);
+
+                    // --- Row 3 (QWERTY / Tab Row: 1.0u) ---
+                    // Tab: 0.071m wide (~2.0833u)
+                    AddFannedKey(VKCode.TAB, "Tab", 1.0f, -6.0f, unitWidth: tabUnitWidth, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.Q, "Q", 1.0f, -4.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.W, "W", 1.0f, -3.5f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.E, "E", 1.0f, -2.5f, finger: KeyboardFinger.LeftMiddle);
+                    AddFannedKey(VKCode.R, "R", 1.0f, -1.5f, finger: KeyboardFinger.LeftIndex);
+                    AddFannedKey(VKCode.T, "T", 1.0f, -0.5f, finger: KeyboardFinger.LeftIndex);
+                    // Forward Dividing Line at 0.0u separates T and Y
+                    AddFannedKey(VKCode.Y, "Y", 1.0f, 0.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.U, "U", 1.0f, 1.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.I, "I", 1.0f, 2.5f, finger: KeyboardFinger.RightMiddle);
+                    AddFannedKey(VKCode.O, "O", 1.0f, 3.5f, finger: KeyboardFinger.RightRing);
+                    AddFannedKey(VKCode.P, "P", 1.0f, 4.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.OEM_4, "[", 1.0f, 5.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.OEM_6, "]", 1.0f, 6.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.OEM_5, "\\", 1.0f, 7.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.NEXT, "PgDn", 1.0f, 9.1f, finger: KeyboardFinger.RightPinky);
+
+                    // --- Row 2 (Home Row: 0.0u Baseline) ---
+                    // Caps: 0.069m wide (~2.0278u)
+                    AddFannedKey(VKCode.CAPITAL, "Caps", 0.0f, -6.0f, unitWidth: capsUnitWidth, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.A, "A", 0.0f, -4.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.S, "S", 0.0f, -3.5f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.D, "D", 0.0f, -2.5f, finger: KeyboardFinger.LeftMiddle);
+                    AddFannedKey(VKCode.F, "F", 0.0f, -1.5f, finger: KeyboardFinger.LeftIndex); // Left Hand Alignment Reference
+                    AddFannedKey(VKCode.G, "G", 0.0f, -0.5f, finger: KeyboardFinger.LeftIndex);
+                    // Forward Dividing Line at 0.0u separates G and H (KeyboardRoot origin)
+                    AddFannedKey(VKCode.H, "H", 0.0f, 0.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.J, "J", 0.0f, 1.5f, finger: KeyboardFinger.RightIndex); // Right Hand Alignment Reference
+                    AddFannedKey(VKCode.K, "K", 0.0f, 2.5f, finger: KeyboardFinger.RightMiddle);
+                    AddFannedKey(VKCode.L, "L", 0.0f, 3.5f, finger: KeyboardFinger.RightRing);
+                    AddFannedKey(VKCode.OEM_1, ";", 0.0f, 4.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.OEM_7, "'", 0.0f, 5.5f, finger: KeyboardFinger.RightPinky);
+                    // Enter: 0.071m wide (~2.0833u)
+                    AddFannedKey(VKCode.RETURN, "Enter", 0.0f, 7.0f, unitWidth: enterUnitWidth, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.HOME, "Home", 0.0f, 9.1f, finger: KeyboardFinger.RightPinky);
+
+                    // --- Row 1 (Shift Row: -1.0u) ---
+                    // LShift: 2.0u wide, flush left at -7.0u, meets Z at -5.0u
+                    AddFannedKey(VKCode.LSHIFT, "Shift", -1.0f, -6.0f, unitWidth: 2.0f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.Z, "Z", -1.0f, -4.5f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.X, "X", -1.0f, -3.5f, finger: KeyboardFinger.LeftRing);
+                    AddFannedKey(VKCode.C, "C", -1.0f, -2.5f, finger: KeyboardFinger.LeftMiddle);
+                    AddFannedKey(VKCode.V, "V", -1.0f, -1.5f, finger: KeyboardFinger.LeftIndex);
+                    AddFannedKey(VKCode.B, "B", -1.0f, -0.5f, finger: KeyboardFinger.LeftIndex);
+                    // Forward Dividing Line at 0.0u separates B and N
+                    AddFannedKey(VKCode.N, "N", -1.0f, 0.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.M, "M", -1.0f, 1.5f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.OEM_COMMA, ",", -1.0f, 2.5f, finger: KeyboardFinger.RightMiddle);
+                    AddFannedKey(VKCode.OEM_PERIOD, ".", -1.0f, 3.5f, finger: KeyboardFinger.RightRing);
+                    AddFannedKey(VKCode.OEM_2, "/", -1.0f, 4.5f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.RSHIFT, "Shift", -1.0f, 6.0f, unitWidth: 2.0f, finger: KeyboardFinger.RightPinky);
+                    AddFannedKey(VKCode.UP, "↑", -1.0f, 8.05f, finger: KeyboardFinger.RightMiddle);
+
+                    // --- Row 0 (Bottom / Modifiers Row: -2.0u & Lowered Spacebar) ---
+                    // Option B: 1.25u Modifiers with harmonious uniform 0.17u (3.2mm) gaps
+                    AddFannedKey(VKCode.LCONTROL, "Ctrl", -2.0f, -6.375f, unitWidth: 1.25f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.LWIN, "Win", -2.0f, -4.958f, unitWidth: 1.25f, finger: KeyboardFinger.LeftPinky);
+                    AddFannedKey(VKCode.LMENU, "Alt", -2.0f, -3.542f, unitWidth: 1.25f, finger: KeyboardFinger.LeftThumb);
+                    // 5.5u Centered Spacebar (Left Thumb Actuated)
+                    AddFannedKey(VKCode.SPACE, "Space", -2.18f, 0.0f, unitWidth: 5.5f, finger: KeyboardFinger.LeftThumb);
+                    AddFannedKey(VKCode.RMENU, "Alt", -2.0f, 3.542f, unitWidth: 1.25f, finger: KeyboardFinger.RightThumb);
+                    AddFannedKey(VKCode.RCONTROL, "Ctrl", -2.0f, 4.958f, unitWidth: 1.25f, finger: KeyboardFinger.RightPinky);
+                    // Balanced Inverted-T Arrow Cluster (standard 1.0u keys)
+                    AddFannedKey(VKCode.LEFT, "←", -2.0f, 7.0f, finger: KeyboardFinger.RightIndex);
+                    AddFannedKey(VKCode.DOWN, "↓", -2.0f, 8.05f, finger: KeyboardFinger.RightMiddle);
+                    AddFannedKey(VKCode.RIGHT, "→", -2.0f, 9.1f, finger: KeyboardFinger.RightRing);
+                    break;
+                }
+            }
+
+            // Set default hand alignment reference keys (F for Left, J for Right, or W/K fallback)
+            var defaultLeftRef = list.FirstOrDefault(k => k.AssignedFinger.IsLeftHand() && k.Key == VKCode.F)
+                              ?? list.FirstOrDefault(k => k.AssignedFinger.IsLeftHand() && k.Key == VKCode.W)
+                              ?? list.FirstOrDefault(k => k.AssignedFinger.IsLeftHand() && k.Key == VKCode.D);
+            if (defaultLeftRef != null) {
+                defaultLeftRef.IsHandAlignmentReference = true;
+            }
+
+            var defaultRightRef = list.FirstOrDefault(k => !k.AssignedFinger.IsLeftHand() && k.Key == VKCode.J)
+                               ?? list.FirstOrDefault(k => !k.AssignedFinger.IsLeftHand() && k.Key == VKCode.K);
+            if (defaultRightRef != null) {
+                defaultRightRef.IsHandAlignmentReference = true;
+            }
+
+            DestroyAllVirtualKeyVisuals();
+            VirtualKeys = list.ToArray();
+            VirtualKeysCollection?.BroadcastDataInput(nameof(VirtualKeysCollection.Keys));
+            BroadcastDataInput(nameof(VirtualKeysCollection));
+            BindingGenerator?.UpdateStatus();
+            UpdateInputEnableDescriptions();
+
+            if (IsKeysVisualActive) {
+                UpdateFloatingKeysState();
+            }
+
+            if (showToast) {
+                Context.Service?.Toast(
+                    Warudo.Core.Server.ToastSeverity.Success,
+                    Name,
+                    $"Applied virtual keys layout preset: {preset}"
+                );
+            }
+        }
+    }
+}

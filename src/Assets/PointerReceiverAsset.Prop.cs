@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
@@ -30,9 +31,12 @@ namespace FlameStream
         Vector3 propRotationOffset;
         Vector3 propScale;
         PropAsset prop;
+        public PropAsset Prop => prop;
         AnchorAsset propSetupRootAnchor;
 
         void OnCreateProp() {
+            Watch(nameof(IsEnabled), delegate { OnInputAffectingPropChange(); });
+            Watch(nameof(IsHandEnabled), delegate { OnInputAffectingPropChange(); });
             Watch(nameof(IsPropEnabled), delegate { OnPropEnabledChanged(); });
 
             Watch(nameof(IsPropEnabled), delegate { OnInputAffectingPropChange(); });
@@ -59,7 +63,8 @@ namespace FlameStream
         }
 
         void OnUpdateProp() {
-            if (!IsPropEnabled) return;
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            if (((!isPuppeteered && (!IsEnabled || !IsHandEnabled)) || !IsPropEnabled)) return;
             if (prop == null) return;
 
             if (inSetupMode) {
@@ -85,8 +90,6 @@ namespace FlameStream
             GetDataInputPort(nameof(PropMouseMode)).Properties.hidden = !(IsPropEnabled && isBasicSetupComplete);
             GetDataInputPort(nameof(PropPenMode)).Properties.hidden = !(IsPropEnabled && isBasicSetupComplete);
 
-            prop?.SetDataInput(nameof(prop.Enabled), IsPropEnabled && IsHandEnabled, true);
-
             BroadcastDataInputProperties(nameof(PropSource));
             BroadcastDataInputProperties(nameof(PropMouseMode));
             BroadcastDataInputProperties(nameof(PropPenMode));
@@ -96,16 +99,27 @@ namespace FlameStream
             OnPropStateChange();
         }
 
+        public void DestroyProp() {
+            tweenPropPosition?.Kill();
+            tweenPropRotation?.Kill();
+            tweenPropScale?.Kill();
+            tweenPropProgress?.Kill();
+            var p = prop ?? (PenPropAssetId != Guid.Empty ? Scene?.GetAssets<PropAsset>().FirstOrDefault(a => a.Id == PenPropAssetId) : null);
+            if (p != null) {
+                CleanDestroy(p);
+            }
+            PenPropAssetId = Guid.Empty;
+            prop = null;
+        }
+
         void OnInputAffectingPropChange() {
             if (!isReady) return;
-            if (!IsPropEnabled) return;
-            if (PropSource == null) {
-                var p = GetProp(true);
-                CleanDestroy(p);
-                PenPropAssetId = Guid.Empty;
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            bool shouldPropBeActive = (isPuppeteered || (IsEnabled && IsHandEnabled)) && IsPropEnabled && !string.IsNullOrEmpty(PropSource) && Character != null;
+            if (!shouldPropBeActive) {
+                DestroyProp();
                 return;
-            };
-            if (Character == null) return;
+            }
 
             prop = GetProp();
             prop.SetDataInput(nameof(Source), PropSource, true);
@@ -114,6 +128,7 @@ namespace FlameStream
             prop.Attachable.AttachToBone = IsRightHanded
                 ? HumanBodyBones.RightHand
                 : HumanBodyBones.LeftHand;
+            prop.SetDataInput(nameof(prop.Enabled), true, true);
             prop.Broadcast();
         }
 
@@ -143,6 +158,8 @@ namespace FlameStream
                 tr.Rotate(st.Transform.Rotation);
                 r += st.Transform.Rotation;
                 s = Vector3.Scale(s, st.Transform.Scale);
+            } else {
+                s = Vector3.zero;
             }
 
             var time = inSetupMode ? 0 : st?.EnterTransition.Time ?? PropMouseMode.EnterTransition.Time;
@@ -191,16 +208,31 @@ namespace FlameStream
         }
 
         GameObjectState GetPropState(int source, bool button1) {
-
             if (!IsPropEnabled) return null;
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            if (isPuppeteered && !activeCoordinator.IsPointerDeviceActive(this)) return null;
 
-            var st = PropPenMode.Enabled && source == 2
-                    ? (BaseState)PropPenMode
-                    : PropMouseMode;
+            bool forcePen = isPuppeteered && activeCoordinator.IsPointerInPenState(this);
+            bool forceMouse = isPuppeteered && activeCoordinator.IsPointerInMouseState(this);
 
-            if (!st.Enabled) return null;
+            BaseState st = null;
+            if (forcePen || (!forceMouse && source == 2)) {
+                if (PropPenMode != null && PropPenMode.Enabled) {
+                    st = PropPenMode;
+                } else if (PropMouseMode != null && PropMouseMode.Enabled) {
+                    st = PropMouseMode;
+                }
+            } else {
+                if (PropMouseMode != null && PropMouseMode.Enabled) {
+                    st = PropMouseMode;
+                } else if (PropPenMode != null && PropPenMode.Enabled) {
+                    st = PropPenMode;
+                }
+            }
 
-            var o = st.ActiveState.Enabled && button1
+            if (st == null || !st.Enabled) return null;
+
+            var o = st.ActiveState != null && st.ActiveState.Enabled && button1
                 ? (GameObjectState)st.ActiveState
                 : st;
 
@@ -238,21 +270,25 @@ namespace FlameStream
             tweenPropRotation?.Kill();
             tweenPropScale?.Kill();
 
-            if (isApply) {
-                NeutralHandPosition.setupAnchor?.ApplyTrigger();
-                setupModeHandState?.Transform.setupAnchor?.ApplyTrigger();
-                setupModeBodyState?.Transform.setupAnchor?.ApplyTrigger();
-            } else {
-                NeutralHandPosition.setupAnchor?.CancelTrigger();
-                setupModeHandState?.Transform.setupAnchor?.CancelTrigger();
-                setupModeBodyState?.Transform.setupAnchor?.CancelTrigger();
+            if (!isExitingVisualSetup) {
+                isExitingVisualSetup = true;
+                try {
+                    TriggerVisualSetupAnchor(NeutralHandPosition, isApply);
+                    TriggerVisualSetupAnchor(setupModeHandState?.Transform, isApply);
+                    TriggerVisualSetupAnchor(setupModeBodyState?.Transform, isApply);
+                } finally {
+                    isExitingVisualSetup = false;
+                }
             }
             lastPropState = null;
+            Context.Service.NavigateToAsset(Id);
+            Context.Service.BroadcastOpenedScene();
+            RequestUiRefresh();
         }
 
         void HandlePropCreateAnchor(GameObjectState p, VisualSetupTransform tr, VisualSetupAnchorAsset a) {
             CleanDestroy(propSetupRootAnchor);
-            propSetupRootAnchor = Scene.AddAsset<AnchorAsset>();
+            propSetupRootAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INTERNAL".Localized());
             propSetupRootAnchor.Attachable.Parent = handAnchor;
             var title = "SETUP_ANCHOR_NAME_PROP_ROOT".Localized();
             propSetupRootAnchor.Name = $"🔒⌛⚓-{title}";
@@ -268,7 +304,7 @@ namespace FlameStream
         }
 
         PropAsset GetProp(bool skipAutoCreate = false) {
-            return GetAsset<PropAsset>(ref PenPropAssetId, skipAutoCreate, newAssetName: $"📦-{LAYER_NAME_PREFIX} Hand Prop");
+            return GetAsset<PropAsset>(ref PenPropAssetId, skipAutoCreate, newAssetName: $"📦-{LayerPrefix} Hand Prop", category: "FS_ASSET_CATEGORY_INPUT".Localized());
         }
 
         async UniTask<AutoCompleteList> GetPropSources() {

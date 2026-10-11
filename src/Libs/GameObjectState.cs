@@ -1,6 +1,4 @@
 using System;
-using System.Diagnostics;
-using System.Linq.Expressions;
 using DG.Tweening;
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
@@ -169,6 +167,7 @@ namespace FlameStream {
 
         protected override void OnReady() {
             base.OnReady();
+            Transform.ShowAnimation = true;
             Transform.OnAnimationChange = (animation) => {
                 Animation = animation;
                 OnAnimationChange.Invoke(this);

@@ -1,58 +1,88 @@
 using Warudo.Core.Attributes;
 using Warudo.Core.Data;
 using UnityEngine;
+using Warudo.Core.Localization;
+using Warudo.Core.Serializations;
+using Cysharp.Threading.Tasks;
 
 namespace FlameStream
 {
-    public class CursorMode : StructuredData {
-        [DataInput]
+    public enum CursorModeValue {
+        [Label("CURSOR_MODE_RAW_TRACKING")]
+        RawTracking = 0,
+        [Label("CURSOR_MODE_FIXED_DELTA")]
+        FixedDelta = 1,
+    }
+
+    public enum OutOfBoundRawTrackingHandlingValue {
+        [Label("CURSOR_MODE_RAW_OOB_OVERFLOW")]
+        Overflow = 0,
+        [Label("CURSOR_MODE_RAW_OOB_CLAMP")]
+        Clamp = 1,
+        [Label("CURSOR_MODE_RAW_OOB_FREEZE")]
+        Freeze = 2,
+        [Label("CURSOR_MODE_RAW_OOB_DISABLE_HAND")]
+        DisableHand = 3,
+    }
+
+    public enum OutOfBoundFixedDeltaHandlingValue {
+        [Label("CURSOR_MODE_FIXED_OOB_CLAMP")]
+        Clamped = 0,
+        [Label("CURSOR_MODE_FIXED_OOB_BACK_TO_CENTER")]
+        BackToCenter = 1,
+    }
+
+    public class CursorMode : StructuredData, ICollapsibleStructuredData {
+        private long uiVersion = 0;
+        public override long GetVersion() => base.GetVersion() + uiVersion;
+
+        public override SerializedStructuredData Serialize() {
+            var serialized = base.Serialize();
+            serialized.version = GetVersion();
+            return serialized;
+        }
+
+        public async void RequestUiRefresh() {
+            await UniTask.Yield();
+            uiVersion++;
+            Broadcast();
+        }
+
+        public string GetHeader() => "CURSOR_SETUP".Localized();
+
+        [DataInput(10)]
         [Label("MODE")]
         public CursorModeValue Mode;
-        public enum CursorModeValue {
-            [Label("CURSOR_MODE_RAW_TRACKING")]
-            RawTracking = 0,
-            [Label("CURSOR_MODE_FIXED_DELTA")]
-            FixedDelta = 1,
-        }
 
-        [DataInput]
+        [DataInput(20)]
         [Label("OOB_HANDLING")]
         public OutOfBoundRawTrackingHandlingValue OutOfBoundRawTrackingHandling;
-        public enum OutOfBoundRawTrackingHandlingValue {
-            [Label("CURSOR_MODE_RAW_OOB_OVERFLOW")]
-            Overflow = 0,
-            [Label("CURSOR_MODE_RAW_OOB_CLAMP")]
-            Clamp = 1,
-            [Label("CURSOR_MODE_RAW_OOB_FREEZE")]
-            Freeze = 2,
-            [Label("CURSOR_MODE_RAW_OOB_DISABLE_HAND")]
-            DisableHand = 3,
-        }
 
-        [DataInput]
+        [DataInput(30)]
         [Label("OOB_HANDLING")]
         public OutOfBoundFixedDeltaHandlingValue OutOfBoundFixedDeltaHandling;
-        public enum OutOfBoundFixedDeltaHandlingValue {
-            [Label("CURSOR_MODE_FIXED_OOB_CLAMP")]
-            Clamped = 0,
-            [Label("CURSOR_MODE_FIXED_OOB_BACK_TO_CENTER")]
-            BackToCenter = 1,
-        }
 
-        [DataInput]
+        [DataInput(40)]
         [Label("DISPLACEMENT_INFLUENCE_FACTOR")]
         [FloatSlider(0.1f, 3.0f, 0.1f)]
         public float DisplacementFactor = 1.0f;
 
-        [DataInput]
+        [DataInput(50)]
         [Label("CURSOR_MODE_BOUND_OFFSETS")]
         [Description("CURSOR_MODE_BOUND_OFFSETS_DESC")]
         public Vector4 BoundOffsets = Vector4.zero;
+
+        [DataInput(60)]
+        [Label("CURSOR_SMOOTHNESS")]
+        [Description("CURSOR_SMOOTHNESS_DESC")]
+        [FloatSlider(0f, 0.1f, 0.01f)]
+        public float CursorSmoothness = 0.05f;
 
         bool isReady;
 
         protected override void OnCreate() {
             base.OnCreate();
+            CollapsedSelf = false;
             Watch(nameof(Mode), delegate { UpdateDataInputProperties(); });
             Watch(nameof(OutOfBoundRawTrackingHandling), delegate { UpdateOutOfBoundRawTrackingHandlingDescription(); });
             Watch(nameof(OutOfBoundFixedDeltaHandling), delegate { UpdateOutOfBoundFixedDeltaHandlingDescription(); });
@@ -88,6 +118,7 @@ namespace FlameStream
             BroadcastDataInputProperties(nameof(OutOfBoundRawTrackingHandling));
             BroadcastDataInputProperties(nameof(OutOfBoundFixedDeltaHandling));
             BroadcastDataInputProperties(nameof(DisplacementFactor));
+            RequestUiRefresh();
         }
 
         protected void UpdateOutOfBoundRawTrackingHandlingDescription() {

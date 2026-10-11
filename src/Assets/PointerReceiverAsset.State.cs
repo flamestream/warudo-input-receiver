@@ -10,6 +10,10 @@ namespace FlameStream {
         public bool LastButton1;
         public bool LastButton2;
 
+        public void InjectRawState(string packet) {
+            lastState = packet;
+        }
+
         void OnUpdateState() {
             if (lastState == null) return;
 

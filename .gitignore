@@ -4,13 +4,8 @@
 #
 /[Ll]ibrary/
 /[Tt]emp/
-/[Oo]bj/
-/[Bb]uild/
-/[Bb]uilds/
-/[Ll]ogs/
-/[Uu]ser[Ss]ettings/
-
-/src/[Oo]bj/
+**/[Oo]bj/
+**/[Bb]in/
 
 # MemoryCaptures can get excessive in size.
 # They also could contain extremely sensitive data
@@ -76,3 +71,4 @@ crashlytics-build.properties
 
 wiki/
 personal-tools/
+*.zip

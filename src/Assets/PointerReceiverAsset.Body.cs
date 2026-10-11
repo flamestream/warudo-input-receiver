@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using DG.Tweening;
 using UnityEngine;
+using Warudo.Core;
 using Warudo.Core.Data;
 using Warudo.Core.Localization;
 using Warudo.Plugins.Core.Assets.Utility;
@@ -37,9 +38,35 @@ namespace FlameStream
 
             Watch(nameof(BodyMouseMode), delegate { OnBodyStateSettingChange(); });
             Watch(nameof(BodyPenMode), delegate { OnBodyStateSettingChange(); });
+            Watch(nameof(BodyDynamicRotation), delegate { SetupBodyDynamicRotation(); });
+            SetupBodyDynamicRotation();
+        }
+
+        void SetupBodyDynamicRotation() {
+            if (BodyDynamicRotation == null) return;
+            BodyDynamicRotation.LocalizationKey = "DYNAMIC_ROTATION_PIVOT";
+            BodyDynamicRotation.GetParentAnchor = () => screenAsset ?? GetSurfaceScreen();
+            BodyDynamicRotation.GetRestPosition = () => NeutralHandPosition != null ? NeutralHandPosition.Position : Vector3.zero;
+            BodyDynamicRotation.GetIsRightHanded = () => IsRightHanded;
+            BodyDynamicRotation.GetDefaultPivotPosition = () => {
+                bool isRight = IsRightHanded;
+                var anim = Character != null ? (Character.Animator ?? Character.CloneAnimator) : null;
+                var elbowBone = anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightLowerArm : HumanBodyBones.LeftLowerArm) : null;
+                Vector3 elbowWorld = elbowBone != null ? elbowBone.position : GetNaturalRestingElbowWorldPosition();
+                var s = screenAsset ?? GetSurfaceScreen();
+                if (s != null) {
+                    Quaternion screenRot = s.GameObject != null ? s.GameObject.transform.rotation : Quaternion.Euler(s.Transform.Rotation);
+                    Vector3 screenPos = s.GameObject != null ? s.GameObject.transform.position : s.Transform.Position;
+                    return Quaternion.Inverse(screenRot) * (elbowWorld - screenPos);
+                }
+                return (NeutralHandPosition != null ? NeutralHandPosition.Position : Vector3.zero) + new Vector3(isRight ? -0.1f : 0.1f, -0.3f, 0f);
+            };
+            BodyDynamicRotation.OnEnterVisualSetup = (dr) => { HandleBodyDynamicRotationEnterVisualSetup(); };
+            BodyDynamicRotation.OnExitVisualSetup = (isApplied) => { HandleBodyDynamicRotationExitVisualSetup(isApplied); };
         }
 
         void OnReadyBody() {
+            SetupBodyDynamicRotation();
 
             BodyMouseMode.OnAnimationChange = (p) => { HandleBodyAnimationChange((PoseState)p); };
             BodyMouseMode.OnAnimationWeightChange = (p, w, r) => { HandleBodyAnimationWeightChange((PoseState)p, w, r); };
@@ -55,7 +82,8 @@ namespace FlameStream
         }
 
         void OnUpdateBody() {
-            if (!IsBodyEnabled) return;
+            bool isPuppeteered = activeCoordinator != null && activeCoordinator.IsEnabled && activeCoordinator.EnableHands;
+            if (((!isPuppeteered && (!IsEnabled || !IsHandEnabled)) || !IsBodyEnabled)) return;
             if (Character == null) return;
             if (cursorAnchorAsset == null) return;
 
@@ -73,7 +101,12 @@ namespace FlameStream
                     // Dynamic extra offset
                     bodyDistanceFactor = screenAsset.GameObject.transform.InverseTransformPoint(targetBodyPosition) - screenAsset.GameObject.transform.InverseTransformPoint(Character.Transform.Position);
                     bodyDistanceFactor.x *= -1;
-                    bodyRotation += BodyDynamicRotation.Evaluate(bodyDistanceFactor);
+                    Vector3 evalBodyDelta = IsRightHanded ? bodyDistanceFactor : new Vector3(-bodyDistanceFactor.x, bodyDistanceFactor.y, bodyDistanceFactor.z);
+                    Vector3 bodyDynamicRot = BodyDynamicRotation.Evaluate(evalBodyDelta);
+                    if (!IsRightHanded) {
+                        bodyDynamicRot = new Vector3(bodyDynamicRot.x, -bodyDynamicRot.y, -bodyDynamicRot.z);
+                    }
+                    bodyRotation += bodyDynamicRot;
 
                     // Body movement style
                     var distanceFactor = bodyDistanceFactor.magnitude;
@@ -315,19 +348,34 @@ namespace FlameStream
             tweenHandPosition?.Kill();
             tweenHandRotation?.Kill();
 
-            if (isApply) {
-                NeutralHandPosition.setupAnchor?.ApplyTrigger();
-                setupModeHandState?.Transform.setupAnchor?.ApplyTrigger();
-                setupModePropState?.Transform.setupAnchor?.ApplyTrigger();
-            } else {
-                NeutralHandPosition.setupAnchor?.CancelTrigger();
-                setupModeHandState?.Transform.setupAnchor?.CancelTrigger();
-                setupModePropState?.Transform.setupAnchor?.CancelTrigger();
+            if (!isExitingVisualSetup) {
+                isExitingVisualSetup = true;
+                try {
+                    TriggerVisualSetupAnchor(NeutralHandPosition, isApply);
+                    TriggerVisualSetupAnchor(setupModeHandState?.Transform, isApply);
+                    TriggerVisualSetupAnchor(setupModePropState?.Transform, isApply);
+                } finally {
+                    isExitingVisualSetup = false;
+                }
             }
             lastBodyState = null;
+            Context.Service.NavigateToAsset(Id);
+            Context.Service.BroadcastOpenedScene();
+            RequestUiRefresh();
         }
+
+        void HandleBodyDynamicRotationEnterVisualSetup() {
+            if (inSetupMode) return;
+            EnterSetupModeMinimal();
+        }
+
+        void HandleBodyDynamicRotationExitVisualSetup(bool isApply) {
+            if (!inSetupMode) return;
+            ExitSetupModeMinimal();
+        }
+
         void HandleBodyCreateAnchor(PoseState p, VisualSetupTransform tr, VisualSetupAnchorAsset a) {
-            bodySetupRootAnchor = Scene.AddAsset<AnchorAsset>();
+            bodySetupRootAnchor = Scene.AddAssetToGroup<AnchorAsset>("FS_ASSET_CATEGORY_INTERNAL".Localized());
             var title = "SETUP_ANCHOR_NAME_BODY_ROOT".Localized();
             bodySetupRootAnchor.Name = $"🔒⌛⚓-{title}";
             Scene.UpdateNewAssetName(bodySetupRootAnchor);
@@ -336,10 +384,11 @@ namespace FlameStream
             a.Animation = p.Animation;
         }
         void HandleBodyAnimationChange(PoseState p) {
-            var userLayers = Character.OverlappingAnimations.Where(d => !d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
-            var pointerLayers = Character.OverlappingAnimations.Where(d => d.CustomLayerID.StartsWith(LAYER_NAME_PREFIX)).ToList() ?? new List<OverlappingAnimationData>();
+            if (Character == null || Character.OverlappingAnimations == null) return;
+            var userLayers = Character.OverlappingAnimations.Where(d => !d.CustomLayerID.StartsWith(LayerPrefix)).ToList() ?? new List<OverlappingAnimationData>();
+            var pointerLayers = Character.OverlappingAnimations.Where(d => d.CustomLayerID.StartsWith(LayerPrefix)).ToList() ?? new List<OverlappingAnimationData>();
 
-            var layerId = p.GetAnimationLayerId(LAYER_NAME_PREFIX);
+            var layerId = p.GetAnimationLayerId(LayerPrefix);
             var layer = pointerLayers.FirstOrDefault(d => d.CustomLayerID == layerId);
             if (layer == null) {
                 layer = StructuredData.Create<OverlappingAnimationData>();
@@ -366,9 +415,9 @@ namespace FlameStream
         }
 
         void HandleBodyAnimationWeightChange(PoseState p, float weight, bool resetAnimation = false) {
-            if (Character == null) return;
+            if (Character == null || Character.OverlappingAnimations == null) return;
 
-            var layerId = p.GetAnimationLayerId(LAYER_NAME_PREFIX);
+            var layerId = p.GetAnimationLayerId(LayerPrefix);
             if (layerId == null) return;
 
             var animationData = Array.Find(

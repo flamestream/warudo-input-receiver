@@ -75,11 +75,18 @@ namespace FlameStream {
             return result;
         }
 
+        static readonly HashSet<string> BuiltInFunctionsAndConstants = new HashSet<string> {
+            "pi", "deg", "rad", "sin", "cos", "tan", "asin", "acos", "atan", "atan2",
+            "noise", "sqrt", "abs", "min", "max", "pow", "exp", "log", "ln", "log10",
+            "ceil", "floor", "round", "sign", "clamp", "clamp01", "lerp", "ulerp",
+            "alerp", "smoothstep", "repeat", "pingpong", "ilerp", "rand", "randint"
+        };
+
         static IEnumerable<string> ExtractVariableNames(string formula) {
             MatchCollection matchCollection = Regex.Matches(formula, "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b");
             foreach (Match item in matchCollection) {
                 string value = item.Value;
-                if (!ExpressionParser.Functions.ContainsKey(value) && !ExpressionParser.Constants.ContainsKey(value)) {
+                if (!BuiltInFunctionsAndConstants.Contains(value)) {
                     yield return value;
                 }
             }

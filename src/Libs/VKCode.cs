@@ -12,7 +12,9 @@ namespace FlameStream {
         CLEAR = 12,
         [Label("Enter (13)")]
         RETURN = 13,
-        // Adding a gap for future use (14, 15)
+        [Label("Numpad Enter (14)")]
+        NUMPAD_RETURN = 14,
+        // Adding a gap for future use (15)
         [Label("Shift (16) (Unused; use LSHIFT or RSHIFT)")]
         SHIFT = 16,
         [Label("Control (17) (Unused; use LCONTROL or RCONTROL)")]
@@ -73,6 +75,26 @@ namespace FlameStream {
         DELETE = 46,
         [Label("Help (47)")]
         HELP = 47,
+        [Label("0 Key (48)")]
+        KEY_0 = 48,
+        [Label("1 Key (49)")]
+        KEY_1 = 49,
+        [Label("2 Key (50)")]
+        KEY_2 = 50,
+        [Label("3 Key (51)")]
+        KEY_3 = 51,
+        [Label("4 Key (52)")]
+        KEY_4 = 52,
+        [Label("5 Key (53)")]
+        KEY_5 = 53,
+        [Label("6 Key (54)")]
+        KEY_6 = 54,
+        [Label("7 Key (55)")]
+        KEY_7 = 55,
+        [Label("8 Key (56)")]
+        KEY_8 = 56,
+        [Label("9 Key (57)")]
+        KEY_9 = 57,
         [Label("A Key (65)")]
         A = 65,
         [Label("B Key (66)")]
